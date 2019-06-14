@@ -30,5 +30,34 @@ DRIVER_INITIALIZE DriverEntry;
 NTSTATUS DriverEntry(
     PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 {
-    return STATUS_SUCCESS;
+    FuseProcessFunction[FspFsctlTransactReservedKind] = FuseOpReserved;
+    FuseProcessFunction[FspFsctlTransactCreateKind] = FuseOpCreate;
+    //FuseProcessFunction[FspFsctlTransactOverwriteKind] = FuseOpOverwrite;
+    //FuseProcessFunction[FspFsctlTransactCleanupKind] = FuseOpCleanup;
+    //FuseProcessFunction[FspFsctlTransactCloseKind] = FuseOpClose;
+    //FuseProcessFunction[FspFsctlTransactReadKind] = FuseOpRead;
+    //FuseProcessFunction[FspFsctlTransactWriteKind] = FuseOpWrite;
+    //FuseProcessFunction[FspFsctlTransactQueryInformationKind] = FuseOpQueryInformation;
+    //FuseProcessFunction[FspFsctlTransactSetInformationKind] = FuseOpSetInformation;
+    //FuseProcessFunction[FspFsctlTransactQueryEaKind] = FuseOpQueryEa;
+    //FuseProcessFunction[FspFsctlTransactSetEaKind] = FuseOpSetEa;
+    //FuseProcessFunction[FspFsctlTransactFlushBuffersKind] = FuseOpFlushBuffers;
+    //FuseProcessFunction[FspFsctlTransactQueryVolumeInformationKind] = FuseOpQueryVolumeInformation;
+    //FuseProcessFunction[FspFsctlTransactSetVolumeInformationKind] = FuseOpSetVolumeInformation;
+    //FuseProcessFunction[FspFsctlTransactQueryDirectoryKind] = FuseOpQueryDirectory;
+    //FuseProcessFunction[FspFsctlTransactFileSystemControlKind] = FuseOpFileSystemControl;
+    //FuseProcessFunction[FspFsctlTransactDeviceControlKind] = FuseOpDeviceControl;
+    //FuseProcessFunction[FspFsctlTransactQuerySecurityKind] = FuseOpQuerySecurity;
+    //FuseProcessFunction[FspFsctlTransactSetSecurityKind] = FuseOpSetSecurity;
+    //FuseProcessFunction[FspFsctlTransactQueryStreamInformationKind] = FuseOpQueryStreamInformation;
+
+    static FSP_FSEXT_PROVIDER Provider;
+    Provider.Version = sizeof Provider;
+    Provider.DeviceTransactCode = FSP_FSCTL_TRANSACT_FUSE;
+    Provider.DeviceExtensionSize = sizeof(FUSE_DEVICE_EXTENSION);
+    Provider.DeviceInit = FuseDeviceInit;
+    Provider.DeviceFini = FuseDeviceFini;
+    Provider.DeviceExpirationRoutine = FuseDeviceExpirationRoutine;
+    Provider.DeviceTransact = FuseDeviceTransact;
+    return FspFsextRegisterProvider(&Provider);
 }

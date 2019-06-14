@@ -10,9 +10,33 @@
     <ClCompile Include="..\..\src\winfuse\driver.c">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\winfuse\ioq.c">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\winfuse\cache.c">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\winfuse\proto.c">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\winfuse\fuseop.c">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\winfuse\fuse.c">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\winfuse\util.c">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\winfuse\driver.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\winfuse\proto.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\winfuse\coro.h">
       <Filter>Source</Filter>
     </ClInclude>
   </ItemGroup>
