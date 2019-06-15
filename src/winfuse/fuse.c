@@ -33,7 +33,6 @@ NTSTATUS FuseDeviceTransact(PIRP Irp, PDEVICE_OBJECT DeviceObject);
 #pragma alloc_text(PAGE, FuseDeviceTransact)
 #pragma alloc_text(PAGE, FuseContextCreate)
 #pragma alloc_text(PAGE, FuseContextDelete)
-#pragma alloc_text(PAGE, FuseNtStatusFromErrno)
 #endif
 
 NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject)
@@ -297,18 +296,4 @@ VOID FuseContextDelete(FUSE_CONTEXT *Context)
     if ((PVOID)&Context->InternalResponseBuf != Context->InternalResponse)
         FuseFree(Context->InternalResponse);
     FuseFree(Context);
-}
-
-NTSTATUS FuseNtStatusFromErrno(INT32 Errno)
-{
-    PAGED_CODE();
-
-    switch (Errno)
-    {
-    #undef FUSE_ERRNO
-    #define FUSE_ERRNO 87
-    #include <winfuse/errno.i>
-    default:
-        return STATUS_ACCESS_DENIED;
-    }
 }

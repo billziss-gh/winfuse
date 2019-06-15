@@ -58,7 +58,7 @@ NTSTATUS DriverEntry(
     FuseProvider.DeviceFini = FuseDeviceFini;
     FuseProvider.DeviceExpirationRoutine = FuseDeviceExpirationRoutine;
     FuseProvider.DeviceTransact = FuseDeviceTransact;
-    return FspFsextRegisterProvider(&FuseProvider);
+    return FspFsextProviderRegister(&FuseProvider);
 }
 
 FSP_FSEXT_PROVIDER FuseProvider;
