@@ -51,13 +51,14 @@ NTSTATUS DriverEntry(
     //FuseProcessFunction[FspFsctlTransactSetSecurityKind] = FuseOpSetSecurity;
     //FuseProcessFunction[FspFsctlTransactQueryStreamInformationKind] = FuseOpQueryStreamInformation;
 
-    static FSP_FSEXT_PROVIDER Provider;
-    Provider.Version = sizeof Provider;
-    Provider.DeviceTransactCode = FSP_FSCTL_TRANSACT_FUSE;
-    Provider.DeviceExtensionSize = sizeof(FUSE_DEVICE_EXTENSION);
-    Provider.DeviceInit = FuseDeviceInit;
-    Provider.DeviceFini = FuseDeviceFini;
-    Provider.DeviceExpirationRoutine = FuseDeviceExpirationRoutine;
-    Provider.DeviceTransact = FuseDeviceTransact;
-    return FspFsextRegisterProvider(&Provider);
+    FuseProvider.Version = sizeof FuseProvider;
+    FuseProvider.DeviceTransactCode = FSP_FSCTL_TRANSACT_FUSE;
+    FuseProvider.DeviceExtensionSize = sizeof(FUSE_DEVICE_EXTENSION);
+    FuseProvider.DeviceInit = FuseDeviceInit;
+    FuseProvider.DeviceFini = FuseDeviceFini;
+    FuseProvider.DeviceExpirationRoutine = FuseDeviceExpirationRoutine;
+    FuseProvider.DeviceTransact = FuseDeviceTransact;
+    return FspFsextRegisterProvider(&FuseProvider);
 }
+
+FSP_FSEXT_PROVIDER FuseProvider;

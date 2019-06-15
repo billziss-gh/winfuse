@@ -23,32 +23,7 @@
 #define WINFUSE_DRIVER_H_INCLUDED
 
 #include <ntifs.h>
-#define WINFSP_SYS_INTERNAL
-#include <winfsp/fsctl.h>
-
-/* !!!: REVISIT: remove */
-#define FSP_FSCTL_TRANSACT_INTERNAL     \
-    CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x800 + 'I', METHOD_NEITHER, FILE_ANY_ACCESS)
-#define FSP_FSCTL_TRANSACT_FUSE         \
-    CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x800 + 'F', METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-typedef struct
-{
-    UINT32 Version;
-    UINT32 DeviceTransactCode;
-    UINT32 DeviceExtensionSize;
-    NTSTATUS (*DeviceInit)(PDEVICE_OBJECT DeviceObject);
-    VOID (*DeviceFini)(PDEVICE_OBJECT DeviceObject);
-    VOID (*DeviceExpirationRoutine)(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
-    NTSTATUS (*DeviceTransact)(PIRP Irp, PDEVICE_OBJECT DeviceObject);
-} FSP_FSEXT_PROVIDER;
-NTSTATUS FspFsextRegisterProvider(FSP_FSEXT_PROVIDER *Provider);
-PVOID FspFsextDeviceExtension(PDEVICE_OBJECT DeviceObject);
-
-NTSTATUS FspPosixMapSidToUid(PSID Sid, PUINT32 PUid);
-NTSTATUS FspPosixMapWindowsToPosixPathEx(PWSTR WindowsPath, char **PPosixPath,
-    BOOLEAN Translate);
-/* !!!: REVISIT: remove */
+#include <winfsp/fsext.h>
 
 /* disable warnings */
 #pragma warning(disable:4100)           /* unreferenced formal parameter */
@@ -56,6 +31,13 @@ NTSTATUS FspPosixMapWindowsToPosixPathEx(PWSTR WindowsPath, char **PPosixPath,
 
 #include <winfuse/coro.h>
 #include <winfuse/proto.h>
+
+/* !!!: REVISIT: remove */
+#define FSP_FSCTL_TRANSACT_INTERNAL     \
+    CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x800 + 'I', METHOD_NEITHER, FILE_ANY_ACCESS)
+#define FSP_FSCTL_TRANSACT_FUSE         \
+    CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x800 + 'F', METHOD_BUFFERED, FILE_ANY_ACCESS)
+/* !!!: REVISIT: remove */
 
 /* device management */
 typedef struct _FUSE_DEVICE_EXTENSION
@@ -70,10 +52,11 @@ NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject);
 VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject);
 VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
 NTSTATUS FuseDeviceTransact(PIRP Irp, PDEVICE_OBJECT DeviceObject);
+extern FSP_FSEXT_PROVIDER FuseProvider;
 static inline
 FUSE_DEVICE_EXTENSION *FuseDeviceExtension(PDEVICE_OBJECT DeviceObject)
 {
-    return FspFsextDeviceExtension(DeviceObject);
+    return (PVOID)((PUINT8)DeviceObject->DeviceExtension + FuseProvider.DeviceExtensionOffset);
 }
 
 /* FUSE processing context */
