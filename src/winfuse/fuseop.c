@@ -349,8 +349,7 @@ static VOID FusePrepareContextNs_ContextFini(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    if (0 != Context->PosixPath)
-        FuseFree(Context->PosixPath);
+    FspPosixDeletePath(Context->PosixPath); /* handles NULL paths */
 }
 
 static NTSTATUS FusePrepareContextNs(FUSE_CONTEXT *Context)
@@ -413,8 +412,8 @@ static NTSTATUS FusePrepareContextNs(FUSE_CONTEXT *Context)
     Result = STATUS_SUCCESS;
 
 exit:
-    if (!NT_SUCCESS(Result) && 0 != PosixPath)
-        FuseFree(PosixPath);
+    if (!NT_SUCCESS(Result))
+        FspPosixDeletePath(PosixPath); /* handles NULL paths */
 
     return Result;
 }

@@ -21,10 +21,10 @@
 
 #include <winfuse/driver.h>
 
-NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject);
+NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *VolumeParams);
 VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject);
 VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
-NTSTATUS FuseDeviceTransact(PIRP Irp, PDEVICE_OBJECT DeviceObject);
+NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp);
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, FuseDeviceInit)
@@ -35,24 +35,29 @@ NTSTATUS FuseDeviceTransact(PIRP Irp, PDEVICE_OBJECT DeviceObject);
 #pragma alloc_text(PAGE, FuseContextDelete)
 #endif
 
-NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject)
+NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *VolumeParams)
 {
     PAGED_CODE();
 
     FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
+    FUSE_IOQ *Ioq;
+    FUSE_CACHE *Cache;
     NTSTATUS Result;
 
-    /* on failure FuseDeviceFini will be called to cleanup */
-
-    Result = FuseIoqCreate((FUSE_IOQ **)&DeviceExtension->Ioq);
+    Result = FuseIoqCreate(&Ioq);
     if (!NT_SUCCESS(Result))
         return Result;
 
-    Result = FuseCacheCreate(0, !DeviceExtension->VolumeParams->CaseSensitiveSearch,
-        (FUSE_CACHE **)&DeviceExtension->Cache);
+    Result = FuseCacheCreate(0, !DeviceExtension->VolumeParams->CaseSensitiveSearch, &Cache);
     if (!NT_SUCCESS(Result))
+    {
+        FuseIoqDelete(Ioq);
         return Result;
+    }
 
+    DeviceExtension->VolumeParams = VolumeParams;
+    DeviceExtension->Ioq = Ioq;
+    DeviceExtension->Cache = Cache;
     KeInitializeEvent(&DeviceExtension->InitEvent, NotificationEvent, FALSE);
 
     return STATUS_SUCCESS;
@@ -94,7 +99,7 @@ static inline BOOLEAN FuseContextProcess(FUSE_CONTEXT *Context,
     return FuseProcessFunction[Kind](Context);
 }
 
-NTSTATUS FuseDeviceTransact(PIRP Irp, PDEVICE_OBJECT DeviceObject)
+NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
     PAGED_CODE();
 

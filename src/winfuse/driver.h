@@ -32,12 +32,8 @@
 #include <winfuse/coro.h>
 #include <winfuse/proto.h>
 
-/* !!!: REVISIT: remove */
-#define FSP_FSCTL_TRANSACT_INTERNAL     \
-    CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x800 + 'I', METHOD_NEITHER, FILE_ANY_ACCESS)
 #define FSP_FSCTL_TRANSACT_FUSE         \
     CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x800 + 'F', METHOD_BUFFERED, FILE_ANY_ACCESS)
-/* !!!: REVISIT: remove */
 
 /* device management */
 typedef struct _FUSE_DEVICE_EXTENSION
@@ -48,10 +44,10 @@ typedef struct _FUSE_DEVICE_EXTENSION
     KEVENT InitEvent;
     UINT32 VersionMajor, VersionMinor;
 } FUSE_DEVICE_EXTENSION;
-NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject);
+NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *VolumeParams);
 VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject);
 VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
-NTSTATUS FuseDeviceTransact(PIRP Irp, PDEVICE_OBJECT DeviceObject);
+NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp);
 extern FSP_FSEXT_PROVIDER FuseProvider;
 static inline
 FUSE_DEVICE_EXTENSION *FuseDeviceExtension(PDEVICE_OBJECT DeviceObject)
