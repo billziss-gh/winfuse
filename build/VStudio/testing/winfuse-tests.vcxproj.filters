@@ -5,10 +5,24 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="Source\tlib">
+      <UniqueIdentifier>{82902fb4-b1f7-4fe3-aa4c-25a31b78cfaa}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tst\winfuse-tests\winfuse-tests.c">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\ext\tlib\testsuite.c">
+      <Filter>Source\tlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tst\winfuse-tests\coro-test.c">
+      <Filter>Source</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\ext\tlib\testsuite.h">
+      <Filter>Source\tlib</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
