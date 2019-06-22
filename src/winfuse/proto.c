@@ -101,9 +101,14 @@ NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList
     if (FuseContextIsStatus(Context))
         return FuseContextToStatus(Context);
 
-    Context->InternalResponse->Hint = FUSE_PROTO_OPCODE_FORGET;
-    Context->ForgetList = *ForgetList;
     Context->Fini = FuseProtoPostForget_ContextFini;
+    Context->InternalResponse->Hint = FUSE_PROTO_OPCODE_FORGET;
+
+    ASSERT(ForgetList != ForgetList->Flink);
+    Context->ForgetList = *ForgetList;
+    /* fixup first/last list entry */
+    Context->ForgetList.Flink->Blink = &Context->ForgetList;
+    Context->ForgetList.Blink->Flink = &Context->ForgetList;
 
     FuseIoqPostPending(FuseDeviceExtension(DeviceObject)->Ioq, Context);
 

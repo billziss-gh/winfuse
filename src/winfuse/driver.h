@@ -32,7 +32,7 @@
 #include <winfuse/coro.h>
 #include <winfuse/proto.h>
 
-#define FSP_FSCTL_TRANSACT_FUSE         \
+#define FUSE_FSCTL_TRANSACT             \
     CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x800 + 'F', METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 /* device management */

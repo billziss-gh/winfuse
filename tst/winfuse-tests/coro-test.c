@@ -20,8 +20,8 @@
  */
 
 #include <windows.h>
-#include <winfuse/coro.h>
 #include <tlib/testsuite.h>
+#include <winfuse/coro.h>
 
 static void bprintf(char **b, const char *format, ...)
 {

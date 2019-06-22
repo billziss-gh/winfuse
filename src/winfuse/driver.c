@@ -30,6 +30,11 @@ DRIVER_INITIALIZE DriverEntry;
 NTSTATUS DriverEntry(
     PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 {
+#if DBG
+    if (!KD_DEBUGGER_NOT_PRESENT)
+        DbgBreakPoint();
+#endif
+
     FuseProcessFunction[FspFsctlTransactReservedKind] = FuseOpReserved;
     FuseProcessFunction[FspFsctlTransactCreateKind] = FuseOpCreate;
     //FuseProcessFunction[FspFsctlTransactOverwriteKind] = FuseOpOverwrite;
@@ -52,7 +57,7 @@ NTSTATUS DriverEntry(
     //FuseProcessFunction[FspFsctlTransactQueryStreamInformationKind] = FuseOpQueryStreamInformation;
 
     FuseProvider.Version = sizeof FuseProvider;
-    FuseProvider.DeviceTransactCode = FSP_FSCTL_TRANSACT_FUSE;
+    FuseProvider.DeviceTransactCode = FUSE_FSCTL_TRANSACT;
     FuseProvider.DeviceExtensionSize = sizeof(FUSE_DEVICE_EXTENSION);
     FuseProvider.DeviceInit = FuseDeviceInit;
     FuseProvider.DeviceFini = FuseDeviceFini;

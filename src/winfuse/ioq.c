@@ -126,8 +126,8 @@ FUSE_CONTEXT *FuseIoqEndProcessing(FUSE_IOQ *Ioq, UINT64 Unique)
         ASSERT(0 != *PContext);
         if (*PContext == ContextHint)
         {
-            *PContext = (*PContext)->DictNext;
-            (*PContext)->DictNext = 0;
+            *PContext = ContextHint->DictNext;
+            ContextHint->DictNext = 0;
 
             Context = ContextHint;
             RemoveEntryList(&Context->ListEntry);

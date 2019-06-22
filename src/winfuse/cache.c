@@ -282,15 +282,22 @@ VOID FuseCacheInvalidateExpired(FUSE_CACHE *Cache, UINT64 ExpirationTime,
 
     ExReleaseFastMutex(&Cache->Mutex);
 
-    if (&ForgetList != ForgetList.Flink)
+    if (&Cache->ForgetList != ForgetList.Flink)
     {
+        /* fixup first/last list entry */
+        ForgetList.Flink->Blink = &ForgetList;
+        ForgetList.Blink->Flink = &ForgetList;
+
         if (0 != DeviceObject)
         {
             Result = FuseProtoPostForget(DeviceObject, &ForgetList);
-            if (!NT_SUCCESS(Result))
+            if (!NT_SUCCESS(Result)) /* !!!: DEBUGTEST */
             {
                 ExAcquireFastMutex(&Cache->Mutex);
-                AppendTailList(&Cache->ForgetList, &ForgetList);
+                ASSERT(&ForgetList != ForgetList.Flink);
+                RemoveEntryList(&ForgetList);
+                    /* see remarks in AppendTailList documentation! */
+                AppendTailList(&Cache->ForgetList, ForgetList.Flink);
                 ExReleaseFastMutex(&Cache->Mutex);
             }
         }

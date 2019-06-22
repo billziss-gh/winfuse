@@ -40,27 +40,37 @@ NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *Vo
     PAGED_CODE();
 
     FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
-    FUSE_IOQ *Ioq;
-    FUSE_CACHE *Cache;
+    FUSE_IOQ *Ioq = 0;
+    FUSE_CACHE *Cache = 0;
     NTSTATUS Result;
 
     Result = FuseIoqCreate(&Ioq);
     if (!NT_SUCCESS(Result))
-        return Result;
+        goto fail;
 
-    Result = FuseCacheCreate(0, !DeviceExtension->VolumeParams->CaseSensitiveSearch, &Cache);
+    Result = FuseCacheCreate(0, !VolumeParams->CaseSensitiveSearch, &Cache);
     if (!NT_SUCCESS(Result))
-    {
-        FuseIoqDelete(Ioq);
-        return Result;
-    }
+        goto fail;
 
     DeviceExtension->VolumeParams = VolumeParams;
     DeviceExtension->Ioq = Ioq;
     DeviceExtension->Cache = Cache;
     KeInitializeEvent(&DeviceExtension->InitEvent, NotificationEvent, FALSE);
 
+    Result = FuseProtoPostInit(DeviceObject);
+    if (!NT_SUCCESS(Result))
+        goto fail;
+
     return STATUS_SUCCESS;
+
+fail:
+    if (0 != Cache)
+        FuseCacheDelete(Cache);
+
+    if (0 != Ioq)
+        FuseIoqDelete(Ioq);
+
+    return Result;
 }
 
 VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
@@ -106,7 +116,7 @@ NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp)
     PIO_STACK_LOCATION IrpSp = IoGetCurrentIrpStackLocation(Irp);
     ASSERT(IRP_MJ_FILE_SYSTEM_CONTROL == IrpSp->MajorFunction);
     ASSERT(IRP_MN_USER_FS_REQUEST == IrpSp->MinorFunction);
-    ASSERT(FSP_FSCTL_TRANSACT_FUSE == IrpSp->Parameters.FileSystemControl.FsControlCode);
+    ASSERT(FUSE_FSCTL_TRANSACT == IrpSp->Parameters.FileSystemControl.FsControlCode);
     ASSERT(METHOD_BUFFERED == (IrpSp->Parameters.FileSystemControl.FsControlCode & 3));
     ASSERT(IrpSp->FileObject->FsContext2 == DeviceObject);
 
