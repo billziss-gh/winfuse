@@ -26,7 +26,7 @@
 #include <winfuse/proto.h>
 
 #define FUSE_FSCTL_TRANSACT             \
-    CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x800 + 'F', METHOD_BUFFERED, FILE_ANY_ACCESS)
+    CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0xC00 + 'F', METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 static void transact_dotest(PWSTR DeviceName, PWSTR Prefix)
 {

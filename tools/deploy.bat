@@ -22,4 +22,4 @@ echo sc delete WinFsp                                                           
 echo sc delete WinFuse                                                          >>%TARGET%kminst.bat
 echo sc create WinFsp type=filesys binPath=%%~dp0winfsp-%SUFFIX%.sys            >>%TARGET%kminst.bat
 echo sc create WinFuse type=kernel binPath=%%~dp0winfuse-%SUFFIX%.sys           >>%TARGET%kminst.bat
-echo reg add HKLM\Software\WinFsp\Fsext /v 00092118 /d "winfuse" /f /reg:32     >>%TARGET%kminst.bat
+echo reg add HKLM\Software\WinFsp\Fsext /v 00093118 /d "winfuse" /f /reg:32     >>%TARGET%kminst.bat
