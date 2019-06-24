@@ -162,7 +162,7 @@ NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp)
             ASSERT(FspFsctlTransactReservedKind != Context->InternalResponse->Kind);
 
             Result = FuseSendTransactInternalIrp(
-                DeviceObject, IrpSp->FileObject, Context->InternalResponse, 0);
+                IrpSp->DeviceObject, IrpSp->FileObject, Context->InternalResponse, 0);
             FuseContextDelete(Context);
             if (!NT_SUCCESS(Result))
                 goto exit;
@@ -170,6 +170,7 @@ NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp)
     }
 
 request:
+    Irp->IoStatus.Information = 0;
     if (0 != FuseRequest)
     {
         RtlZeroMemory(FuseRequest, FUSE_PROTO_REQ_HEADER_SIZE);
@@ -198,7 +199,7 @@ request:
             }
 
             Result = FuseSendTransactInternalIrp(
-                DeviceObject, IrpSp->FileObject, 0, &InternalRequest);
+                IrpSp->DeviceObject, IrpSp->FileObject, 0, &InternalRequest);
             if (!NT_SUCCESS(Result))
                 goto exit;
             if (0 == InternalRequest)
@@ -228,35 +229,31 @@ request:
             ASSERT(!FuseContextIsStatus(Context));
             FuseIoqStartProcessing(DeviceExtension->Ioq, Context);
         }
+        else if (FuseContextIsStatus(Context))
+        {
+            RtlZeroMemory(&InternalResponse, sizeof InternalResponse);
+            InternalResponse.Size = sizeof InternalResponse;
+            InternalResponse.Kind = InternalRequest->Kind;
+            InternalResponse.Hint = InternalRequest->Hint;
+            InternalResponse.IoStatus.Status = FuseContextToStatus(Context);
+            Result = FuseSendTransactInternalIrp(
+                IrpSp->DeviceObject, IrpSp->FileObject, &InternalResponse, 0);
+            if (!NT_SUCCESS(Result))
+                goto exit;
+        }
         else if (0 == Context->InternalRequest)
             /* ignore */;
         else
         {
-            if (FuseContextIsStatus(Context))
-            {
-                RtlZeroMemory(&InternalResponse, sizeof InternalResponse);
-                InternalResponse.Size = sizeof InternalResponse;
-                InternalResponse.Kind = InternalRequest->Kind;
-                InternalResponse.Hint = InternalRequest->Hint;
-                InternalResponse.IoStatus.Status = FuseContextToStatus(Context);
-                Result = FuseSendTransactInternalIrp(
-                    DeviceObject, IrpSp->FileObject, &InternalResponse, 0);
-            }
-            else
-            {
-                Result = FuseSendTransactInternalIrp(
-                    DeviceObject, IrpSp->FileObject, Context->InternalResponse, 0);
-                FuseContextDelete(Context);
-            }
-
+            Result = FuseSendTransactInternalIrp(
+                IrpSp->DeviceObject, IrpSp->FileObject, Context->InternalResponse, 0);
+            FuseContextDelete(Context);
             if (!NT_SUCCESS(Result))
                 goto exit;
         }
 
         Irp->IoStatus.Information = FuseRequest->len;
     }
-    else
-        Irp->IoStatus.Information = 0;
 
     Result = STATUS_SUCCESS;
 
