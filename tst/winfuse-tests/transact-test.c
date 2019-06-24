@@ -179,6 +179,13 @@ static void transact_lookup_dotest(PWSTR DeviceName, PWSTR Prefix)
         Response, Response->len, RequestBuf, sizeof RequestBuf, &BytesTransferred, 0);
     ASSERT(Success);
 
+    while (0 == BytesTransferred)
+    {
+        Success = DeviceIoControl(VolumeHandle, FUSE_FSCTL_TRANSACT,
+            0, 0, RequestBuf, sizeof RequestBuf, &BytesTransferred, 0);
+        ASSERT(Success);
+    }
+
     if (0 < BytesTransferred)
     {
         ASSERT(FUSE_PROTO_REQ_SIZE(lookup) == Request->len);

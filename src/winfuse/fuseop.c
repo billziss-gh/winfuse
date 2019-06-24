@@ -290,13 +290,16 @@ static NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass,
 {
     PAGED_CODE();
 
-    PSID Sid;
-    union
+    PSID *PSid;
+    struct
     {
-        TOKEN_USER U;
-        TOKEN_OWNER O;
-        TOKEN_PRIMARY_GROUP G;
-        UINT8 B[128];
+        union
+        {
+            TOKEN_USER U;
+            TOKEN_OWNER O;
+            TOKEN_PRIMARY_GROUP G;
+        } u;
+        FSP_FSCTL_DECLSPEC_ALIGN UINT8 B[SECURITY_MAX_SID_SIZE];
     } InfoBuf;
     PVOID Info = &InfoBuf;
     ULONG Size;
@@ -305,13 +308,13 @@ static NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass,
     switch (InfoClass)
     {
     case TokenUser:
-        Sid = ((PTOKEN_USER)Info)->User.Sid;
+        PSid = &((PTOKEN_USER)Info)->User.Sid;
         break;
     case TokenOwner:
-        Sid = ((PTOKEN_OWNER)Info)->Owner;
+        PSid = &((PTOKEN_OWNER)Info)->Owner;
         break;
     case TokenPrimaryGroup:
-        Sid = ((PTOKEN_PRIMARY_GROUP)Info)->PrimaryGroup;
+        PSid = &((PTOKEN_PRIMARY_GROUP)Info)->PrimaryGroup;
         break;
     default:
         ASSERT(0);
@@ -320,29 +323,9 @@ static NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass,
 
     Result = ZwQueryInformationToken(Token, InfoClass, Info, sizeof InfoBuf, &Size);
     if (!NT_SUCCESS(Result))
-    {
-        if (STATUS_BUFFER_TOO_SMALL != Result)
-            goto exit;
+        return Result;
 
-        Info = FuseAlloc(Size);
-        if (0 == Info)
-        {
-            Result = STATUS_INSUFFICIENT_RESOURCES;
-            goto exit;
-        }
-
-        Result = ZwQueryInformationToken(Token, InfoClass, Info, Size, &Size);
-        if (!NT_SUCCESS(Result))
-            goto exit;
-    }
-
-    Result = FspPosixMapSidToUid(Sid, PUid);
-
-exit:
-    if (Info != &InfoBuf)
-        FuseFree(Info);
-
-    return Result;
+    return FspPosixMapSidToUid(*PSid, PUid);
 }
 
 static VOID FusePrepareContextNs_ContextFini(FUSE_CONTEXT *Context)
