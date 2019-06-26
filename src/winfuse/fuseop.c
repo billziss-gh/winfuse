@@ -31,7 +31,6 @@ static NTSTATUS FuseAccessCheck(
     UINT32 FileUid, UINT32 FileGid, UINT32 FileMode,
     UINT32 OrigUid, UINT32 OrigGid, UINT32 DesiredAccess,
     PUINT32 PGrantedAccess);
-static NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid);
 static VOID FusePrepareContextNs_ContextFini(FUSE_CONTEXT *Context);
 static NTSTATUS FusePrepareContextNs(FUSE_CONTEXT *Context);
 static VOID FuseLookupName(FUSE_CONTEXT *Context);
@@ -74,7 +73,6 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FusePosixPathFirstName)
 #pragma alloc_text(PAGE, FusePosixPathLastSlash)
 #pragma alloc_text(PAGE, FuseAccessCheck)
-#pragma alloc_text(PAGE, FuseGetTokenUid)
 #pragma alloc_text(PAGE, FusePrepareContextNs_ContextFini)
 #pragma alloc_text(PAGE, FusePrepareContextNs)
 #pragma alloc_text(PAGE, FuseLookupName)
@@ -284,48 +282,6 @@ static NTSTATUS FuseAccessCheck(
             *PGrantedAccess = 0;
         return STATUS_ACCESS_DENIED;
     }
-}
-
-static NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid)
-{
-    PAGED_CODE();
-
-    PSID *PSid;
-    struct
-    {
-        union
-        {
-            TOKEN_USER U;
-            TOKEN_OWNER O;
-            TOKEN_PRIMARY_GROUP G;
-        } u;
-        FSP_FSCTL_DECLSPEC_ALIGN UINT8 B[SECURITY_MAX_SID_SIZE];
-    } InfoBuf;
-    PVOID Info = &InfoBuf;
-    ULONG Size;
-    NTSTATUS Result;
-
-    switch (InfoClass)
-    {
-    case TokenUser:
-        PSid = &((PTOKEN_USER)Info)->User.Sid;
-        break;
-    case TokenOwner:
-        PSid = &((PTOKEN_OWNER)Info)->Owner;
-        break;
-    case TokenPrimaryGroup:
-        PSid = &((PTOKEN_PRIMARY_GROUP)Info)->PrimaryGroup;
-        break;
-    default:
-        ASSERT(0);
-        return STATUS_INVALID_PARAMETER;
-    }
-
-    Result = ZwQueryInformationToken(Token, InfoClass, Info, sizeof InfoBuf, &Size);
-    if (!NT_SUCCESS(Result))
-        return Result;
-
-    return FspPosixMapSidToUid(*PSid, PUid);
 }
 
 static VOID FusePrepareContextNs_ContextFini(FUSE_CONTEXT *Context)

@@ -21,6 +21,7 @@
 
 #include <winfuse/driver.h>
 
+NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid);
 NTSTATUS FuseSendTransactInternalIrp(PDEVICE_OBJECT DeviceObject, PFILE_OBJECT FileObject,
     FSP_FSCTL_TRANSACT_RSP *Response, FSP_FSCTL_TRANSACT_REQ **PRequest);
 static NTSTATUS FuseSendIrpCompletion(
@@ -28,10 +29,53 @@ static NTSTATUS FuseSendIrpCompletion(
 NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 
 #ifdef ALLOC_PRAGMA
+#pragma alloc_text(PAGE, FuseGetTokenUid)
 #pragma alloc_text(PAGE, FuseSendTransactInternalIrp)
 // !#pragma alloc_text(PAGE, FuseSendIrpCompletion)
 #pragma alloc_text(PAGE, FuseNtStatusFromErrno)
 #endif
+
+NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid)
+{
+    PAGED_CODE();
+
+    PSID *PSid;
+    struct
+    {
+        union
+        {
+            TOKEN_USER U;
+            TOKEN_OWNER O;
+            TOKEN_PRIMARY_GROUP G;
+        } u;
+        FSP_FSCTL_DECLSPEC_ALIGN UINT8 B[SECURITY_MAX_SID_SIZE];
+    } InfoBuf;
+    PVOID Info = &InfoBuf;
+    ULONG Size;
+    NTSTATUS Result;
+
+    switch (InfoClass)
+    {
+    case TokenUser:
+        PSid = &((PTOKEN_USER)Info)->User.Sid;
+        break;
+    case TokenOwner:
+        PSid = &((PTOKEN_OWNER)Info)->Owner;
+        break;
+    case TokenPrimaryGroup:
+        PSid = &((PTOKEN_PRIMARY_GROUP)Info)->PrimaryGroup;
+        break;
+    default:
+        ASSERT(0);
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    Result = ZwQueryInformationToken(Token, InfoClass, Info, sizeof InfoBuf, &Size);
+    if (!NT_SUCCESS(Result))
+        return Result;
+
+    return FspPosixMapSidToUid(*PSid, PUid);
+}
 
 typedef struct
 {
