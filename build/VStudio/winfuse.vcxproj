@@ -134,6 +134,7 @@
     <ClCompile Include="..\..\src\winfuse\fuse.c" />
     <ClCompile Include="..\..\src\winfuse\fuseop.c" />
     <ClCompile Include="..\..\src\winfuse\ioq.c" />
+    <ClCompile Include="..\..\src\winfuse\path.c" />
     <ClCompile Include="..\..\src\winfuse\proto.c" />
     <ClCompile Include="..\..\src\winfuse\util.c" />
   </ItemGroup>

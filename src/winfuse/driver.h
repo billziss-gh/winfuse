@@ -156,6 +156,10 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 
+/* paths */
+VOID FusePosixPathPrefix(PSTRING Path, PSTRING Prefix, PSTRING Remain);
+VOID FusePosixPathSuffix(PSTRING Path, PSTRING Remain, PSTRING Suffix);
+
 /* utility */
 NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid);
 NTSTATUS FuseSendTransactInternalIrp(PDEVICE_OBJECT DeviceObject, PFILE_OBJECT FileObject,

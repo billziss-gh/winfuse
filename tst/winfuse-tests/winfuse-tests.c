@@ -25,6 +25,7 @@
 int main(int argc, char *argv[])
 {
     TESTSUITE(coro_tests);
+    TESTSUITE(path_tests);
     TESTSUITE(transact_tests);
 
     tlib_run_tests(argc, argv);
