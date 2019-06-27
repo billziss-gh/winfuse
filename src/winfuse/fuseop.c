@@ -356,9 +356,7 @@ static VOID FuseLookupName(FUSE_CONTEXT *Context)
         }
 
         Context->Ino = Entry->nodeid;
-        Context->Lookup.FileUid = Entry->attr.uid;
-        Context->Lookup.FileGid = Entry->attr.gid;
-        Context->Lookup.FileMode = Entry->attr.mode;
+        Context->Lookup.Attr = Entry->attr;
         coro_break;
     }
 }
@@ -407,7 +405,8 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
                     if (!LastName && TravPriv)
                     {
                         Context->InternalResponse->IoStatus.Status = FuseAccessCheck(
-                            Context->Lookup.FileUid, Context->Lookup.FileGid, Context->Lookup.FileMode,
+                            Context->Lookup.Attr.uid, Context->Lookup.Attr.gid,
+                            Context->Lookup.Attr.mode,
                             Context->OrigUid, Context->OrigGid,
                             FILE_TRAVERSE, 0);
                         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
@@ -416,7 +415,8 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
                     else if (LastName)
                     {
                         Context->InternalResponse->IoStatus.Status = FuseAccessCheck(
-                            Context->Lookup.FileUid, Context->Lookup.FileGid, Context->Lookup.FileMode,
+                            Context->Lookup.Attr.uid, Context->Lookup.Attr.gid,
+                            Context->Lookup.Attr.mode,
                             Context->OrigUid, Context->OrigGid,
                             Context->Lookup.DesiredAccess, &Context->Lookup.GrantedAccess);
                         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
@@ -614,6 +614,18 @@ static VOID FuseOpCreate_FileOpen(FUSE_CONTEXT *Context)
             coro_break;
 
         coro_await (FuseProtoSendOpen(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        Context->InternalResponse->IoStatus.Information = FILE_OPENED;
+        Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
+            Context->FuseResponse->rsp.open.fh;
+        Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
+            Context->Lookup.GrantedAccess;
+        FuseAttrToFileInfo(Context->DeviceObject, &Context->Lookup.Attr,
+            &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
+        Context->InternalResponse->Rsp.Create.Opened.DisableCache =
+            BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
 
         coro_break;
     }

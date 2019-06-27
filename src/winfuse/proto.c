@@ -31,6 +31,8 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
+VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
+    FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, FuseProtoPostInit)
@@ -43,6 +45,7 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseProtoSendGetattr)
 #pragma alloc_text(PAGE, FuseProtoSendCreate)
 #pragma alloc_text(PAGE, FuseProtoSendOpen)
+#pragma alloc_text(PAGE, FuseAttrToFileInfo)
 #endif
 
 static inline VOID FuseProtoInitRequest(FUSE_CONTEXT *Context,
@@ -217,8 +220,108 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
+    UINT32 opcode;
+
     coro_block (Context->CoroState)
     {
+        switch (Context->Lookup.Attr.mode & 0170000)
+        {
+        case 0040000: /* S_IFDIR */
+            /* FILE_ATTRIBUTE_DIRECTORY */
+            opcode = FUSE_PROTO_OPCODE_OPENDIR;
+            break;
+        case 0010000: /* S_IFIFO */
+        case 0020000: /* S_IFCHR */
+        case 0060000: /* S_IFBLK */
+        case 0140000: /* S_IFSOCK */
+            /* FILE_ATTRIBUTE_REPARSE_POINT/IO_REPARSE_TAG_NFS */
+            opcode = 0;
+            break;
+        case 0120000: /* S_IFLNK */
+            /* FILE_ATTRIBUTE_REPARSE_POINT/IO_REPARSE_TAG_SYMLINK */
+            opcode = 0;
+            break;
+        default:
+            opcode = FUSE_PROTO_OPCODE_OPEN;
+            break;
+        }
+
+        if (0 == opcode)
+        {
+            // !!!: REVISIT!
+            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_OBJECT_NAME_NOT_FOUND;
+            coro_break;
+        }
+
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_SIZE(open), opcode, Context->Ino);
+
+        switch (Context->Lookup.GrantedAccess & (FILE_READ_DATA | FILE_WRITE_DATA))
+        {
+        default:
+        case FILE_READ_DATA:
+            Context->FuseRequest->req.open.flags = 0/*O_RDONLY*/;
+            break;
+        case FILE_WRITE_DATA:
+            Context->FuseRequest->req.open.flags = 1/*O_WRONLY*/;
+            break;
+        case FILE_READ_DATA | FILE_WRITE_DATA:
+            Context->FuseRequest->req.open.flags = 2/*O_RDWR*/;
+            break;
+        }
+
+        coro_yield;
+
+        if (0 != Context->FuseResponse->error)
+            Context->InternalResponse->IoStatus.Status =
+                FuseNtStatusFromErrno(Context->FuseResponse->error);
         coro_break;
     }
+}
+
+VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
+    FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo)
+{
+    PAGED_CODE();
+
+    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
+    UINT64 AllocationUnit;
+
+    AllocationUnit = (UINT64)DeviceExtension->VolumeParams->SectorSize *
+        (UINT64)DeviceExtension->VolumeParams->SectorsPerAllocationUnit;
+
+    switch (Attr->mode & 0170000)
+    {
+    case 0040000: /* S_IFDIR */
+        FileInfo->FileAttributes = FILE_ATTRIBUTE_DIRECTORY;
+        FileInfo->ReparseTag = 0;
+        break;
+    case 0010000: /* S_IFIFO */
+    case 0020000: /* S_IFCHR */
+    case 0060000: /* S_IFBLK */
+    case 0140000: /* S_IFSOCK */
+        FileInfo->FileAttributes = FILE_ATTRIBUTE_REPARSE_POINT;
+        FileInfo->ReparseTag = IO_REPARSE_TAG_NFS;
+        break;
+    case 0120000: /* S_IFLNK */
+        /* !!!: if target is directory FILE_ATTRIBUTE_DIRECTORY must also be set! */
+        FileInfo->FileAttributes = FILE_ATTRIBUTE_REPARSE_POINT;
+        FileInfo->ReparseTag = IO_REPARSE_TAG_SYMLINK;
+        break;
+    default:
+        FileInfo->FileAttributes = 0;
+        FileInfo->ReparseTag = 0;
+        break;
+    }
+
+    FileInfo->FileSize = Attr->size;
+    FileInfo->AllocationSize =
+        (FileInfo->FileSize + AllocationUnit - 1) / AllocationUnit * AllocationUnit;
+    FuseUnixTimeToFileTime(Attr->atime, Attr->atimensec, &FileInfo->LastAccessTime);
+    FuseUnixTimeToFileTime(Attr->mtime, Attr->mtimensec, &FileInfo->LastWriteTime);
+    FuseUnixTimeToFileTime(Attr->ctime, Attr->ctimensec, &FileInfo->ChangeTime);
+    FileInfo->CreationTime = FileInfo->ChangeTime;
+    FileInfo->IndexNumber = Attr->ino;
+    FileInfo->HardLinks = 0;
+    FileInfo->EaSize = 0;
 }

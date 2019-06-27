@@ -81,7 +81,7 @@ struct _FUSE_CONTEXT
         {
             STRING OrigPath;
             STRING Remain, Name;
-            UINT32 FileUid, FileGid, FileMode;
+            FUSE_PROTO_ATTR Attr;
             UINT32 DesiredAccess, GrantedAccess;
         } Lookup;
         struct
@@ -157,6 +157,22 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
+VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
+    FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
+static inline
+VOID FuseFileTimeToUnixTime(UINT64 FileTime0, PUINT64 sec, PUINT32 nsec)
+{
+    INT64 FileTime = (INT64)FileTime0 - 116444736000000000LL;
+    INT32 Remain = FileTime % 10000000;
+    *sec = (UINT64)(FileTime / 10000000);
+    *nsec = (UINT32)(0 <= Remain ? Remain : Remain + 10000000) * 100;
+}
+static inline
+VOID FuseUnixTimeToFileTime(UINT64 sec, UINT32 nsec, PUINT64 PFileTime)
+{
+    INT64 FileTime = (INT64)sec * 10000000 + (INT64)nsec / 100 + 116444736000000000LL;
+    *PFileTime = FileTime;
+}
 
 /* paths */
 VOID FusePosixPathPrefix(PSTRING Path, PSTRING Prefix, PSTRING Remain);
