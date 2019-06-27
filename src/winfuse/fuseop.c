@@ -25,8 +25,6 @@ static BOOLEAN FuseOpReserved_Init(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpReserved_Destroy(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpReserved_Forget(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpReserved(FUSE_CONTEXT *Context);
-static PSTR FusePosixPathFirstName(PSTR PosixPath);
-static PSTR FusePosixPathLastSlash(PSTR PosixPath);
 static NTSTATUS FuseAccessCheck(
     UINT32 FileUid, UINT32 FileGid, UINT32 FileMode,
     UINT32 OrigUid, UINT32 OrigGid, UINT32 DesiredAccess,
@@ -70,8 +68,6 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpReserved_Destroy)
 #pragma alloc_text(PAGE, FuseOpReserved_Forget)
 #pragma alloc_text(PAGE, FuseOpReserved)
-#pragma alloc_text(PAGE, FusePosixPathFirstName)
-#pragma alloc_text(PAGE, FusePosixPathLastSlash)
 #pragma alloc_text(PAGE, FuseAccessCheck)
 #pragma alloc_text(PAGE, FusePrepareContextNs_ContextFini)
 #pragma alloc_text(PAGE, FusePrepareContextNs)
@@ -196,45 +192,6 @@ BOOLEAN FuseOpReserved(FUSE_CONTEXT *Context)
     }
 }
 
-static inline PSTR FusePosixPathEnd(PSTR PosixPath)
-{
-    return PosixPath + strlen(PosixPath);
-}
-
-static PSTR FusePosixPathFirstName(PSTR PosixPath)
-{
-    PAGED_CODE();
-
-    PSTR P;
-
-    P = PosixPath;
-    while ('/' == *P)
-        P++;
-
-    return P;
-}
-
-static PSTR FusePosixPathLastSlash(PSTR PosixPath)
-{
-    PAGED_CODE();
-
-    PSTR P, LastSlash;
-
-    LastSlash = P = PosixPath;
-
-    while (*P)
-        if ('/' == *P)
-        {
-            LastSlash = P;
-            while ('/' == *++P)
-                ;
-        }
-        else
-            P++;
-
-    return LastSlash;
-}
-
 /* code borrowed from winfsp/src/ku/posix.c - see there for comments/explanations */
 #define FusePosixDefaultPerm            \
     (SYNCHRONIZE | READ_CONTROL | FILE_READ_ATTRIBUTES | FILE_READ_EA)
@@ -288,7 +245,7 @@ static VOID FusePrepareContextNs_ContextFini(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    FspPosixDeletePath(Context->PosixPath); /* handles NULL paths */
+    FspPosixDeletePath(Context->OrigPath.Buffer); /* handles NULL paths */
 }
 
 static NTSTATUS FusePrepareContextNs(FUSE_CONTEXT *Context)
@@ -341,7 +298,7 @@ static NTSTATUS FusePrepareContextNs(FUSE_CONTEXT *Context)
         Pid = FSP_FSCTL_TRANSACT_REQ_TOKEN_PID(AccessToken);
     }
 
-    Context->PosixPath = PosixPath;
+    RtlInitString(&Context->OrigPath, PosixPath);
     Context->OrigUid = Uid;
     Context->OrigGid = Gid;
     Context->OrigPid = Pid;
@@ -361,17 +318,12 @@ static VOID FuseLookupName(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    STRING Name;
     FUSE_PROTO_ENTRY Entry;
-
-    /* executed on coro reentry! */
-    Name.Length = Name.MaximumLength = (USHORT)(Context->PosixPathRem - Context->PosixName);
-    Name.Buffer = Context->PosixName;
 
     coro_block (Context->CoroState)
     {
         if (FuseCacheGetEntry(FuseDeviceExtension(Context->DeviceObject)->Cache,
-            Context->Ino, &Name, &Entry))
+            Context->Ino, &Context->Name, &Entry))
         {
             Context->Ino = Entry.nodeid;
             Context->FileUid = Entry.attr.uid;
@@ -386,7 +338,7 @@ static VOID FuseLookupName(FUSE_CONTEXT *Context)
 
         Context->InternalResponse->IoStatus.Status = FuseCacheSetEntry(
             FuseDeviceExtension(Context->DeviceObject)->Cache,
-            Context->Ino, &Name, &Context->FuseResponse->rsp.lookup.entry);
+            Context->Ino, &Context->Name, &Context->FuseResponse->rsp.lookup.entry);
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
@@ -400,20 +352,20 @@ static VOID FuseLookupName(FUSE_CONTEXT *Context)
 
 static VOID FuseLookupPath(FUSE_CONTEXT *Context)
 {
-    PAGED_CODE();
+#define RootName                        (1 == Context->Name.Length && '/' == Context->Name.Buffer[0])
+#define LastName                        (0 == Context->Remain.Length)
+#define UserMode                        (Context->InternalRequest->Req.Create.UserMode)
+#define TravPriv                        (Context->InternalRequest->Req.Create.HasTraversePrivilege)
 
-    PSTR P;
+    PAGED_CODE();
 
     coro_block (Context->CoroState)
     {
-        P = Context->PosixPath;
-        while ('/' == *P)
-            P++;
-        Context->PosixPathRem = Context->PosixName = P;
         Context->Ino = FUSE_PROTO_ROOT_ID;
-
         for (;;)
         {
+            FusePosixPathPrefix(&Context->Remain, &Context->Name, &Context->Remain);
+
             /*
              * - RootName:
              *     - UserMode:
@@ -431,10 +383,6 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
              *         - LastName:
              *             - AccessCheck
              */
-#define RootName                        (Context->PosixName == Context->PosixPathRem)
-#define LastName                        (Context->PosixPathEnd == Context->PosixPathRem)
-#define UserMode                        (Context->InternalRequest->Req.Create.UserMode)
-#define TravPriv                        (Context->InternalRequest->Req.Create.HasTraversePrivilege)
             if (!RootName || (UserMode && (TravPriv || LastName)))
             {
                 coro_await (FuseLookupName(Context));
@@ -463,22 +411,16 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
                     }
                 }
             }
+
+            if (LastName)
+                coro_break;
+        }
+    }
+
 #undef TravPriv
 #undef UserMode
 #undef LastName
 #undef RootName
-
-            P = Context->PosixPathRem;
-            while ('/' == *P)
-                P++;
-            Context->PosixName = P;
-            while (Context->PosixPathEnd > P && '/' != *P)
-                P++;
-            Context->PosixPathRem = P;
-            if (Context->PosixName == P)
-                coro_break;
-        }
-    }
 }
 
 static VOID FuseCreateCheck(FUSE_CONTEXT *Context)
@@ -503,7 +445,7 @@ static VOID FuseCreateCheck(FUSE_CONTEXT *Context)
             coro_break;
         }
 
-        Context->PosixPathEnd = FusePosixPathLastSlash(Context->PosixPath);
+        FusePosixPathSuffix(&Context->OrigPath, &Context->Remain, 0);
 
         if (Context->InternalRequest->Req.Create.HasRestorePrivilege)
             Context->DesiredAccess = 0;
@@ -512,24 +454,9 @@ static VOID FuseCreateCheck(FUSE_CONTEXT *Context)
         else
             Context->DesiredAccess = FILE_ADD_FILE;
 
-        if (0 == Context->PosixName)
-        {
-            coro_await (FuseLookupPath(Context));
-            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-                coro_break;
-        }
-        else
-        {
-            if (Context->InternalRequest->Req.Create.UserMode)
-            {
-                Context->InternalResponse->IoStatus.Status = FuseAccessCheck(
-                    Context->FileUid, Context->FileGid, Context->FileMode,
-                    Context->OrigUid, Context->OrigGid,
-                    Context->DesiredAccess, &Context->GrantedAccess);
-                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-                    coro_break;
-            }
-        }
+        coro_await (FuseLookupPath(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
 
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
             FlagOn(Context->InternalRequest->Req.Create.DesiredAccess, MAXIMUM_ALLOWED) ?
@@ -558,7 +485,7 @@ static VOID FuseOpenCheck(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->PosixPathEnd = FusePosixPathEnd(Context->PosixPath);
+        Context->Remain = Context->OrigPath;
 
         Context->DesiredAccess = Context->InternalRequest->Req.Create.DesiredAccess |
             (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DELETE_ON_CLOSE) ?
@@ -596,7 +523,7 @@ static VOID FuseOverwriteCheck(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->PosixPathEnd = FusePosixPathEnd(Context->PosixPath);
+        Context->Remain = Context->OrigPath;
 
         Context->DesiredAccess = Context->InternalRequest->Req.Create.DesiredAccess |
             (FILE_SUPERSEDE == ((Context->InternalRequest->Req.Create.CreateOptions >> 24) & 0xff) ?
@@ -630,7 +557,7 @@ static VOID FuseOpenTargetDirectoryCheck(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->PosixPathEnd = FusePosixPathLastSlash(Context->PosixPath);
+        FusePosixPathSuffix(&Context->OrigPath, &Context->Remain, 0);
 
         Context->DesiredAccess = Context->InternalRequest->Req.Create.DesiredAccess;
 
@@ -656,7 +583,7 @@ static VOID FuseOpCreate_FileCreate(FUSE_CONTEXT *Context)
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        Context->PosixName = FusePosixPathFirstName(Context->PosixPathEnd + 1);
+        FusePosixPathSuffix(&Context->OrigPath, 0, &Context->Name);
         coro_await (FuseProtoSendCreate(Context));
 
         coro_break;
@@ -695,7 +622,7 @@ static VOID FuseOpCreate_FileOpenIf(FUSE_CONTEXT *Context)
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
-            Context->PosixName = FusePosixPathFirstName(Context->PosixPathEnd + 1);
+            FusePosixPathSuffix(&Context->OrigPath, 0, &Context->Name);
             coro_await (FuseProtoSendCreate(Context));
         }
         else
@@ -741,7 +668,7 @@ static VOID FuseOpCreate_FileOverwriteIf(FUSE_CONTEXT *Context)
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
-            Context->PosixName = FusePosixPathFirstName(Context->PosixPathEnd + 1);
+            FusePosixPathSuffix(&Context->OrigPath, 0, &Context->Name);
             coro_await (FuseProtoSendCreate(Context));
         }
         else
@@ -771,7 +698,7 @@ static VOID FuseOpCreate_FileOpenTargetDirectory(FUSE_CONTEXT *Context)
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        Context->PosixName = FusePosixPathFirstName(Context->PosixPathEnd + 1);
+        FusePosixPathSuffix(&Context->OrigPath, 0, &Context->Name);
         coro_await (FuseLookupName(Context));
         Context->InternalResponse->IoStatus.Information =
             NT_SUCCESS(Context->InternalResponse->IoStatus.Status) ?

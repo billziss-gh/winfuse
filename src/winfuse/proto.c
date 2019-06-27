@@ -161,7 +161,7 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
     coro_block (Context->CoroState)
     {
         Context->FuseRequest->len = (UINT32)(FUSE_PROTO_REQ_SIZE(lookup) +
-            (Context->PosixPathRem - Context->PosixName) + 1);
+            Context->Name.Length + 1);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
         Context->FuseRequest->opcode = FUSE_PROTO_OPCODE_LOOKUP;
         Context->FuseRequest->unique = (UINT64)(UINT_PTR)Context;
@@ -169,9 +169,9 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
         Context->FuseRequest->uid = Context->OrigUid;
         Context->FuseRequest->gid = Context->OrigGid;
         Context->FuseRequest->pid = Context->OrigPid;
-        RtlCopyMemory(Context->FuseRequest->req.lookup.name, Context->PosixName,
-            Context->PosixPathRem - Context->PosixName);
-        Context->FuseRequest->req.lookup.name[Context->PosixPathRem - Context->PosixName] = '\0';
+        RtlCopyMemory(Context->FuseRequest->req.lookup.name, Context->Name.Buffer,
+            Context->Name.Length);
+        Context->FuseRequest->req.lookup.name[Context->Name.Length] = '\0';
         coro_yield;
 
         if (0 != Context->FuseResponse->error)

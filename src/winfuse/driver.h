@@ -81,8 +81,9 @@ struct _FUSE_CONTEXT
         };
         struct
         {
+            STRING OrigPath;
             UINT32 OrigUid, OrigGid, OrigPid;
-            PSTR PosixPath, PosixPathEnd, PosixPathRem, PosixName;
+            STRING Remain, Name;
             UINT64 Ino;
             UINT32 FileUid, FileGid, FileMode;
             UINT32 DesiredAccess, GrantedAccess;

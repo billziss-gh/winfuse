@@ -33,20 +33,28 @@ VOID FusePosixPathPrefix(PSTRING Path, PSTRING Prefix, PSTRING Remain)
 {
     PAGED_CODE();
 
-    PSTR P = Path->Buffer, EndP = P + Path->Length / sizeof(*P);
+    STRING PathBuf, PrefixBuf, RemainBuf;
+
+    PathBuf = *Path;
+    if (0 == Prefix)
+        Prefix = &PrefixBuf;
+    if (0 == Remain)
+        Remain = &RemainBuf;
+
+    PSTR P = PathBuf.Buffer, EndP = P + PathBuf.Length / sizeof(*P);
 
     if (EndP > P && '/' == *P)
     {
         Prefix->Length = 1;
-        Prefix->Buffer = Path->Buffer;
+        Prefix->Buffer = PathBuf.Buffer;
     }
     else
     {
         while (EndP > P && '/' != *P)
             P++;
 
-        Prefix->Length = (USHORT)((P - Path->Buffer) * sizeof *P);
-        Prefix->Buffer = Path->Buffer;
+        Prefix->Length = (USHORT)((P - PathBuf.Buffer) * sizeof *P);
+        Prefix->Buffer = PathBuf.Buffer;
     }
 
     while (EndP > P && '/' == *P)
@@ -63,18 +71,26 @@ VOID FusePosixPathSuffix(PSTRING Path, PSTRING Remain, PSTRING Suffix)
 {
     PAGED_CODE();
 
-    PSTR P = Path->Buffer, EndP = P + Path->Length / sizeof(*P);
+    STRING PathBuf, RemainBuf, SuffixBuf;
 
-    Remain->Length = Path->Length;
-    Remain->Buffer = Path->Buffer;
+    PathBuf = *Path;
+    if (0 == Remain)
+        Remain = &RemainBuf;
+    if (0 == Suffix)
+        Suffix = &SuffixBuf;
+
+    PSTR P = PathBuf.Buffer, EndP = P + PathBuf.Length / sizeof(*P);
+
+    Remain->Length = PathBuf.Length;
+    Remain->Buffer = PathBuf.Buffer;
 
     Suffix->Length = 0;
-    Suffix->Buffer = Path->Buffer;
+    Suffix->Buffer = PathBuf.Buffer;
 
     while (EndP > P)
         if ('/' == *P)
         {
-            Remain->Length = (USHORT)((P - Path->Buffer) * sizeof *P);
+            Remain->Length = (USHORT)((P - PathBuf.Buffer) * sizeof *P);
             if (0 == Remain->Length)
                 Remain->Length = 1;
 
