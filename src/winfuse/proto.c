@@ -103,12 +103,12 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
     coro_block (Context->CoroState)
     {
         FuseProtoInitRequest(Context,
-            (UINT32)(FUSE_PROTO_REQ_SIZE(lookup) + Context->Name.Length + 1),
+            (UINT32)(FUSE_PROTO_REQ_SIZE(lookup) + Context->Lookup.Name.Length + 1),
             FUSE_PROTO_OPCODE_LOOKUP, Context->Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
-        RtlCopyMemory(Context->FuseRequest->req.lookup.name, Context->Name.Buffer,
-            Context->Name.Length);
-        Context->FuseRequest->req.lookup.name[Context->Name.Length] = '\0';
+        RtlCopyMemory(Context->FuseRequest->req.lookup.name, Context->Lookup.Name.Buffer,
+            Context->Lookup.Name.Length);
+        Context->FuseRequest->req.lookup.name[Context->Lookup.Name.Length] = '\0';
         coro_yield;
 
         if (0 != Context->FuseResponse->error)
@@ -133,10 +133,10 @@ NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList
     Context->InternalResponse->Hint = FUSE_PROTO_OPCODE_FORGET;
 
     ASSERT(ForgetList != ForgetList->Flink);
-    Context->ForgetList = *ForgetList;
+    Context->Forget.ForgetList = *ForgetList;
     /* fixup first/last list entry */
-    Context->ForgetList.Flink->Blink = &Context->ForgetList;
-    Context->ForgetList.Blink->Flink = &Context->ForgetList;
+    Context->Forget.ForgetList.Flink->Blink = &Context->Forget.ForgetList;
+    Context->Forget.ForgetList.Blink->Flink = &Context->Forget.ForgetList;
 
     FuseIoqPostPending(FuseDeviceExtension(DeviceObject)->Ioq, Context);
 
@@ -147,7 +147,7 @@ static VOID FuseProtoPostForget_ContextFini(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    FuseCacheDeleteItems(&Context->ForgetList);
+    FuseCacheDeleteItems(&Context->Forget.ForgetList);
 }
 
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context)
@@ -157,7 +157,7 @@ VOID FuseProtoFillForget(FUSE_CONTEXT *Context)
     UINT64 Ino;
     BOOLEAN Ok;
 
-    Ok = FuseCacheForgetNextItem(&Context->ForgetList, &Ino);
+    Ok = FuseCacheForgetNextItem(&Context->Forget.ForgetList, &Ino);
     ASSERT(Ok);
 
     FuseProtoInitRequest(Context,
@@ -174,7 +174,7 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context)
 
     StartP = (PVOID)((PUINT8)Context->FuseRequest + FUSE_PROTO_REQ_SIZE(batch_forget));
     EndP = (PVOID)((PUINT8)StartP + (FUSE_PROTO_REQ_SIZEMIN - FUSE_PROTO_REQ_SIZE(batch_forget)));
-    for (P = StartP; EndP > P && FuseCacheForgetNextItem(&Context->ForgetList, &Ino); P++)
+    for (P = StartP; EndP > P && FuseCacheForgetNextItem(&Context->Forget.ForgetList, &Ino); P++)
     {
         P->nodeid = Ino;
         P->nlookup = 1;

@@ -79,15 +79,15 @@ struct _FUSE_CONTEXT
     {
         struct
         {
-            LIST_ENTRY ForgetList;
-        };
-        struct
-        {
             STRING OrigPath;
             STRING Remain, Name;
             UINT32 FileUid, FileGid, FileMode;
             UINT32 DesiredAccess, GrantedAccess;
-        };
+        } Lookup;
+        struct
+        {
+            LIST_ENTRY ForgetList;
+        } Forget;
     };
 };
 #pragma warning(pop)
