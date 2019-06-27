@@ -43,6 +43,18 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseProtoSendOpen)
 #endif
 
+static inline VOID FuseProtoInitRequest(FUSE_CONTEXT *Context,
+    UINT32 len, UINT32 opcode, UINT64 nodeid)
+{
+    Context->FuseRequest->len = len;
+    Context->FuseRequest->opcode = opcode;
+    Context->FuseRequest->unique = (UINT64)(UINT_PTR)Context;
+    Context->FuseRequest->nodeid = nodeid;
+    Context->FuseRequest->uid = Context->OrigUid;
+    Context->FuseRequest->gid = Context->OrigGid;
+    Context->FuseRequest->pid = Context->OrigPid;
+}
+
 NTSTATUS FuseProtoPostInit(PDEVICE_OBJECT DeviceObject)
 {
     PAGED_CODE();
@@ -67,9 +79,8 @@ VOID FuseProtoSendInit(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->FuseRequest->len = FUSE_PROTO_REQ_SIZE(init);
-        Context->FuseRequest->opcode = FUSE_PROTO_OPCODE_INIT;
-        Context->FuseRequest->unique = (UINT64)(UINT_PTR)Context;
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_SIZE(init), FUSE_PROTO_OPCODE_INIT, 0);
         Context->FuseRequest->req.init.major = FUSE_PROTO_VERSION;
         Context->FuseRequest->req.init.minor = FUSE_PROTO_MINOR_VERSION;
         Context->FuseRequest->req.init.max_readahead = 0;   /* !!!: REVISIT */
@@ -125,10 +136,8 @@ VOID FuseProtoFillForget(FUSE_CONTEXT *Context)
     Ok = FuseCacheForgetNextItem(&Context->ForgetList, &Ino);
     ASSERT(Ok);
 
-    Context->FuseRequest->len = FUSE_PROTO_REQ_SIZE(forget);
-    Context->FuseRequest->opcode = FUSE_PROTO_OPCODE_FORGET;
-    Context->FuseRequest->unique = 0;
-    Context->FuseRequest->nodeid = Ino;
+    FuseProtoInitRequest(Context,
+        FUSE_PROTO_REQ_SIZE(forget), FUSE_PROTO_OPCODE_FORGET, Ino);
     Context->FuseRequest->req.forget.nlookup = 1;
 }
 
@@ -147,10 +156,9 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context)
         P->nlookup = 1;
     }
 
-    Context->FuseRequest->len = (ULONG)((PUINT8)P - (PUINT8)Context->FuseRequest);
-    Context->FuseRequest->opcode = FUSE_PROTO_OPCODE_BATCH_FORGET;
-    Context->FuseRequest->unique = 0;
-    Context->FuseRequest->nodeid = 0;
+    FuseProtoInitRequest(Context,
+        (UINT32)((PUINT8)P - (PUINT8)Context->FuseRequest), FUSE_PROTO_OPCODE_BATCH_FORGET, 0);
+    ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
     Context->FuseRequest->req.batch_forget.count = (ULONG)(P - StartP);
 }
 
@@ -160,15 +168,10 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->FuseRequest->len = (UINT32)(FUSE_PROTO_REQ_SIZE(lookup) +
-            Context->Name.Length + 1);
+        FuseProtoInitRequest(Context,
+            (UINT32)(FUSE_PROTO_REQ_SIZE(lookup) + Context->Name.Length + 1),
+            FUSE_PROTO_OPCODE_LOOKUP, Context->Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
-        Context->FuseRequest->opcode = FUSE_PROTO_OPCODE_LOOKUP;
-        Context->FuseRequest->unique = (UINT64)(UINT_PTR)Context;
-        Context->FuseRequest->nodeid = Context->Ino;
-        Context->FuseRequest->uid = Context->OrigUid;
-        Context->FuseRequest->gid = Context->OrigGid;
-        Context->FuseRequest->pid = Context->OrigPid;
         RtlCopyMemory(Context->FuseRequest->req.lookup.name, Context->Name.Buffer,
             Context->Name.Length);
         Context->FuseRequest->req.lookup.name[Context->Name.Length] = '\0';
