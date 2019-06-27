@@ -23,22 +23,22 @@
 
 NTSTATUS FuseProtoPostInit(PDEVICE_OBJECT DeviceObject);
 VOID FuseProtoSendInit(FUSE_CONTEXT *Context);
-static VOID FuseProtoPostForget_ContextFini(FUSE_CONTEXT *Context);
+VOID FuseProtoSendLookup(FUSE_CONTEXT *Context);
 NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList);
+static VOID FuseProtoPostForget_ContextFini(FUSE_CONTEXT *Context);
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context);
 VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
-VOID FuseProtoSendLookup(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, FuseProtoPostInit)
 #pragma alloc_text(PAGE, FuseProtoSendInit)
-#pragma alloc_text(PAGE, FuseProtoPostForget_ContextFini)
+#pragma alloc_text(PAGE, FuseProtoSendLookup)
 #pragma alloc_text(PAGE, FuseProtoPostForget)
+#pragma alloc_text(PAGE, FuseProtoPostForget_ContextFini)
 #pragma alloc_text(PAGE, FuseProtoFillForget)
 #pragma alloc_text(PAGE, FuseProtoFillBatchForget)
-#pragma alloc_text(PAGE, FuseProtoSendLookup)
 #pragma alloc_text(PAGE, FuseProtoSendCreate)
 #pragma alloc_text(PAGE, FuseProtoSendOpen)
 #endif
@@ -94,11 +94,26 @@ VOID FuseProtoSendInit(FUSE_CONTEXT *Context)
     }
 }
 
-static VOID FuseProtoPostForget_ContextFini(FUSE_CONTEXT *Context)
+VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    FuseCacheDeleteItems(&Context->ForgetList);
+    coro_block (Context->CoroState)
+    {
+        FuseProtoInitRequest(Context,
+            (UINT32)(FUSE_PROTO_REQ_SIZE(lookup) + Context->Name.Length + 1),
+            FUSE_PROTO_OPCODE_LOOKUP, Context->Ino);
+        ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
+        RtlCopyMemory(Context->FuseRequest->req.lookup.name, Context->Name.Buffer,
+            Context->Name.Length);
+        Context->FuseRequest->req.lookup.name[Context->Name.Length] = '\0';
+        coro_yield;
+
+        if (0 != Context->FuseResponse->error)
+            Context->InternalResponse->IoStatus.Status =
+                FuseNtStatusFromErrno(Context->FuseResponse->error);
+        coro_break;
+    }
 }
 
 NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList)
@@ -124,6 +139,13 @@ NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList
     FuseIoqPostPending(FuseDeviceExtension(DeviceObject)->Ioq, Context);
 
     return STATUS_SUCCESS;
+}
+
+static VOID FuseProtoPostForget_ContextFini(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    FuseCacheDeleteItems(&Context->ForgetList);
 }
 
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context)
@@ -160,28 +182,6 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context)
         (UINT32)((PUINT8)P - (PUINT8)Context->FuseRequest), FUSE_PROTO_OPCODE_BATCH_FORGET, 0);
     ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
     Context->FuseRequest->req.batch_forget.count = (ULONG)(P - StartP);
-}
-
-VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
-{
-    PAGED_CODE();
-
-    coro_block (Context->CoroState)
-    {
-        FuseProtoInitRequest(Context,
-            (UINT32)(FUSE_PROTO_REQ_SIZE(lookup) + Context->Name.Length + 1),
-            FUSE_PROTO_OPCODE_LOOKUP, Context->Ino);
-        ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
-        RtlCopyMemory(Context->FuseRequest->req.lookup.name, Context->Name.Buffer,
-            Context->Name.Length);
-        Context->FuseRequest->req.lookup.name[Context->Name.Length] = '\0';
-        coro_yield;
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-        coro_break;
-    }
 }
 
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)

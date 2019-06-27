@@ -29,8 +29,8 @@ static NTSTATUS FuseAccessCheck(
     UINT32 FileUid, UINT32 FileGid, UINT32 FileMode,
     UINT32 OrigUid, UINT32 OrigGid, UINT32 DesiredAccess,
     PUINT32 PGrantedAccess);
-static VOID FusePrepareContextNs_ContextFini(FUSE_CONTEXT *Context);
 static NTSTATUS FusePrepareContextNs(FUSE_CONTEXT *Context);
+static VOID FusePrepareContextNs_ContextFini(FUSE_CONTEXT *Context);
 static VOID FuseLookupName(FUSE_CONTEXT *Context);
 static VOID FuseLookupPath(FUSE_CONTEXT *Context);
 static VOID FuseCreateCheck(FUSE_CONTEXT *Context);
@@ -69,8 +69,8 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpReserved_Forget)
 #pragma alloc_text(PAGE, FuseOpReserved)
 #pragma alloc_text(PAGE, FuseAccessCheck)
-#pragma alloc_text(PAGE, FusePrepareContextNs_ContextFini)
 #pragma alloc_text(PAGE, FusePrepareContextNs)
+#pragma alloc_text(PAGE, FusePrepareContextNs_ContextFini)
 #pragma alloc_text(PAGE, FuseLookupName)
 #pragma alloc_text(PAGE, FuseLookupPath)
 #pragma alloc_text(PAGE, FuseCreateCheck)
@@ -241,13 +241,6 @@ static NTSTATUS FuseAccessCheck(
     }
 }
 
-static VOID FusePrepareContextNs_ContextFini(FUSE_CONTEXT *Context)
-{
-    PAGED_CODE();
-
-    FspPosixDeletePath(Context->OrigPath.Buffer); /* handles NULL paths */
-}
-
 static NTSTATUS FusePrepareContextNs(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
@@ -312,6 +305,13 @@ exit:
         FspPosixDeletePath(PosixPath); /* handles NULL paths */
 
     return Result;
+}
+
+static VOID FusePrepareContextNs_ContextFini(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    FspPosixDeletePath(Context->OrigPath.Buffer); /* handles NULL paths */
 }
 
 static VOID FuseLookupName(FUSE_CONTEXT *Context)
