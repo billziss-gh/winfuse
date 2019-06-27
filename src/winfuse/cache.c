@@ -155,8 +155,15 @@ static inline FUSE_CACHE_ITEM *FuseCacheRemoveItem(FUSE_CACHE *Cache,
         {
             *P = (*P)->DictNext;
             RemoveEntryList(&Item->ListEntry);
-            InsertTailList(&Cache->ForgetList, &Item->ListEntry);
             Cache->ItemCount--;
+
+            if (Item->ParentIno == FUSE_PROTO_ROOT_ID &&
+                1 == Item->Name.Length && '/' == Item->Name.Buffer[0])
+                /* the root is not LOOKUP'ed; free without FORGET */
+                FuseFree(Item);
+            else
+                InsertTailList(&Cache->ForgetList, &Item->ListEntry);
+
             break;
         }
     return Item;
@@ -189,8 +196,15 @@ static inline FUSE_CACHE_ITEM *FuseCacheRemoveHashedItem(FUSE_CACHE *Cache,
             Item = *P;
             *P = (*P)->DictNext;
             RemoveEntryList(&Item->ListEntry);
-            InsertTailList(&Cache->ForgetList, &Item->ListEntry);
             Cache->ItemCount--;
+
+            if (Item->ParentIno == FUSE_PROTO_ROOT_ID &&
+                1 == Item->Name.Length && '/' == Item->Name.Buffer[0])
+                /* the root is not LOOKUP'ed; free without FORGET */
+                FuseFree(Item);
+            else
+                InsertTailList(&Cache->ForgetList, &Item->ListEntry);
+
             break;
         }
     return Item;

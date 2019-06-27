@@ -318,34 +318,47 @@ static VOID FuseLookupName(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    FUSE_PROTO_ENTRY Entry;
+    FUSE_PROTO_ENTRY EntryBuf, *Entry = &EntryBuf;
 
     coro_block (Context->CoroState)
     {
-        if (FuseCacheGetEntry(FuseDeviceExtension(Context->DeviceObject)->Cache,
-            Context->Ino, &Context->Name, &Entry))
+        if (!FuseCacheGetEntry(FuseDeviceExtension(Context->DeviceObject)->Cache,
+            Context->Ino, &Context->Name, Entry))
         {
-            Context->Ino = Entry.nodeid;
-            Context->FileUid = Entry.attr.uid;
-            Context->FileGid = Entry.attr.gid;
-            Context->FileMode = Entry.attr.mode;
-            coro_break;
+            if (FUSE_PROTO_ROOT_ID == Context->Ino &&
+                1 == Context->Name.Length && '/' == Context->Name.Buffer[0])
+            {
+                coro_await (FuseProtoSendGetattr(Context));
+                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                    coro_break;
+
+                Entry->nodeid = FUSE_PROTO_ROOT_ID;
+                Entry->entry_valid = Entry->attr_valid =
+                    Context->FuseResponse->rsp.getattr.attr_valid;
+                Entry->entry_valid_nsec = Entry->attr_valid_nsec =
+                    Context->FuseResponse->rsp.getattr.attr_valid_nsec;
+                Entry->attr = Context->FuseResponse->rsp.getattr.attr;
+            }
+            else
+            {
+                coro_await (FuseProtoSendLookup(Context));
+                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                    coro_break;
+
+                Entry = &Context->FuseResponse->rsp.lookup.entry;
+            }
+
+            Context->InternalResponse->IoStatus.Status = FuseCacheSetEntry(
+                FuseDeviceExtension(Context->DeviceObject)->Cache,
+                Context->Ino, &Context->Name, Entry);
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
         }
 
-        coro_await (FuseProtoSendLookup(Context));
-        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-            coro_break;
-
-        Context->InternalResponse->IoStatus.Status = FuseCacheSetEntry(
-            FuseDeviceExtension(Context->DeviceObject)->Cache,
-            Context->Ino, &Context->Name, &Context->FuseResponse->rsp.lookup.entry);
-        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-            coro_break;
-
-        Context->Ino = Context->FuseResponse->rsp.lookup.entry.nodeid;
-        Context->FileUid = Context->FuseResponse->rsp.lookup.entry.attr.uid;
-        Context->FileGid = Context->FuseResponse->rsp.lookup.entry.attr.gid;
-        Context->FileMode = Context->FuseResponse->rsp.lookup.entry.attr.mode;
+        Context->Ino = Entry->nodeid;
+        Context->FileUid = Entry->attr.uid;
+        Context->FileGid = Entry->attr.gid;
+        Context->FileMode = Entry->attr.mode;
         coro_break;
     }
 }

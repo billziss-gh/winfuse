@@ -73,6 +73,8 @@ struct _FUSE_CONTEXT
     FUSE_PROTO_REQ *FuseRequest;
     FUSE_PROTO_RSP *FuseResponse;
     SHORT CoroState[16];
+    UINT32 OrigUid, OrigGid, OrigPid;
+    UINT64 Ino;
     union
     {
         struct
@@ -82,9 +84,7 @@ struct _FUSE_CONTEXT
         struct
         {
             STRING OrigPath;
-            UINT32 OrigUid, OrigGid, OrigPid;
             STRING Remain, Name;
-            UINT64 Ino;
             UINT32 FileUid, FileGid, FileMode;
             UINT32 DesiredAccess, GrantedAccess;
         };
@@ -150,10 +150,11 @@ FUSE_PROCESS_DISPATCH FuseOpQueryStreamInformation;
 /* protocol implementation */
 NTSTATUS FuseProtoPostInit(PDEVICE_OBJECT DeviceObject);
 VOID FuseProtoSendInit(FUSE_CONTEXT *Context);
+VOID FuseProtoSendLookup(FUSE_CONTEXT *Context);
 NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList);
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context);
 VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
-VOID FuseProtoSendLookup(FUSE_CONTEXT *Context);
+VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 
