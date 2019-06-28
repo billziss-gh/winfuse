@@ -29,6 +29,8 @@ static VOID FuseProtoPostForget_ContextFini(FUSE_CONTEXT *Context);
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context);
 VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
+VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
+VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
@@ -44,6 +46,8 @@ VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
 #pragma alloc_text(PAGE, FuseProtoFillForget)
 #pragma alloc_text(PAGE, FuseProtoFillBatchForget)
 #pragma alloc_text(PAGE, FuseProtoSendGetattr)
+#pragma alloc_text(PAGE, FuseProtoSendMkdir)
+#pragma alloc_text(PAGE, FuseProtoSendMknod)
 #pragma alloc_text(PAGE, FuseProtoSendCreate)
 #pragma alloc_text(PAGE, FuseProtoSendOpen)
 #pragma alloc_text(PAGE, FuseProtoSendOpendir)
@@ -208,12 +212,76 @@ VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context)
     }
 }
 
+VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    coro_block (Context->CoroState)
+    {
+        FuseProtoInitRequest(Context,
+            (UINT32)(FUSE_PROTO_REQ_SIZE(mkdir) + Context->Lookup.Name.Length + 1),
+            FUSE_PROTO_OPCODE_MKDIR, Context->Ino);
+        ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
+        Context->FuseRequest->req.mkdir.mode = 0777;        /* !!!: REVISIT */
+        Context->FuseRequest->req.mkdir.umask = 0;          /* !!!: REVISIT */
+        RtlCopyMemory(Context->FuseRequest->req.mkdir.name, Context->Lookup.Name.Buffer,
+            Context->Lookup.Name.Length);
+        Context->FuseRequest->req.mkdir.name[Context->Lookup.Name.Length] = '\0';
+        coro_yield;
+
+        if (0 != Context->FuseResponse->error)
+            Context->InternalResponse->IoStatus.Status =
+                FuseNtStatusFromErrno(Context->FuseResponse->error);
+        coro_break;
+    }
+}
+
+VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    coro_block (Context->CoroState)
+    {
+        FuseProtoInitRequest(Context,
+            (UINT32)(FUSE_PROTO_REQ_SIZE(mknod) + Context->Lookup.Name.Length + 1),
+            FUSE_PROTO_OPCODE_MKDIR, Context->Ino);
+        ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
+        Context->FuseRequest->req.mknod.mode = 0777;        /* !!!: REVISIT */
+        Context->FuseRequest->req.mknod.rdev = 0;           /* !!!: REVISIT */
+        Context->FuseRequest->req.mknod.umask = 0;          /* !!!: REVISIT */
+        RtlCopyMemory(Context->FuseRequest->req.mknod.name, Context->Lookup.Name.Buffer,
+            Context->Lookup.Name.Length);
+        Context->FuseRequest->req.mknod.name[Context->Lookup.Name.Length] = '\0';
+        coro_yield;
+
+        if (0 != Context->FuseResponse->error)
+            Context->InternalResponse->IoStatus.Status =
+                FuseNtStatusFromErrno(Context->FuseResponse->error);
+        coro_break;
+    }
+}
+
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
     coro_block (Context->CoroState)
     {
+        FuseProtoInitRequest(Context,
+            (UINT32)(FUSE_PROTO_REQ_SIZE(create) + Context->Lookup.Name.Length + 1),
+            FUSE_PROTO_OPCODE_CREATE, Context->Ino);
+        ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
+        Context->FuseRequest->req.create.flags = 0x0100 | 0x0400 | 2 /*O_CREAT|O_EXCL|O_RDWR*/;
+        Context->FuseRequest->req.create.mode = 0777;       /* !!!: REVISIT */
+        Context->FuseRequest->req.create.umask = 0;         /* !!!: REVISIT */
+        RtlCopyMemory(Context->FuseRequest->req.create.name, Context->Lookup.Name.Buffer,
+            Context->Lookup.Name.Length);
+        Context->FuseRequest->req.create.name[Context->Lookup.Name.Length] = '\0';
+        coro_yield;
+
+        if (0 != Context->FuseResponse->error)
+            Context->InternalResponse->IoStatus.Status =
+                FuseNtStatusFromErrno(Context->FuseResponse->error);
         coro_break;
     }
 }

@@ -155,6 +155,8 @@ NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context);
 VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
+VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
+VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
