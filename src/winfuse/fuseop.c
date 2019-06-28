@@ -588,6 +588,16 @@ static VOID FuseOpenTargetDirectoryCheck(FUSE_CONTEXT *Context)
     }
 }
 
+static VOID FuseCreate(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    coro_block (Context->CoroState)
+    {
+        coro_break;
+    }
+}
+
 static VOID FuseOpen(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
@@ -654,7 +664,7 @@ static VOID FuseOpCreate_FileCreate(FUSE_CONTEXT *Context)
             coro_break;
 
         FusePosixPathSuffix(&Context->Lookup.OrigPath, 0, &Context->Lookup.Name);
-        coro_await (FuseProtoSendCreate(Context));
+        coro_await (FuseCreate(Context));
 
         coro_break;
     }
@@ -693,10 +703,10 @@ static VOID FuseOpCreate_FileOpenIf(FUSE_CONTEXT *Context)
                 coro_break;
 
             FusePosixPathSuffix(&Context->Lookup.OrigPath, 0, &Context->Lookup.Name);
-            coro_await (FuseProtoSendCreate(Context));
+            coro_await (FuseCreate(Context));
         }
         else
-            coro_await (FuseProtoSendOpen(Context));
+            coro_await (FuseOpen(Context));
 
         coro_break;
     }
@@ -712,7 +722,7 @@ static VOID FuseOpCreate_FileOverwrite(FUSE_CONTEXT *Context)
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        coro_await (FuseProtoSendOpen(Context));
+        coro_await (FuseOpen(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
@@ -739,11 +749,11 @@ static VOID FuseOpCreate_FileOverwriteIf(FUSE_CONTEXT *Context)
                 coro_break;
 
             FusePosixPathSuffix(&Context->Lookup.OrigPath, 0, &Context->Lookup.Name);
-            coro_await (FuseProtoSendCreate(Context));
+            coro_await (FuseCreate(Context));
         }
         else
         {
-            coro_await (FuseProtoSendOpen(Context));
+            coro_await (FuseOpen(Context));
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
@@ -764,7 +774,7 @@ static VOID FuseOpCreate_FileOpenTargetDirectory(FUSE_CONTEXT *Context)
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        coro_await (FuseProtoSendOpen(Context));
+        coro_await (FuseOpen(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
