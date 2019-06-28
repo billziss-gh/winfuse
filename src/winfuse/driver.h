@@ -157,6 +157,7 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
+VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 static inline

@@ -37,6 +37,7 @@ static VOID FuseCreateCheck(FUSE_CONTEXT *Context);
 static VOID FuseOpenCheck(FUSE_CONTEXT *Context);
 static VOID FuseOverwriteCheck(FUSE_CONTEXT *Context);
 static VOID FuseOpenTargetDirectoryCheck(FUSE_CONTEXT *Context);
+static VOID FuseOpen(FUSE_CONTEXT *Context);
 static VOID FuseOpCreate_FileCreate(FUSE_CONTEXT *Context);
 static VOID FuseOpCreate_FileOpen(FUSE_CONTEXT *Context);
 static VOID FuseOpCreate_FileOpenIf(FUSE_CONTEXT *Context);
@@ -77,6 +78,7 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpenCheck)
 #pragma alloc_text(PAGE, FuseOverwriteCheck)
 #pragma alloc_text(PAGE, FuseOpenTargetDirectoryCheck)
+#pragma alloc_text(PAGE, FuseOpen)
 #pragma alloc_text(PAGE, FuseOpCreate_FileCreate)
 #pragma alloc_text(PAGE, FuseOpCreate_FileOpen)
 #pragma alloc_text(PAGE, FuseOpCreate_FileOpenIf)
@@ -586,6 +588,61 @@ static VOID FuseOpenTargetDirectoryCheck(FUSE_CONTEXT *Context)
     }
 }
 
+static VOID FuseOpen(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    VOID (*Fn)(FUSE_CONTEXT *) = 0;
+
+    coro_block (Context->CoroState)
+    {
+        switch (Context->Lookup.Attr.mode & 0170000)
+        {
+        case 0040000: /* S_IFDIR */
+            /* FILE_ATTRIBUTE_DIRECTORY */
+            Fn = FuseProtoSendOpendir;
+            break;
+        case 0010000: /* S_IFIFO */
+        case 0020000: /* S_IFCHR */
+        case 0060000: /* S_IFBLK */
+        case 0140000: /* S_IFSOCK */
+            /* FILE_ATTRIBUTE_REPARSE_POINT/IO_REPARSE_TAG_NFS */
+            Fn = 0;
+            break;
+        case 0120000: /* S_IFLNK */
+            /* FILE_ATTRIBUTE_REPARSE_POINT/IO_REPARSE_TAG_SYMLINK */
+            Fn = 0;
+            break;
+        default:
+            Fn = FuseProtoSendOpen;
+            break;
+        }
+
+        if (0 == Fn)
+        {
+            // !!!: REVISIT!
+            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_OBJECT_NAME_NOT_FOUND;
+            coro_break;
+        }
+
+        coro_await (Fn(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        Context->InternalResponse->IoStatus.Information = FILE_OPENED;
+        Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
+            Context->FuseResponse->rsp.open.fh;
+        Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
+            Context->Lookup.GrantedAccess;
+        FuseAttrToFileInfo(Context->DeviceObject, &Context->Lookup.Attr,
+            &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
+        Context->InternalResponse->Rsp.Create.Opened.DisableCache =
+            BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
+
+        coro_break;
+    }
+}
+
 static VOID FuseOpCreate_FileCreate(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
@@ -613,19 +670,7 @@ static VOID FuseOpCreate_FileOpen(FUSE_CONTEXT *Context)
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        coro_await (FuseProtoSendOpen(Context));
-        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-            coro_break;
-
-        Context->InternalResponse->IoStatus.Information = FILE_OPENED;
-        Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
-            Context->FuseResponse->rsp.open.fh;
-        Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
-            Context->Lookup.GrantedAccess;
-        FuseAttrToFileInfo(Context->DeviceObject, &Context->Lookup.Attr,
-            &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
-        Context->InternalResponse->Rsp.Create.Opened.DisableCache =
-            BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
+        coro_await (FuseOpen(Context));
 
         coro_break;
     }
