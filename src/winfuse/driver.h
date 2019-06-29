@@ -176,6 +176,7 @@ VOID FuseUnixTimeToFileTime(UINT64 sec, UINT32 nsec, PUINT64 PFileTime)
     INT64 FileTime = (INT64)sec * 10000000 + (INT64)nsec / 100 + 116444736000000000LL;
     *PFileTime = FileTime;
 }
+NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 
 /* paths */
 VOID FusePosixPathPrefix(PSTRING Path, PSTRING Prefix, PSTRING Remain);
@@ -185,7 +186,6 @@ VOID FusePosixPathSuffix(PSTRING Path, PSTRING Remain, PSTRING Suffix);
 NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid);
 NTSTATUS FuseSendTransactInternalIrp(PDEVICE_OBJECT DeviceObject, PFILE_OBJECT FileObject,
     FSP_FSCTL_TRANSACT_RSP *Response, FSP_FSCTL_TRANSACT_REQ **PRequest);
-NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 
 /* memory allocation */
 #define FUSE_ALLOC_TAG                  'ESUF'

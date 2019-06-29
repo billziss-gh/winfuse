@@ -26,13 +26,11 @@ NTSTATUS FuseSendTransactInternalIrp(PDEVICE_OBJECT DeviceObject, PFILE_OBJECT F
     FSP_FSCTL_TRANSACT_RSP *Response, FSP_FSCTL_TRANSACT_REQ **PRequest);
 static NTSTATUS FuseSendIrpCompletion(
     PDEVICE_OBJECT DeviceObject, PIRP Irp, PVOID Context0);
-NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, FuseGetTokenUid)
 #pragma alloc_text(PAGE, FuseSendTransactInternalIrp)
 // !#pragma alloc_text(PAGE, FuseSendIrpCompletion)
-#pragma alloc_text(PAGE, FuseNtStatusFromErrno)
 #endif
 
 NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid)
@@ -137,18 +135,4 @@ static NTSTATUS FuseSendIrpCompletion(
     IoFreeIrp(Irp);
 
     return STATUS_MORE_PROCESSING_REQUIRED;
-}
-
-NTSTATUS FuseNtStatusFromErrno(INT32 Errno)
-{
-    PAGED_CODE();
-
-    switch (Errno)
-    {
-    #undef FUSE_ERRNO
-    #define FUSE_ERRNO 87
-    #include <winfuse/errno.i>
-    default:
-        return STATUS_ACCESS_DENIED;
-    }
 }

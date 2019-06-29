@@ -36,6 +36,7 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
+NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, FuseProtoPostInit)
@@ -52,6 +53,7 @@ VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
 #pragma alloc_text(PAGE, FuseProtoSendOpen)
 #pragma alloc_text(PAGE, FuseProtoSendOpendir)
 #pragma alloc_text(PAGE, FuseAttrToFileInfo)
+#pragma alloc_text(PAGE, FuseNtStatusFromErrno)
 #endif
 
 static inline VOID FuseProtoInitRequest(FUSE_CONTEXT *Context,
@@ -378,4 +380,18 @@ VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FileInfo->IndexNumber = Attr->ino;
     FileInfo->HardLinks = 0;
     FileInfo->EaSize = 0;
+}
+
+NTSTATUS FuseNtStatusFromErrno(INT32 Errno)
+{
+    PAGED_CODE();
+
+    switch (Errno)
+    {
+    #undef FUSE_ERRNO
+    #define FUSE_ERRNO 87
+    #include <winfuse/errno.i>
+    default:
+        return STATUS_ACCESS_DENIED;
+    }
 }
