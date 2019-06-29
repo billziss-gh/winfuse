@@ -594,9 +594,23 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
+    UINT32 Uid, Gid, Mode;
+
     coro_block (Context->CoroState)
     {
-        /* !!!: security descriptor */
+        if (0 != Context->InternalRequest->Req.Create.SecurityDescriptor.Offset)
+        {
+            Context->InternalResponse->IoStatus.Status = FspPosixMapSecurityDescriptorToPermissions(
+                (PSECURITY_DESCRIPTOR)(Context->InternalRequest->Buffer +
+                    Context->InternalRequest->Req.Create.SecurityDescriptor.Offset),
+                &Uid, &Gid, &Mode);
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+
+            Context->Lookup.Attr.mode = Mode;
+        }
+        else
+            Context->Lookup.Attr.mode = 0777;
 
         if (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DIRECTORY_FILE))
         {
@@ -604,328 +618,98 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
+            Context->Lookup.Attr = Context->FuseResponse->rsp.mkdir.entry.attr;
+
             coro_await (FuseProtoSendOpendir(Context));
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
+
+            Context->InternalResponse->IoStatus.Information = FILE_CREATED;
+            Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
+                Context->FuseResponse->rsp.open.fh;
+            Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
+                Context->Lookup.GrantedAccess;
+            FuseAttrToFileInfo(Context->DeviceObject, &Context->Lookup.Attr,
+                &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
+            Context->InternalResponse->Rsp.Create.Opened.DisableCache =
+                BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
         }
         else
         {
             coro_await (FuseProtoSendCreate(Context));
+            if (NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            {
+                Context->InternalResponse->IoStatus.Information = FILE_CREATED;
+                Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
+                    Context->FuseResponse->rsp.create.fh;
+                Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
+                    Context->Lookup.GrantedAccess;
+                FuseAttrToFileInfo(Context->DeviceObject, &Context->Lookup.Attr,
+                    &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
+                Context->InternalResponse->Rsp.Create.Opened.DisableCache =
+                    BooleanFlagOn(Context->FuseResponse->rsp.create.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
+            }
+            else
+            {
+                if (STATUS_INVALID_DEVICE_REQUEST != Context->InternalResponse->IoStatus.Status)
+                    coro_break;
+
+                coro_await (FuseProtoSendMknod(Context));
+                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                    coro_break;
+
+                Context->Lookup.Attr = Context->FuseResponse->rsp.mkdir.entry.attr;
+
+                coro_await (FuseProtoSendOpen(Context));
+                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                    coro_break;
+
+                Context->InternalResponse->IoStatus.Information = FILE_CREATED;
+                Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
+                    Context->FuseResponse->rsp.open.fh;
+                Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
+                    Context->Lookup.GrantedAccess;
+                FuseAttrToFileInfo(Context->DeviceObject, &Context->Lookup.Attr,
+                    &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
+                Context->InternalResponse->Rsp.Create.Opened.DisableCache =
+                    BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
+            }
+        }
+
+        if (0 != Context->InternalRequest->Req.Create.SecurityDescriptor.Offset)
+        {
+            Context->InternalResponse->IoStatus.Status = FspPosixMapSecurityDescriptorToPermissions(
+                (PSECURITY_DESCRIPTOR)(Context->InternalRequest->Buffer +
+                    Context->InternalRequest->Req.Create.SecurityDescriptor.Offset),
+                &Uid, &Gid, &Mode);
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                goto cleanup;
+
+            if (Uid != Context->OrigUid || Gid != Context->OrigGid)
             {
-                if (STATUS_INVALID_DEVICE_REQUEST == Context->InternalResponse->IoStatus.Status)
-                {
-                    coro_await (FuseProtoSendMknod(Context));
-                    if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-                        coro_break;
+                Context->Fh = Context->InternalResponse->Rsp.Create.Opened.UserContext2;
+                coro_await (FuseProtoSendChownOrig(Context));
+                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status) &&
+                    STATUS_INVALID_DEVICE_REQUEST != Context->InternalResponse->IoStatus.Status)
+                    goto cleanup;
 
-                    coro_await (FuseProtoSendOpen(Context));
-                    if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-                        coro_break;
-                }
-
-                coro_break;
+                FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.setattr.attr,
+                    &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
             }
         }
 
-#if 0
-        if (CreateOptions & FILE_DIRECTORY_FILE)
-        {
-            if (0 != f->ops.mkdir)
-            {
-                err = f->ops.mkdir(contexthdr->PosixPath, Mode);
-                if (0 != err)
-                {
-                    Result = fsp_fuse_ntstatus_from_errno(f->env, err);
-                    goto exit;
-                }
+        coro_break;
 
-                if (0 != f->ops.opendir)
-                {
-                    err = f->ops.opendir(contexthdr->PosixPath, &fi);
-                    Result = fsp_fuse_ntstatus_from_errno(f->env, err);
-                }
-                else
-                {
-                    fi.fh = -1;
-                    Result = STATUS_SUCCESS;
-                }
-            }
-            else
-                Result = STATUS_INVALID_DEVICE_REQUEST;
-        }
+    cleanup:
+        if (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DIRECTORY_FILE))
+            coro_await (FuseProtoSendReleasedir(Context));
         else
-        {
-            if (0 != f->ops.create)
-            {
-                err = f->ops.create(contexthdr->PosixPath, Mode, &fi);
-                Result = fsp_fuse_ntstatus_from_errno(f->env, err);
-            }
-            else if (0 != f->ops.mknod && 0 != f->ops.open)
-            {
-                err = f->ops.mknod(contexthdr->PosixPath, Mode, 0);
-                if (0 != err)
-                {
-                    Result = fsp_fuse_ntstatus_from_errno(f->env, err);
-                    goto exit;
-                }
+            coro_await (FuseProtoSendRelease(Context));
 
-                err = f->ops.open(contexthdr->PosixPath, &fi);
-                Result = fsp_fuse_ntstatus_from_errno(f->env, err);
-            }
-            else
-                Result = STATUS_INVALID_DEVICE_REQUEST;
-        }
-#endif
+        Context->InternalResponse->IoStatus.Information = 0;
 
         coro_break;
     }
-
-#if 0
-    struct fuse *f = FileSystem->UserContext;
-    struct fuse_context *context = fsp_fuse_get_context(f->env);
-    struct fsp_fuse_context_header *contexthdr = FSP_FUSE_HDR_FROM_CONTEXT(context);
-    UINT32 Uid, Gid, Mode;
-    FSP_FSCTL_FILE_INFO FileInfoBuf;
-    struct fsp_fuse_file_desc *filedesc = 0;
-    struct fuse_file_info fi;
-    BOOLEAN Opened = FALSE;
-    int err;
-    NTSTATUS Result;
-
-    Uid = context->uid;
-    Gid = context->gid;
-    Mode = 0777;
-    if (0 != SecurityDescriptor)
-    {
-        Result = FspPosixMapSecurityDescriptorToPermissions(SecurityDescriptor,
-            &Uid, &Gid, &Mode);
-        if (!NT_SUCCESS(Result))
-            goto exit;
-    }
-    Mode &= ~context->umask;
-    if (CreateOptions & FILE_DIRECTORY_FILE)
-    {
-        if (f->set_create_dir_umask)
-            Mode = 0777 & ~f->create_dir_umask;
-        else
-        if (f->set_create_umask)
-            Mode = 0777 & ~f->create_umask;
-    }
-    else
-    {
-        if (f->set_create_file_umask)
-            Mode = 0777 & ~f->create_file_umask;
-        else
-        if (f->set_create_umask)
-            Mode = 0777 & ~f->create_umask;
-    }
-
-    memset(&fi, 0, sizeof fi);
-    if ('C' == f->env->environment) /* Cygwin */
-        fi.flags = 0x0200 | 0x0800 | 2 /*O_CREAT|O_EXCL|O_RDWR*/;
-    else
-        fi.flags = 0x0100 | 0x0400 | 2 /*O_CREAT|O_EXCL|O_RDWR*/;
-
-    if (CreateOptions & FILE_DIRECTORY_FILE)
-    {
-        if (0 != f->ops.mkdir)
-        {
-            err = f->ops.mkdir(contexthdr->PosixPath, Mode);
-            if (0 != err)
-            {
-                Result = fsp_fuse_ntstatus_from_errno(f->env, err);
-                goto exit;
-            }
-
-            if (0 != f->ops.opendir)
-            {
-                err = f->ops.opendir(contexthdr->PosixPath, &fi);
-                Result = fsp_fuse_ntstatus_from_errno(f->env, err);
-            }
-            else
-            {
-                fi.fh = -1;
-                Result = STATUS_SUCCESS;
-            }
-        }
-        else
-            Result = STATUS_INVALID_DEVICE_REQUEST;
-    }
-    else
-    {
-        if (0 != f->ops.create)
-        {
-            err = f->ops.create(contexthdr->PosixPath, Mode, &fi);
-            Result = fsp_fuse_ntstatus_from_errno(f->env, err);
-        }
-        else if (0 != f->ops.mknod && 0 != f->ops.open)
-        {
-            err = f->ops.mknod(contexthdr->PosixPath, Mode, 0);
-            if (0 != err)
-            {
-                Result = fsp_fuse_ntstatus_from_errno(f->env, err);
-                goto exit;
-            }
-
-            err = f->ops.open(contexthdr->PosixPath, &fi);
-            Result = fsp_fuse_ntstatus_from_errno(f->env, err);
-        }
-        else
-            Result = STATUS_INVALID_DEVICE_REQUEST;
-    }
-    if (!NT_SUCCESS(Result))
-        goto exit;
-
-    Opened = TRUE;
-
-    if (0 != FileAttributes &&
-        0 != (f->conn_want & FSP_FUSE_CAP_STAT_EX) && 0 != f->ops.chflags)
-    {
-        err = f->ops.chflags(contexthdr->PosixPath,
-            fsp_fuse_intf_MapFileAttributesToFlags(CreateOptions & FILE_DIRECTORY_FILE ?
-                FileAttributes : FileAttributes | FILE_ATTRIBUTE_ARCHIVE));
-        Result = fsp_fuse_ntstatus_from_errno(f->env, err);
-        if (!NT_SUCCESS(Result) && STATUS_INVALID_DEVICE_REQUEST != Result)
-            goto exit;
-    }
-
-    if ((Uid != context->uid || Gid != context->gid) &&
-        0 != f->ops.chown)
-    {
-        err = f->ops.chown(contexthdr->PosixPath, Uid, Gid);
-        Result = fsp_fuse_ntstatus_from_errno(f->env, err);
-        if (!NT_SUCCESS(Result) && STATUS_INVALID_DEVICE_REQUEST != Result)
-            goto exit;
-    }
-
-    if (0 != ExtraBuffer)
-    {
-        if (!ExtraBufferIsReparsePoint)
-        {
-            Result = FspFileSystemEnumerateEa(FileSystem,
-                fsp_fuse_intf_SetEaEntry, contexthdr->PosixPath, ExtraBuffer, ExtraLength);
-            if (!NT_SUCCESS(Result))
-                goto exit;
-        }
-        else
-        {
-            /* !!!: revisit: WslFeatures, GetFileInfoFunnel, GetReparsePointEx, SetReparsePoint */
-            Result = STATUS_INVALID_PARAMETER;
-            goto exit;
-        }
-    }
-    /*
-     * Ignore fuse_file_info::direct_io, fuse_file_info::keep_cache.
-     * NOTE: Originally WinFsp dit not support disabling the cache manager
-     * for an individual file. This is now possible and we should revisit.
-     *
-     * Ignore fuse_file_info::nonseekable.
-     */
-
-    Result = fsp_fuse_intf_GetFileInfoEx(FileSystem, contexthdr->PosixPath, &fi,
-        &Uid, &Gid, &Mode, &FileInfoBuf);
-    if (!NT_SUCCESS(Result))
-        goto exit;
-
-    *PFileDesc = filedesc;
-    memcpy(FileInfo, &FileInfoBuf, sizeof FileInfoBuf);
-
-    filedesc->PosixPath = contexthdr->PosixPath;
-    filedesc->IsDirectory = !!(FileInfoBuf.FileAttributes & FILE_ATTRIBUTE_DIRECTORY);
-    filedesc->IsReparsePoint = FALSE;
-    filedesc->OpenFlags = fi.flags;
-    filedesc->FileHandle = fi.fh;
-    filedesc->DirBuffer = 0;
-    contexthdr->PosixPath = 0;
-
-    Result = STATUS_SUCCESS;
-
-exit:
-    if (!NT_SUCCESS(Result))
-    {
-        if (Opened)
-        {
-            if (CreateOptions & FILE_DIRECTORY_FILE)
-            {
-                if (0 != f->ops.releasedir)
-                    f->ops.releasedir(filedesc->PosixPath, &fi);
-            }
-            else
-            {
-                if (0 != f->ops.release)
-                    f->ops.release(filedesc->PosixPath, &fi);
-            }
-        }
-
-        MemFree(filedesc);
-    }
-
-    return Result;
-#endif
-#if 0
-    NTSTATUS Result;
-    UINT32 GrantedAccess;
-    PSECURITY_DESCRIPTOR ParentDescriptor;
-    FSP_FSCTL_TRANSACT_FULL_CONTEXT FullContext;
-    FSP_FSCTL_OPEN_FILE_INFO OpenFileInfo;
-    PSECURITY_DESCRIPTOR OpenDescriptor = 0;
-
-    Result = FspFileSystemCreateCheck(FileSystem, Request, Response, TRUE,
-        &GrantedAccess, &ParentDescriptor);
-    if (!NT_SUCCESS(Result) || STATUS_REPARSE == Result)
-        return Result;
-
-    Result = FspCreateSecurityDescriptor(FileSystem, Request, ParentDescriptor, &OpenDescriptor);
-    FspDeleteSecurityDescriptor(ParentDescriptor, FspAccessCheckEx);
-    if (!NT_SUCCESS(Result))
-        return Result;
-
-    FullContext.UserContext = 0;
-    FullContext.UserContext2 = 0;
-    memset(&OpenFileInfo, 0, sizeof OpenFileInfo);
-    OpenFileInfo.NormalizedName = (PVOID)Response->Buffer;
-    OpenFileInfo.NormalizedNameSize = FSP_FSCTL_TRANSACT_RSP_BUFFER_SIZEMAX;
-    if (0 != FileSystem->Interface->CreateEx)
-        Result = FileSystem->Interface->CreateEx(FileSystem,
-            (PWSTR)Request->Buffer, Request->Req.Create.CreateOptions, GrantedAccess,
-            Request->Req.Create.FileAttributes, OpenDescriptor, Request->Req.Create.AllocationSize,
-            0 != Request->Req.Create.Ea.Size ?
-                (PVOID)(Request->Buffer + Request->Req.Create.Ea.Offset) : 0,
-            Request->Req.Create.Ea.Size,
-            Request->Req.Create.EaIsReparsePoint,
-            AddrOfFileContext(FullContext), &OpenFileInfo.FileInfo);
-    else
-        Result = FileSystem->Interface->Create(FileSystem,
-            (PWSTR)Request->Buffer, Request->Req.Create.CreateOptions, GrantedAccess,
-            Request->Req.Create.FileAttributes, OpenDescriptor, Request->Req.Create.AllocationSize,
-            AddrOfFileContext(FullContext), &OpenFileInfo.FileInfo);
-    if (!NT_SUCCESS(Result))
-    {
-        FspDeleteSecurityDescriptor(OpenDescriptor, FspCreateSecurityDescriptor);
-        return Result;
-    }
-
-    if (FSP_FSCTL_TRANSACT_PATH_SIZEMAX >= OpenFileInfo.NormalizedNameSize)
-    {
-        Response->Size = (UINT16)(sizeof *Response + OpenFileInfo.NormalizedNameSize);
-        Response->Rsp.Create.Opened.FileName.Offset = 0;
-        Response->Rsp.Create.Opened.FileName.Size = (UINT16)OpenFileInfo.NormalizedNameSize;
-    }
-
-    if (0 != OpenDescriptor)
-    {
-        FspFileSystemOpCreate_SetOpenDescriptor(Response, OpenDescriptor);
-        FspDeleteSecurityDescriptor(OpenDescriptor, FspCreateSecurityDescriptor);
-    }
-
-    Response->IoStatus.Information = FILE_CREATED;
-    SetFileContext(Response->Rsp.Create.Opened, FullContext);
-    Response->Rsp.Create.Opened.GrantedAccess = GrantedAccess;
-    memcpy(&Response->Rsp.Create.Opened.FileInfo,
-        &OpenFileInfo.FileInfo, sizeof OpenFileInfo.FileInfo);
-    return STATUS_SUCCESS;
-#endif
 }
 
 static VOID FuseOpen(FUSE_CONTEXT *Context)

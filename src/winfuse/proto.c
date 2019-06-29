@@ -32,8 +32,11 @@ VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
-VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
+VOID FuseProtoSendChownOrig(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
+VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
+VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context);
+VOID FuseProtoSendRelease(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
@@ -50,8 +53,11 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoSendMkdir)
 #pragma alloc_text(PAGE, FuseProtoSendMknod)
 #pragma alloc_text(PAGE, FuseProtoSendCreate)
-#pragma alloc_text(PAGE, FuseProtoSendOpen)
+#pragma alloc_text(PAGE, FuseProtoSendChownOrig)
 #pragma alloc_text(PAGE, FuseProtoSendOpendir)
+#pragma alloc_text(PAGE, FuseProtoSendOpen)
+#pragma alloc_text(PAGE, FuseProtoSendReleasedir)
+#pragma alloc_text(PAGE, FuseProtoSendRelease)
 #pragma alloc_text(PAGE, FuseAttrToFileInfo)
 #pragma alloc_text(PAGE, FuseNtStatusFromErrno)
 #endif
@@ -224,7 +230,7 @@ VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
             (UINT32)(FUSE_PROTO_REQ_SIZE(mkdir) + Context->Lookup.Name.Length + 1),
             FUSE_PROTO_OPCODE_MKDIR, Context->Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
-        Context->FuseRequest->req.mkdir.mode = 0777;        /* !!!: REVISIT */
+        Context->FuseRequest->req.mkdir.mode = Context->Lookup.Attr.mode;
         Context->FuseRequest->req.mkdir.umask = 0;          /* !!!: REVISIT */
         RtlCopyMemory(Context->FuseRequest->req.mkdir.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
@@ -248,7 +254,7 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
             (UINT32)(FUSE_PROTO_REQ_SIZE(mknod) + Context->Lookup.Name.Length + 1),
             FUSE_PROTO_OPCODE_MKDIR, Context->Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
-        Context->FuseRequest->req.mknod.mode = 0777;        /* !!!: REVISIT */
+        Context->FuseRequest->req.mknod.mode = Context->Lookup.Attr.mode;
         Context->FuseRequest->req.mknod.rdev = 0;           /* !!!: REVISIT */
         Context->FuseRequest->req.mknod.umask = 0;          /* !!!: REVISIT */
         RtlCopyMemory(Context->FuseRequest->req.mknod.name, Context->Lookup.Name.Buffer,
@@ -274,11 +280,50 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
             FUSE_PROTO_OPCODE_CREATE, Context->Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
         Context->FuseRequest->req.create.flags = 0x0100 | 0x0400 | 2 /*O_CREAT|O_EXCL|O_RDWR*/;
-        Context->FuseRequest->req.create.mode = 0777;       /* !!!: REVISIT */
+        Context->FuseRequest->req.create.mode = Context->Lookup.Attr.mode;
         Context->FuseRequest->req.create.umask = 0;         /* !!!: REVISIT */
         RtlCopyMemory(Context->FuseRequest->req.create.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.create.name[Context->Lookup.Name.Length] = '\0';
+        coro_yield;
+
+        if (0 != Context->FuseResponse->error)
+            Context->InternalResponse->IoStatus.Status =
+                FuseNtStatusFromErrno(Context->FuseResponse->error);
+        coro_break;
+    }
+}
+
+VOID FuseProtoSendChownOrig(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    coro_block (Context->CoroState)
+    {
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, 0);
+        Context->FuseRequest->req.setattr.valid =
+            FUSE_PROTO_SETATTR_FH | FUSE_PROTO_SETATTR_UID | FUSE_PROTO_SETATTR_GID;
+        Context->FuseRequest->req.setattr.fh = Context->Fh;
+        Context->FuseRequest->req.setattr.uid = Context->OrigUid;
+        Context->FuseRequest->req.setattr.gid = Context->OrigGid;
+        coro_yield;
+
+        if (0 != Context->FuseResponse->error)
+            Context->InternalResponse->IoStatus.Status =
+                FuseNtStatusFromErrno(Context->FuseResponse->error);
+        coro_break;
+    }
+}
+
+VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    coro_block (Context->CoroState)
+    {
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPENDIR, Context->Ino);
         coro_yield;
 
         if (0 != Context->FuseResponse->error)
@@ -318,14 +363,37 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context)
     }
 }
 
-VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context)
+VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
     coro_block (Context->CoroState)
     {
         FuseProtoInitRequest(Context,
-            FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPENDIR, Context->Ino);
+            FUSE_PROTO_REQ_SIZE(release), FUSE_PROTO_OPCODE_RELEASEDIR, 0);
+        Context->FuseRequest->req.release.fh = Context->Fh;
+        Context->FuseRequest->req.release.flags = 0;        /* !!!: REVISIT */
+        coro_yield;
+
+        if (0 != Context->FuseResponse->error)
+            Context->InternalResponse->IoStatus.Status =
+                FuseNtStatusFromErrno(Context->FuseResponse->error);
+        coro_break;
+    }
+}
+
+VOID FuseProtoSendRelease(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    coro_block (Context->CoroState)
+    {
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_SIZE(release), FUSE_PROTO_OPCODE_RELEASE, 0);
+        Context->FuseRequest->req.release.fh = Context->Fh;
+        Context->FuseRequest->req.release.flags = 0;        /* !!!: REVISIT */
+        Context->FuseRequest->req.release.release_flags = 0;/* !!!: REVISIT */
+        Context->FuseRequest->req.release.lock_owner = 0;   /* !!!: REVISIT */
         coro_yield;
 
         if (0 != Context->FuseResponse->error)

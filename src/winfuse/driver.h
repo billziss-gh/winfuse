@@ -74,7 +74,10 @@ struct _FUSE_CONTEXT
     FUSE_PROTO_RSP *FuseResponse;
     SHORT CoroState[16];
     UINT32 OrigUid, OrigGid, OrigPid;
-    UINT64 Ino;
+    union
+    {
+        UINT64 Ino, Fh;
+    };
     union
     {
         struct
@@ -158,8 +161,11 @@ VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
-VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
+VOID FuseProtoSendChownOrig(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
+VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
+VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context);
+VOID FuseProtoSendRelease(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 static inline
