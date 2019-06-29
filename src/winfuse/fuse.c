@@ -222,7 +222,10 @@ request:
             }
         }
         else
+        {
+            ASSERT(!FuseContextIsStatus(Context));
             Continue = FuseContextProcess(Context, 0, FuseRequest);
+        }
 
         if (Continue)
         {
@@ -231,6 +234,7 @@ request:
         }
         else if (FuseContextIsStatus(Context))
         {
+            ASSERT(0 != InternalRequest);
             RtlZeroMemory(&InternalResponse, sizeof InternalResponse);
             InternalResponse.Size = sizeof InternalResponse;
             InternalResponse.Kind = InternalRequest->Kind;

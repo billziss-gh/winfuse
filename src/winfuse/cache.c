@@ -35,15 +35,6 @@
  * was recently used.
  */
 
-/*
- * FUSE_CACHE_REMOVE_HASHED_ITEM
- *
- * Define this macro to include code to remove hashed items.
- *
- * (Untested: please test prior to using.)
- */
-//#define FUSE_CACHE_REMOVE_HASHED_ITEM
-
 NTSTATUS FuseCacheCreate(ULONG Capacity, BOOLEAN CaseInsensitive, FUSE_CACHE **PCache);
 VOID FuseCacheDelete(FUSE_CACHE *Cache);
 VOID FuseCacheDeleteItems(PLIST_ENTRY ItemList);
@@ -120,7 +111,7 @@ static inline FUSE_CACHE_ITEM *FuseCacheLookupHashedItem(FUSE_CACHE *Cache,
     for (FUSE_CACHE_ITEM *ItemX = Cache->ItemBuckets[HashIndex]; ItemX; ItemX = ItemX->DictNext)
         if (ItemX->Hash == Hash &&
             ItemX->ParentIno == ParentIno &&
-            RtlEqualString(&Item->Name, Name, Cache->CaseInsensitive))
+            RtlEqualString(&ItemX->Name, Name, Cache->CaseInsensitive))
         {
             Item = ItemX;
             break;
@@ -146,7 +137,7 @@ static inline VOID FuseCacheAddItem(FUSE_CACHE *Cache,
     Cache->ItemCount++;
 }
 
-static inline FUSE_CACHE_ITEM *FuseCacheRemoveItem(FUSE_CACHE *Cache,
+static inline BOOLEAN FuseCacheRemoveItem(FUSE_CACHE *Cache,
     FUSE_CACHE_ITEM *Item)
 {
     ULONG HashIndex = Item->Hash % Cache->ItemBucketCount;
@@ -156,20 +147,18 @@ static inline FUSE_CACHE_ITEM *FuseCacheRemoveItem(FUSE_CACHE *Cache,
             *P = (*P)->DictNext;
             RemoveEntryList(&Item->ListEntry);
             Cache->ItemCount--;
-
             if (Item->ParentIno == FUSE_PROTO_ROOT_ID &&
                 1 == Item->Name.Length && '/' == Item->Name.Buffer[0])
                 /* the root is not LOOKUP'ed; free without FORGET */
                 FuseFree(Item);
             else
                 InsertTailList(&Cache->ForgetList, &Item->ListEntry);
-
-            break;
+            return TRUE;
         }
-    return Item;
+    return FALSE;
 }
 
-static inline FUSE_CACHE_ITEM *FuseCacheRemoveExpiredItem(FUSE_CACHE *Cache,
+static inline BOOLEAN FuseCacheRemoveExpiredItem(FUSE_CACHE *Cache,
     UINT64 ExpirationTime)
 {
     PLIST_ENTRY Head = &Cache->ItemList;
@@ -181,35 +170,6 @@ static inline FUSE_CACHE_ITEM *FuseCacheRemoveExpiredItem(FUSE_CACHE *Cache,
         return 0;
     return FuseCacheRemoveItem(Cache, Item);
 }
-
-#if defined(FUSE_CACHE_REMOVE_HASHED_ITEM)
-static inline FUSE_CACHE_ITEM *FuseCacheRemoveHashedItem(FUSE_CACHE *Cache,
-    ULONG Hash, UINT64 ParentIno, PSTRING Name)
-{
-    FUSE_CACHE_ITEM *Item = 0;
-    ULONG HashIndex = Item->Hash % Cache->ItemBucketCount;
-    for (FUSE_CACHE_ITEM **P = (PVOID)&Cache->ItemBuckets[HashIndex]; *P; P = &(*P)->DictNext)
-        if ((*P)->Hash == Hash &&
-            (*P)->ParentIno == ParentIno &&
-            RtlEqualString(&Item->Name, Name, Cache->CaseInsensitive))
-        {
-            Item = *P;
-            *P = (*P)->DictNext;
-            RemoveEntryList(&Item->ListEntry);
-            Cache->ItemCount--;
-
-            if (Item->ParentIno == FUSE_PROTO_ROOT_ID &&
-                1 == Item->Name.Length && '/' == Item->Name.Buffer[0])
-                /* the root is not LOOKUP'ed; free without FORGET */
-                FuseFree(Item);
-            else
-                InsertTailList(&Cache->ForgetList, &Item->ListEntry);
-
-            break;
-        }
-    return Item;
-}
-#endif
 
 NTSTATUS FuseCacheCreate(ULONG Capacity, BOOLEAN CaseInsensitive, FUSE_CACHE **PCache)
 {
@@ -386,13 +346,7 @@ NTSTATUS FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
         }
     }
     else
-    {
-#if defined(FUSE_CACHE_REMOVE_HASHED_ITEM)
-        FuseCacheRemoveHashedItem(Cache, Hash, ParentIno, Name);
-#else
         ASSERT(0);
-#endif
-    }
 
     ExReleaseFastMutex(&Cache->Mutex);
 

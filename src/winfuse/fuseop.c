@@ -37,6 +37,7 @@ static VOID FuseCreateCheck(FUSE_CONTEXT *Context);
 static VOID FuseOpenCheck(FUSE_CONTEXT *Context);
 static VOID FuseOverwriteCheck(FUSE_CONTEXT *Context);
 static VOID FuseOpenTargetDirectoryCheck(FUSE_CONTEXT *Context);
+static VOID FuseCreate(FUSE_CONTEXT *Context);
 static VOID FuseOpen(FUSE_CONTEXT *Context);
 static VOID FuseOpCreate_FileCreate(FUSE_CONTEXT *Context);
 static VOID FuseOpCreate_FileOpen(FUSE_CONTEXT *Context);
@@ -78,6 +79,7 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpenCheck)
 #pragma alloc_text(PAGE, FuseOverwriteCheck)
 #pragma alloc_text(PAGE, FuseOpenTargetDirectoryCheck)
+#pragma alloc_text(PAGE, FuseCreate)
 #pragma alloc_text(PAGE, FuseOpen)
 #pragma alloc_text(PAGE, FuseOpCreate_FileCreate)
 #pragma alloc_text(PAGE, FuseOpCreate_FileOpen)
