@@ -135,8 +135,6 @@ static BOOLEAN FuseOpReserved_Init(FUSE_CONTEXT *Context)
         DeviceExtension->VersionMinor = Context->FuseResponse->rsp.init.minor;
         // !!!: REVISIT
         KeSetEvent(&DeviceExtension->InitEvent, 1, FALSE);
-
-        coro_break;
     }
 
     return coro_active();
@@ -171,8 +169,6 @@ static BOOLEAN FuseOpReserved_Forget(FUSE_CONTEXT *Context)
                 coro_yield;
             }
         }
-
-        coro_break;
     }
 
     return coro_active();
@@ -361,7 +357,6 @@ static VOID FuseLookupName(FUSE_CONTEXT *Context)
 
         Context->Ino = Entry->nodeid;
         Context->Lookup.Attr = Entry->attr;
-        coro_break;
     }
 }
 
@@ -377,7 +372,7 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
     coro_block (Context->CoroState)
     {
         Context->Ino = FUSE_PROTO_ROOT_ID;
-        for (;;)
+        while (1) /* for (;;) produces "warning C4702: unreachable code" */
         {
             FusePosixPathPrefix(&Context->Lookup.Remain, &Context->Lookup.Name, &Context->Lookup.Remain);
 
@@ -481,8 +476,6 @@ static VOID FuseCreateCheck(FUSE_CONTEXT *Context)
                 Context->InternalRequest->Req.Create.DesiredAccess;
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess |=
             Context->InternalRequest->Req.Create.GrantedAccess;
-
-        coro_break;
     }
 }
 
@@ -518,8 +511,6 @@ static VOID FuseOpenCheck(FUSE_CONTEXT *Context)
                 (Context->InternalRequest->Req.Create.DesiredAccess & DELETE);
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess |=
             Context->InternalRequest->Req.Create.GrantedAccess;
-
-        coro_break;
     }
 }
 
@@ -558,8 +549,6 @@ static VOID FuseOverwriteCheck(FUSE_CONTEXT *Context)
                 (Context->InternalRequest->Req.Create.DesiredAccess & (DELETE | FILE_WRITE_DATA));
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess |=
             Context->InternalRequest->Req.Create.GrantedAccess;
-
-        coro_break;
     }
 }
 
@@ -585,8 +574,6 @@ static VOID FuseOpenTargetDirectoryCheck(FUSE_CONTEXT *Context)
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess = Context->Lookup.GrantedAccess;
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess |=
             Context->InternalRequest->Req.Create.GrantedAccess;
-
-        coro_break;
     }
 }
 
@@ -707,8 +694,6 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             coro_await (FuseProtoSendRelease(Context));
 
         Context->InternalResponse->IoStatus.Information = 0;
-
-        coro_break;
     }
 }
 
@@ -762,8 +747,6 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
             &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
         Context->InternalResponse->Rsp.Create.Opened.DisableCache =
             BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
-
-        coro_break;
     }
 }
 
@@ -779,8 +762,6 @@ static VOID FuseOpCreate_FileCreate(FUSE_CONTEXT *Context)
 
         FusePosixPathSuffix(&Context->Lookup.OrigPath, 0, &Context->Lookup.Name);
         coro_await (FuseCreate(Context));
-
-        coro_break;
     }
 }
 
@@ -795,8 +776,6 @@ static VOID FuseOpCreate_FileOpen(FUSE_CONTEXT *Context)
             coro_break;
 
         coro_await (FuseOpen(Context));
-
-        coro_break;
     }
 }
 
@@ -821,8 +800,6 @@ static VOID FuseOpCreate_FileOpenIf(FUSE_CONTEXT *Context)
         }
         else
             coro_await (FuseOpen(Context));
-
-        coro_break;
     }
 }
 
@@ -841,8 +818,6 @@ static VOID FuseOpCreate_FileOverwrite(FUSE_CONTEXT *Context)
             coro_break;
 
         Context->InternalResponse->IoStatus.Information = FILE_OVERWRITTEN;
-
-        coro_break;
     }
 }
 
@@ -873,8 +848,6 @@ static VOID FuseOpCreate_FileOverwriteIf(FUSE_CONTEXT *Context)
 
             Context->InternalResponse->IoStatus.Information = FILE_OVERWRITTEN;
         }
-
-        coro_break;
     }
 }
 
@@ -897,8 +870,6 @@ static VOID FuseOpCreate_FileOpenTargetDirectory(FUSE_CONTEXT *Context)
         Context->InternalResponse->IoStatus.Information =
             NT_SUCCESS(Context->InternalResponse->IoStatus.Status) ?
                 FILE_EXISTS : FILE_DOES_NOT_EXIST;
-
-        coro_break;
     }
 }
 
@@ -951,8 +922,6 @@ BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context)
             coro_await (Fn(Context));
         else
             Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_PARAMETER;
-
-        coro_break;
     }
 
     return coro_active();

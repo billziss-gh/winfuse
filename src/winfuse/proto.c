@@ -109,7 +109,6 @@ VOID FuseProtoSendInit(FUSE_CONTEXT *Context)
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
                 FuseNtStatusFromErrno(Context->FuseResponse->error);
-        coro_break;
     }
 }
 
@@ -131,7 +130,6 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
                 FuseNtStatusFromErrno(Context->FuseResponse->error);
-        coro_break;
     }
 }
 
@@ -216,7 +214,6 @@ VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context)
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
                 FuseNtStatusFromErrno(Context->FuseResponse->error);
-        coro_break;
     }
 }
 
@@ -240,7 +237,6 @@ VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
                 FuseNtStatusFromErrno(Context->FuseResponse->error);
-        coro_break;
     }
 }
 
@@ -265,7 +261,6 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
                 FuseNtStatusFromErrno(Context->FuseResponse->error);
-        coro_break;
     }
 }
 
@@ -290,7 +285,6 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
                 FuseNtStatusFromErrno(Context->FuseResponse->error);
-        coro_break;
     }
 }
 
@@ -312,7 +306,6 @@ VOID FuseProtoSendChownOrig(FUSE_CONTEXT *Context)
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
                 FuseNtStatusFromErrno(Context->FuseResponse->error);
-        coro_break;
     }
 }
 
@@ -329,7 +322,6 @@ VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context)
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
                 FuseNtStatusFromErrno(Context->FuseResponse->error);
-        coro_break;
     }
 }
 
@@ -359,7 +351,6 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context)
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
                 FuseNtStatusFromErrno(Context->FuseResponse->error);
-        coro_break;
     }
 }
 
@@ -378,7 +369,6 @@ VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context)
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
                 FuseNtStatusFromErrno(Context->FuseResponse->error);
-        coro_break;
     }
 }
 
@@ -399,7 +389,6 @@ VOID FuseProtoSendRelease(FUSE_CONTEXT *Context)
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
                 FuseNtStatusFromErrno(Context->FuseResponse->error);
-        coro_break;
     }
 }
 

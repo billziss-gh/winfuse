@@ -73,11 +73,12 @@
  *         If the coroutine block is reentered it exits immediately. It is an error to use "break"
  *         outside of a coroutine block.
  */
-#define coro_block(S)       short *coro_S__ = (S); if (!coro_active()) coro_X__:; else switch (coro_enter__()) case 0:
+#define coro_block(S)       short *coro_S__ = (S); if (!coro_active()) coro_X__:; else \
+                            switch (coro_enter__()) for (; 0,0; coro_below__ = 0, coro_leave__(-1)) case 0:
 #define coro_await__(N, E)  do { E; coro_await_break__; coro_leave__(N); goto coro_X__; case N:; } while (1,1)
 #define coro_await_break__  if (!coro_active()) { coro_below__ = 0; break; }
-#define coro_yield__(N)     do { coro_below__ = 0; coro_leave__(N); goto coro_X__; case N:; } while (0,0)
-#define coro_break          do { coro_below__ = 0; coro_leave__(-1); goto coro_X__; } while (0,0)
+#define coro_yield__(N)     do { coro_below__ = 0, coro_leave__(N); goto coro_X__; case N:; } while (0,0)
+#define coro_break          do { coro_below__ = 0, coro_leave__(-1); goto coro_X__; } while (0,0)
 #define coro_active()       (-1 != coro_below__)
 #define coro_below__        (coro_S__[coro_S__[0] + 1])
 #define coro_enter__()      (coro_S__[++coro_S__[0]])

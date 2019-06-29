@@ -32,18 +32,18 @@ static void bprintf(char **b, const char *format, ...)
     *b += len;
 }
 
-static int coro_break_dotest(short stack[8], char **b)
+static int coro_break_dotest(int brk, short stack[8], char **b)
 {
     coro_block (stack)
     {
         bprintf(b, "%s\n", __FUNCTION__);
-        coro_break;
+        if (brk) coro_break;
     }
 
     return coro_active();
 }
 
-static int coro_yield_dotest(short stack[8], char **b)
+static int coro_yield_dotest(int brk, short stack[8], char **b)
 {
     coro_block (stack)
     {
@@ -51,13 +51,13 @@ static int coro_yield_dotest(short stack[8], char **b)
         coro_yield;
 
         bprintf(b, "%s:20\n", __FUNCTION__);
-        coro_break;
+        if (brk) coro_break;
     }
 
     return coro_active();
 }
 
-static int coro_loopyield_dotest(short stack[8], int *state, char **b)
+static int coro_loopyield_dotest(int brk, short stack[8], int *state, char **b)
 {
     coro_block (stack)
     {
@@ -68,100 +68,100 @@ static int coro_loopyield_dotest(short stack[8], int *state, char **b)
         }
 
         bprintf(b, "%s:20\n", __FUNCTION__);
-        coro_break;
+        if (brk) coro_break;
     }
 
     return coro_active();
 }
 
-static int coro_await_break_dotest(short stack[8], char **b)
+static int coro_await_break_dotest(int brk, short stack[8], char **b)
 {
     coro_block (stack)
     {
         bprintf(b, "%s:10\n", __FUNCTION__);
-        coro_await (coro_break_dotest(stack, b));
+        coro_await (coro_break_dotest(brk, stack, b));
 
         bprintf(b, "%s:20\n", __FUNCTION__);
-        coro_break;
+        if (brk) coro_break;
     }
 
     return coro_active();
 }
 
-static int coro_await_yield_dotest(short stack[8], char **b)
+static int coro_await_yield_dotest(int brk, short stack[8], char **b)
 {
     coro_block (stack)
     {
         bprintf(b, "%s:10\n", __FUNCTION__);
-        coro_await (coro_yield_dotest(stack, b));
+        coro_await (coro_yield_dotest(brk, stack, b));
 
         bprintf(b, "%s:20\n", __FUNCTION__);
-        coro_break;
+        if (brk) coro_break;
     }
 
     return coro_active();
 }
 
-static int coro_await_loopyield_dotest(short stack[8], int *state, char **b)
+static int coro_await_loopyield_dotest(int brk, short stack[8], int *state, char **b)
 {
     coro_block (stack)
     {
         bprintf(b, "%s:10\n", __FUNCTION__);
-        coro_await (coro_loopyield_dotest(stack, state, b));
+        coro_await (coro_loopyield_dotest(brk, stack, state, b));
 
         bprintf(b, "%s:20\n", __FUNCTION__);
-        coro_break;
+        if (brk) coro_break;
     }
 
     return coro_active();
 }
 
-static int coro_loopawait_yield_dotest(short stack[8], int *state, char **b)
+static int coro_loopawait_yield_dotest(int brk, short stack[8], int *state, char **b)
 {
     coro_block (stack)
     {
         while ((*state)++ < 3)
         {
             bprintf(b, "%s:10:%d\n", __FUNCTION__, *state);
-            coro_await (coro_yield_dotest(stack, b));
+            coro_await (coro_yield_dotest(brk, stack, b));
         }
 
         bprintf(b, "%s:20\n", __FUNCTION__);
-        coro_break;
+        if (brk) coro_break;
     }
 
     return coro_active();
 }
 
-static int coro_await_await_yield_dotest(short stack[8], char **b)
+static int coro_await_await_yield_dotest(int brk, short stack[8], char **b)
 {
     coro_block (stack)
     {
         bprintf(b, "%s:10\n", __FUNCTION__);
-        coro_await (coro_await_yield_dotest(stack, b));
+        coro_await (coro_await_yield_dotest(brk, stack, b));
 
         bprintf(b, "%s:20\n", __FUNCTION__);
-        coro_break;
+        if (brk) coro_break;
     }
 
     return coro_active();
 }
 
-static int coro_await_loopawait_yield_dotest(short stack[8], int *state, char **b)
+static int coro_await_loopawait_yield_dotest(int brk, short stack[8], int *state, char **b)
 {
     coro_block (stack)
     {
         bprintf(b, "%s:10\n", __FUNCTION__);
-        coro_await (coro_loopawait_yield_dotest(stack, state, b));
+        coro_await (coro_loopawait_yield_dotest(brk, stack, state, b));
 
         bprintf(b, "%s:20\n", __FUNCTION__);
-        coro_break;
+        if (brk) coro_break;
     }
 
     return coro_active();
 }
 
-static int coro_loopawait_loopawait_yield_dotest(short stack[8], int *state, char **b)
+static int coro_loopawait_loopawait_yield_dotest(int brk, short stack[8], int *state, char **b)
 {
     coro_block (stack)
     {
@@ -169,17 +169,17 @@ static int coro_loopawait_loopawait_yield_dotest(short stack[8], int *state, cha
         {
             bprintf(b, "%s:10:%d\n", __FUNCTION__, *state);
             state[1] = 0;
-            coro_await (coro_loopawait_yield_dotest(stack, state + 1, b));
+            coro_await (coro_loopawait_yield_dotest(brk, stack, state + 1, b));
         }
 
         bprintf(b, "%s:20\n", __FUNCTION__);
-        coro_break;
+        if (brk) coro_break;
     }
 
     return coro_active();
 }
 
-static void coro_test(void)
+static void coro_dotest(int brk)
 {
     short stack[8];
     int state[2];
@@ -187,25 +187,25 @@ static void coro_test(void)
 
     memset(stack, 0, sizeof stack);
     b = buf;
-    ASSERT(!coro_break_dotest(stack, &b));
-    ASSERT(!coro_break_dotest(stack, &b));
+    ASSERT(!coro_break_dotest(brk, stack, &b));
+    ASSERT(!coro_break_dotest(brk, stack, &b));
     ASSERT(0 == strcmp(buf, "coro_break_dotest\n"));
 
     memset(stack, 0, sizeof stack);
     b = buf;
-    ASSERT( coro_yield_dotest(stack, &b));
-    ASSERT(!coro_yield_dotest(stack, &b));
-    ASSERT(!coro_yield_dotest(stack, &b));
+    ASSERT( coro_yield_dotest(brk, stack, &b));
+    ASSERT(!coro_yield_dotest(brk, stack, &b));
+    ASSERT(!coro_yield_dotest(brk, stack, &b));
     ASSERT(0 == strcmp(buf, "coro_yield_dotest:10\ncoro_yield_dotest:20\n"));
 
     memset(stack, 0, sizeof stack);
     state[0] = 0;
     b = buf;
-    ASSERT( coro_loopyield_dotest(stack, state, &b));
-    ASSERT( coro_loopyield_dotest(stack, state, &b));
-    ASSERT( coro_loopyield_dotest(stack, state, &b));
-    ASSERT(!coro_loopyield_dotest(stack, state, &b));
-    ASSERT(!coro_loopyield_dotest(stack, state, &b));
+    ASSERT( coro_loopyield_dotest(brk, stack, state, &b));
+    ASSERT( coro_loopyield_dotest(brk, stack, state, &b));
+    ASSERT( coro_loopyield_dotest(brk, stack, state, &b));
+    ASSERT(!coro_loopyield_dotest(brk, stack, state, &b));
+    ASSERT(!coro_loopyield_dotest(brk, stack, state, &b));
     ASSERT(0 == strcmp(buf,
         "coro_loopyield_dotest:10:1\n"
         "coro_loopyield_dotest:10:2\n"
@@ -214,25 +214,25 @@ static void coro_test(void)
 
     memset(stack, 0, sizeof stack);
     b = buf;
-    ASSERT(!coro_await_break_dotest(stack, &b));
-    ASSERT(!coro_await_break_dotest(stack, &b));
+    ASSERT(!coro_await_break_dotest(brk, stack, &b));
+    ASSERT(!coro_await_break_dotest(brk, stack, &b));
     ASSERT(0 == strcmp(buf, "coro_await_break_dotest:10\ncoro_break_dotest\ncoro_await_break_dotest:20\n"));
 
     memset(stack, 0, sizeof stack);
     b = buf;
-    ASSERT( coro_await_yield_dotest(stack, &b));
-    ASSERT(!coro_await_yield_dotest(stack, &b));
-    ASSERT(!coro_await_yield_dotest(stack, &b));
+    ASSERT( coro_await_yield_dotest(brk, stack, &b));
+    ASSERT(!coro_await_yield_dotest(brk, stack, &b));
+    ASSERT(!coro_await_yield_dotest(brk, stack, &b));
     ASSERT(0 == strcmp(buf, "coro_await_yield_dotest:10\ncoro_yield_dotest:10\ncoro_yield_dotest:20\ncoro_await_yield_dotest:20\n"));
 
     memset(stack, 0, sizeof stack);
     state[0] = 0;
     b = buf;
-    ASSERT( coro_await_loopyield_dotest(stack, state, &b));
-    ASSERT( coro_await_loopyield_dotest(stack, state, &b));
-    ASSERT( coro_await_loopyield_dotest(stack, state, &b));
-    ASSERT(!coro_await_loopyield_dotest(stack, state, &b));
-    ASSERT(!coro_await_loopyield_dotest(stack, state, &b));
+    ASSERT( coro_await_loopyield_dotest(brk, stack, state, &b));
+    ASSERT( coro_await_loopyield_dotest(brk, stack, state, &b));
+    ASSERT( coro_await_loopyield_dotest(brk, stack, state, &b));
+    ASSERT(!coro_await_loopyield_dotest(brk, stack, state, &b));
+    ASSERT(!coro_await_loopyield_dotest(brk, stack, state, &b));
     ASSERT(0 == strcmp(buf,
         "coro_await_loopyield_dotest:10\n"
         "coro_loopyield_dotest:10:1\n"
@@ -244,11 +244,11 @@ static void coro_test(void)
     memset(stack, 0, sizeof stack);
     state[0] = 0;
     b = buf;
-    ASSERT( coro_loopawait_yield_dotest(stack, state, &b));
-    ASSERT( coro_loopawait_yield_dotest(stack, state, &b));
-    ASSERT( coro_loopawait_yield_dotest(stack, state, &b));
-    ASSERT(!coro_loopawait_yield_dotest(stack, state, &b));
-    ASSERT(!coro_loopawait_yield_dotest(stack, state, &b));
+    ASSERT( coro_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT( coro_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT( coro_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT(!coro_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT(!coro_loopawait_yield_dotest(brk, stack, state, &b));
     ASSERT(0 == strcmp(buf,
         "coro_loopawait_yield_dotest:10:1\n"
         "coro_yield_dotest:10\n"
@@ -263,9 +263,9 @@ static void coro_test(void)
 
     memset(stack, 0, sizeof stack);
     b = buf;
-    ASSERT( coro_await_await_yield_dotest(stack, &b));
-    ASSERT(!coro_await_await_yield_dotest(stack, &b));
-    ASSERT(!coro_await_await_yield_dotest(stack, &b));
+    ASSERT( coro_await_await_yield_dotest(brk, stack, &b));
+    ASSERT(!coro_await_await_yield_dotest(brk, stack, &b));
+    ASSERT(!coro_await_await_yield_dotest(brk, stack, &b));
     ASSERT(0 == strcmp(buf,
         "coro_await_await_yield_dotest:10\n"
         "coro_await_yield_dotest:10\n"
@@ -277,11 +277,11 @@ static void coro_test(void)
     memset(stack, 0, sizeof stack);
     state[0] = 0;
     b = buf;
-    ASSERT( coro_await_loopawait_yield_dotest(stack, state, &b));
-    ASSERT( coro_await_loopawait_yield_dotest(stack, state, &b));
-    ASSERT( coro_await_loopawait_yield_dotest(stack, state, &b));
-    ASSERT(!coro_await_loopawait_yield_dotest(stack, state, &b));
-    ASSERT(!coro_await_loopawait_yield_dotest(stack, state, &b));
+    ASSERT( coro_await_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT( coro_await_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT( coro_await_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT(!coro_await_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT(!coro_await_loopawait_yield_dotest(brk, stack, state, &b));
     ASSERT(0 == strcmp(buf,
         "coro_await_loopawait_yield_dotest:10\n"
         "coro_loopawait_yield_dotest:10:1\n"
@@ -299,14 +299,14 @@ static void coro_test(void)
     memset(stack, 0, sizeof stack);
     state[0] = 0;
     b = buf;
-    ASSERT( coro_loopawait_loopawait_yield_dotest(stack, state, &b));
-    ASSERT( coro_loopawait_loopawait_yield_dotest(stack, state, &b));
-    ASSERT( coro_loopawait_loopawait_yield_dotest(stack, state, &b));
-    ASSERT( coro_loopawait_loopawait_yield_dotest(stack, state, &b));
-    ASSERT( coro_loopawait_loopawait_yield_dotest(stack, state, &b));
-    ASSERT( coro_loopawait_loopawait_yield_dotest(stack, state, &b));
-    ASSERT(!coro_loopawait_loopawait_yield_dotest(stack, state, &b));
-    ASSERT(!coro_loopawait_loopawait_yield_dotest(stack, state, &b));
+    ASSERT( coro_loopawait_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT( coro_loopawait_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT( coro_loopawait_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT( coro_loopawait_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT( coro_loopawait_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT( coro_loopawait_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT(!coro_loopawait_loopawait_yield_dotest(brk, stack, state, &b));
+    ASSERT(!coro_loopawait_loopawait_yield_dotest(brk, stack, state, &b));
     ASSERT(0 == strcmp(buf,
         "coro_loopawait_loopawait_yield_dotest:10:1\n"
         "coro_loopawait_yield_dotest:10:1\n"
@@ -331,6 +331,12 @@ static void coro_test(void)
         "coro_yield_dotest:20\n"
         "coro_loopawait_yield_dotest:20\n"
         "coro_loopawait_loopawait_yield_dotest:20\n"));
+}
+
+static void coro_test(void)
+{
+    coro_dotest(0);
+    coro_dotest(1);
 }
 
 void coro_tests(void)
