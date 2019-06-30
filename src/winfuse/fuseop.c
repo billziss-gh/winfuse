@@ -1005,7 +1005,22 @@ BOOLEAN FuseOpClose(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    return FALSE;
+    coro_block (Context->CoroState)
+    {
+        /* NOTE: CLOSE cannot report failure! */
+
+        if (Context->File->IsReparsePoint)
+            /* reparse points are not opened; ignore */;
+        else if (Context->File->IsDirectory)
+            coro_await (FuseProtoSendReleasedir(Context));
+        else
+            coro_await (FuseProtoSendRelease(Context));
+
+        FuseFree(Context->File);
+        Context->File = 0;
+    }
+
+    return coro_active();
 }
 
 BOOLEAN FuseOpRead(FUSE_CONTEXT *Context)
