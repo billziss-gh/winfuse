@@ -66,8 +66,6 @@ typedef struct _FUSE_FILE
     UINT32 OpenFlags;
     UINT32 IsDirectory:1;
     UINT32 IsReparsePoint:1;
-    UINT32 DisableCache:1;
-    UINT32 ChownOnCreate:1;
 } FUSE_FILE;
 
 /* FUSE processing context */
@@ -97,6 +95,10 @@ struct _FUSE_CONTEXT
             STRING Remain, Name;
             FUSE_PROTO_ATTR Attr;
             UINT32 DesiredAccess, GrantedAccess;
+            UINT32 UserMode:1;
+            UINT32 HasTraversePrivilege:1;
+            UINT32 DisableCache:1;
+            UINT32 ChownOnCreate:1;
         } Lookup;
         struct
         {
@@ -170,6 +172,8 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
+VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);
+VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendChownOnCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);

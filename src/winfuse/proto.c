@@ -31,6 +31,8 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
+VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);
+VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendChownOnCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
@@ -52,6 +54,8 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoSendGetattr)
 #pragma alloc_text(PAGE, FuseProtoSendMkdir)
 #pragma alloc_text(PAGE, FuseProtoSendMknod)
+#pragma alloc_text(PAGE, FuseProtoSendRmdir)
+#pragma alloc_text(PAGE, FuseProtoSendUnlink)
 #pragma alloc_text(PAGE, FuseProtoSendCreate)
 #pragma alloc_text(PAGE, FuseProtoSendChownOnCreate)
 #pragma alloc_text(PAGE, FuseProtoSendOpendir)
@@ -256,6 +260,48 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
         RtlCopyMemory(Context->FuseRequest->req.mknod.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.mknod.name[Context->Lookup.Name.Length] = '\0';
+        coro_yield;
+
+        if (0 != Context->FuseResponse->error)
+            Context->InternalResponse->IoStatus.Status =
+                FuseNtStatusFromErrno(Context->FuseResponse->error);
+    }
+}
+
+VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    coro_block (Context->CoroState)
+    {
+        FuseProtoInitRequest(Context,
+            (UINT32)(FUSE_PROTO_REQ_SIZE(rmdir) + Context->Lookup.Name.Length + 1),
+            FUSE_PROTO_OPCODE_RMDIR, Context->Ino);
+        ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
+        RtlCopyMemory(Context->FuseRequest->req.rmdir.name, Context->Lookup.Name.Buffer,
+            Context->Lookup.Name.Length);
+        Context->FuseRequest->req.rmdir.name[Context->Lookup.Name.Length] = '\0';
+        coro_yield;
+
+        if (0 != Context->FuseResponse->error)
+            Context->InternalResponse->IoStatus.Status =
+                FuseNtStatusFromErrno(Context->FuseResponse->error);
+    }
+}
+
+VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    coro_block (Context->CoroState)
+    {
+        FuseProtoInitRequest(Context,
+            (UINT32)(FUSE_PROTO_REQ_SIZE(unlink) + Context->Lookup.Name.Length + 1),
+            FUSE_PROTO_OPCODE_UNLINK, Context->Ino);
+        ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
+        RtlCopyMemory(Context->FuseRequest->req.unlink.name, Context->Lookup.Name.Buffer,
+            Context->Lookup.Name.Length);
+        Context->FuseRequest->req.unlink.name[Context->Lookup.Name.Length] = '\0';
         coro_yield;
 
         if (0 != Context->FuseResponse->error)
