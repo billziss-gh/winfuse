@@ -85,7 +85,6 @@ struct _FUSE_CONTEXT
     FUSE_PROTO_RSP *FuseResponse;
     SHORT CoroState[16];
     UINT32 OrigUid, OrigGid, OrigPid;
-    UINT64 Ino;
     FUSE_FILE *File;
     union
     {
@@ -93,6 +92,7 @@ struct _FUSE_CONTEXT
         {
             STRING OrigPath;
             STRING Remain, Name;
+            UINT64 Ino;
             FUSE_PROTO_ATTR Attr;
             UINT32 DesiredAccess, GrantedAccess;
             UINT32 UserMode:1;

@@ -340,9 +340,9 @@ static VOID FuseLookupName(FUSE_CONTEXT *Context)
     coro_block (Context->CoroState)
     {
         if (!FuseCacheGetEntry(FuseDeviceExtension(Context->DeviceObject)->Cache,
-            Context->Ino, &Context->Lookup.Name, Entry))
+            Context->Lookup.Ino, &Context->Lookup.Name, Entry))
         {
-            if (FUSE_PROTO_ROOT_ID == Context->Ino &&
+            if (FUSE_PROTO_ROOT_ID == Context->Lookup.Ino &&
                 1 == Context->Lookup.Name.Length && '/' == Context->Lookup.Name.Buffer[0])
             {
                 coro_await (FuseProtoSendGetattr(Context));
@@ -367,12 +367,12 @@ static VOID FuseLookupName(FUSE_CONTEXT *Context)
 
             Context->InternalResponse->IoStatus.Status = FuseCacheSetEntry(
                 FuseDeviceExtension(Context->DeviceObject)->Cache,
-                Context->Ino, &Context->Lookup.Name, Entry);
+                Context->Lookup.Ino, &Context->Lookup.Name, Entry);
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
         }
 
-        Context->Ino = Entry->nodeid;
+        Context->Lookup.Ino = Entry->nodeid;
         Context->Lookup.Attr = Entry->attr;
     }
 }
@@ -388,7 +388,7 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->Ino = FUSE_PROTO_ROOT_ID;
+        Context->Lookup.Ino = FUSE_PROTO_ROOT_ID;
         while (1) /* for (;;) produces "warning C4702: unreachable code" */
         {
             FusePosixPathPrefix(&Context->Lookup.Remain, &Context->Lookup.Name, &Context->Lookup.Remain);
@@ -757,7 +757,7 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
         {
             Context->Lookup.DisableCache = TRUE;
 
-            Context->File->Fh = Context->Ino;
+            Context->File->Ino = Context->Lookup.Ino;
             Context->File->IsReparsePoint = TRUE;
         }
         else

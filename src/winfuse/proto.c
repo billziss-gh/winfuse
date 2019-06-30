@@ -124,7 +124,7 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
     {
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(lookup) + Context->Lookup.Name.Length + 1),
-            FUSE_PROTO_OPCODE_LOOKUP, Context->Ino);
+            FUSE_PROTO_OPCODE_LOOKUP, Context->Lookup.Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
         RtlCopyMemory(Context->FuseRequest->req.lookup.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
@@ -212,7 +212,7 @@ VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context)
     coro_block (Context->CoroState)
     {
         FuseProtoInitRequest(Context,
-            FUSE_PROTO_REQ_SIZE(getattr), FUSE_PROTO_OPCODE_GETATTR, Context->Ino);
+            FUSE_PROTO_REQ_SIZE(getattr), FUSE_PROTO_OPCODE_GETATTR, Context->Lookup.Ino);
         coro_yield;
 
         if (0 != Context->FuseResponse->error)
@@ -229,7 +229,7 @@ VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
     {
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(mkdir) + Context->Lookup.Name.Length + 1),
-            FUSE_PROTO_OPCODE_MKDIR, Context->Ino);
+            FUSE_PROTO_OPCODE_MKDIR, Context->Lookup.Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
         Context->FuseRequest->req.mkdir.mode = Context->Lookup.Attr.mode;
         Context->FuseRequest->req.mkdir.umask = 0;          /* !!!: REVISIT */
@@ -252,7 +252,7 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
     {
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(mknod) + Context->Lookup.Name.Length + 1),
-            FUSE_PROTO_OPCODE_MKDIR, Context->Ino);
+            FUSE_PROTO_OPCODE_MKDIR, Context->Lookup.Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
         Context->FuseRequest->req.mknod.mode = Context->Lookup.Attr.mode;
         Context->FuseRequest->req.mknod.rdev = 0;           /* !!!: REVISIT */
@@ -276,7 +276,7 @@ VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context)
     {
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(rmdir) + Context->Lookup.Name.Length + 1),
-            FUSE_PROTO_OPCODE_RMDIR, Context->Ino);
+            FUSE_PROTO_OPCODE_RMDIR, Context->Lookup.Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
         RtlCopyMemory(Context->FuseRequest->req.rmdir.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
@@ -297,7 +297,7 @@ VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context)
     {
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(unlink) + Context->Lookup.Name.Length + 1),
-            FUSE_PROTO_OPCODE_UNLINK, Context->Ino);
+            FUSE_PROTO_OPCODE_UNLINK, Context->Lookup.Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
         RtlCopyMemory(Context->FuseRequest->req.unlink.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
@@ -318,7 +318,7 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
     {
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(create) + Context->Lookup.Name.Length + 1),
-            FUSE_PROTO_OPCODE_CREATE, Context->Ino);
+            FUSE_PROTO_OPCODE_CREATE, Context->Lookup.Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
         Context->FuseRequest->req.create.flags = Context->File->OpenFlags;
         Context->FuseRequest->req.create.mode = Context->Lookup.Attr.mode;
@@ -362,7 +362,7 @@ VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context)
     coro_block (Context->CoroState)
     {
         FuseProtoInitRequest(Context,
-            FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPENDIR, Context->Ino);
+            FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPENDIR, Context->Lookup.Ino);
         coro_yield;
 
         if (0 != Context->FuseResponse->error)
@@ -378,7 +378,7 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context)
     coro_block (Context->CoroState)
     {
         FuseProtoInitRequest(Context,
-            FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPEN, Context->Ino);
+            FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPEN, Context->Lookup.Ino);
         Context->FuseRequest->req.open.flags = Context->File->OpenFlags;
         coro_yield;
 
