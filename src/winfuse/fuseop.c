@@ -29,7 +29,7 @@ static NTSTATUS FuseAccessCheck(
     UINT32 FileUid, UINT32 FileGid, UINT32 FileMode,
     UINT32 OrigUid, UINT32 OrigGid, UINT32 DesiredAccess,
     PUINT32 PGrantedAccess);
-static NTSTATUS FusePrepareLookup(FUSE_CONTEXT *Context);
+static VOID FusePrepareLookup(FUSE_CONTEXT *Context);
 static VOID FusePrepareLookup_ContextFini(FUSE_CONTEXT *Context);
 static VOID FuseLookupName(FUSE_CONTEXT *Context);
 static VOID FuseLookupPath(FUSE_CONTEXT *Context);
@@ -241,64 +241,63 @@ static NTSTATUS FuseAccessCheck(
     }
 }
 
-static NTSTATUS FusePrepareLookup(FUSE_CONTEXT *Context)
+static VOID FusePrepareLookup(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    FSP_FSCTL_TRANSACT_REQ *InternalRequest = Context->InternalRequest;
     UINT32 Uid = 0, Gid = 0, Pid = 0;
     PSTR PosixPath = 0;
     PWSTR FileName = 0;
     UINT64 AccessToken = 0;
     UINT32 UserMode = 1;
     UINT32 HasTraversePrivilege = 0;
-    NTSTATUS Result;
 
-    if (FspFsctlTransactCreateKind == InternalRequest->Kind)
+    if (FspFsctlTransactCreateKind == Context->InternalRequest->Kind)
     {
-        FileName = (PWSTR)InternalRequest->Buffer;
-        AccessToken = InternalRequest->Req.Create.AccessToken;
-        UserMode = InternalRequest->Req.Create.UserMode;
-        HasTraversePrivilege = InternalRequest->Req.Create.HasTraversePrivilege;
+        FileName = (PWSTR)Context->InternalRequest->Buffer;
+        AccessToken = Context->InternalRequest->Req.Create.AccessToken;
+        UserMode = Context->InternalRequest->Req.Create.UserMode;
+        HasTraversePrivilege = Context->InternalRequest->Req.Create.HasTraversePrivilege;
     }
-    else if (FspFsctlTransactCleanupKind == InternalRequest->Kind &&
-        InternalRequest->Req.Cleanup.Delete)
+    else if (FspFsctlTransactCleanupKind == Context->InternalRequest->Kind &&
+        Context->InternalRequest->Req.Cleanup.Delete)
     {
-        FileName = (PWSTR)InternalRequest->Buffer;
+        FileName = (PWSTR)Context->InternalRequest->Buffer;
         UserMode = 0;
         HasTraversePrivilege = 1;
     }
-    else if (FspFsctlTransactSetInformationKind == InternalRequest->Kind &&
-        FileRenameInformation == InternalRequest->Req.SetInformation.FileInformationClass)
+    else if (FspFsctlTransactSetInformationKind == Context->InternalRequest->Kind &&
+        FileRenameInformation == Context->InternalRequest->Req.SetInformation.FileInformationClass)
     {
-        FileName = (PWSTR)(InternalRequest->Buffer +
-            InternalRequest->Req.SetInformation.Info.Rename.NewFileName.Offset);
-        AccessToken = InternalRequest->Req.SetInformation.Info.Rename.AccessToken;
+        FileName = (PWSTR)(Context->InternalRequest->Buffer +
+            Context->InternalRequest->Req.SetInformation.Info.Rename.NewFileName.Offset);
+        AccessToken = Context->InternalRequest->Req.SetInformation.Info.Rename.AccessToken;
         UserMode = 1;
         HasTraversePrivilege = 1;
     }
 
     if (0 != FileName)
     {
-        Result = FspPosixMapWindowsToPosixPathEx(FileName, &PosixPath, TRUE);
-        if (!NT_SUCCESS(Result))
+        Context->InternalResponse->IoStatus.Status = FspPosixMapWindowsToPosixPathEx(
+            FileName, &PosixPath, TRUE);
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             goto exit;
     }
 
     if (0 != AccessToken)
     {
-        Result = FuseGetTokenUid(
+        Context->InternalResponse->IoStatus.Status = FuseGetTokenUid(
             FSP_FSCTL_TRANSACT_REQ_TOKEN_HANDLE(AccessToken),
             TokenUser,
             &Uid);
-        if (!NT_SUCCESS(Result))
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             goto exit;
 
-        Result = FuseGetTokenUid(
+        Context->InternalResponse->IoStatus.Status = FuseGetTokenUid(
             FSP_FSCTL_TRANSACT_REQ_TOKEN_HANDLE(AccessToken),
             TokenPrimaryGroup,
             &Gid);
-        if (!NT_SUCCESS(Result))
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             goto exit;
 
         Pid = FSP_FSCTL_TRANSACT_REQ_TOKEN_PID(AccessToken);
@@ -314,13 +313,11 @@ static NTSTATUS FusePrepareLookup(FUSE_CONTEXT *Context)
 
     Context->Fini = FusePrepareLookup_ContextFini;
 
-    Result = STATUS_SUCCESS;
+    Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
 
 exit:
-    if (!NT_SUCCESS(Result))
+    if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
         FspPosixDeletePath(PosixPath); /* handles NULL paths */
-
-    return Result;
 }
 
 static VOID FusePrepareLookup_ContextFini(FUSE_CONTEXT *Context)
@@ -931,7 +928,6 @@ BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context)
     PAGED_CODE();
 
     UINT32 Disposition;
-    NTSTATUS Result;
 
     coro_block (Context->CoroState)
     {
@@ -941,12 +937,9 @@ BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context)
             coro_break;
         }
 
-        Result = FusePrepareLookup(Context);
-        if (!NT_SUCCESS(Result))
-        {
-            Context->InternalResponse->IoStatus.Status = Result;
+        FusePrepareLookup(Context);
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
-        }
 
         Disposition = (Context->InternalRequest->Req.Create.CreateOptions >> 24) & 0xff;
         if (Context->InternalRequest->Req.Create.OpenTargetDirectory)
@@ -984,16 +977,14 @@ BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    NTSTATUS Result;
-
     coro_block (Context->CoroState)
     {
         if (Context->InternalRequest->Req.Cleanup.Delete)
         {
             /* NOTE: CLEANUP cannot report failure! */
 
-            Result = FusePrepareLookup(Context);
-            if (!NT_SUCCESS(Result))
+            FusePrepareLookup(Context);
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
             coro_await (FuseLookupPath(Context));
