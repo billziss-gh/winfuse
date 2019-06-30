@@ -311,6 +311,10 @@ static VOID FusePrepareContextNs_ContextFini(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
+    if (FspFsctlTransactCreateKind == Context->InternalRequest->Kind &&
+        0 != Context->File)
+        FuseFree(Context->File);
+
     FspPosixDeletePath(Context->Lookup.OrigPath.Buffer); /* handles NULL paths */
 }
 
@@ -585,6 +589,16 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
+        Context->File = FuseAlloc(sizeof(FUSE_FILE));
+        if (0 == Context->File)
+        {
+            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INSUFFICIENT_RESOURCES;
+            coro_break;
+        }
+
+        RtlZeroMemory(Context->File, sizeof(FUSE_FILE));
+        Context->File->OpenFlags = 0x0100 | 0x0400 | 2 /*O_CREAT|O_EXCL|O_RDWR*/;
+
         if (0 != Context->InternalRequest->Req.Create.SecurityDescriptor.Offset)
         {
             Context->InternalResponse->IoStatus.Status = FspPosixMapSecurityDescriptorToPermissions(
@@ -595,6 +609,8 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
                 coro_break;
 
             Context->Lookup.Attr.mode = Mode;
+
+            Context->File->ChownOnCreate = Uid != Context->OrigUid || Gid != Context->OrigGid;
         }
         else
             Context->Lookup.Attr.mode = 0777;
@@ -611,14 +627,9 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
-            Context->InternalResponse->IoStatus.Information = FILE_CREATED;
-            Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
-                Context->FuseResponse->rsp.open.fh;
-            Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
-                Context->Lookup.GrantedAccess;
-            FuseAttrToFileInfo(Context->DeviceObject, &Context->Lookup.Attr,
-                &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
-            Context->InternalResponse->Rsp.Create.Opened.DisableCache =
+            Context->File->Fh = Context->FuseResponse->rsp.open.fh;
+            Context->File->IsDirectory = TRUE;
+            Context->File->DisableCache =
                 BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
         }
         else
@@ -626,14 +637,10 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             coro_await (FuseProtoSendCreate(Context));
             if (NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             {
-                Context->InternalResponse->IoStatus.Information = FILE_CREATED;
-                Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
-                    Context->FuseResponse->rsp.create.fh;
-                Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
-                    Context->Lookup.GrantedAccess;
-                FuseAttrToFileInfo(Context->DeviceObject, &Context->Lookup.Attr,
-                    &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
-                Context->InternalResponse->Rsp.Create.Opened.DisableCache =
+                Context->Lookup.Attr = Context->FuseResponse->rsp.create.entry.attr;
+
+                Context->File->Fh = Context->FuseResponse->rsp.create.fh;
+                Context->File->DisableCache =
                     BooleanFlagOn(Context->FuseResponse->rsp.create.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
             }
             else
@@ -645,25 +652,28 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
                 if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                     coro_break;
 
-                Context->Lookup.Attr = Context->FuseResponse->rsp.mkdir.entry.attr;
+                Context->Lookup.Attr = Context->FuseResponse->rsp.mknod.entry.attr;
 
                 coro_await (FuseProtoSendOpen(Context));
                 if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                     coro_break;
 
-                Context->InternalResponse->IoStatus.Information = FILE_CREATED;
-                Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
-                    Context->FuseResponse->rsp.open.fh;
-                Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
-                    Context->Lookup.GrantedAccess;
-                FuseAttrToFileInfo(Context->DeviceObject, &Context->Lookup.Attr,
-                    &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
-                Context->InternalResponse->Rsp.Create.Opened.DisableCache =
+                Context->File->Fh = Context->FuseResponse->rsp.open.fh;
+                Context->File->DisableCache =
                     BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
             }
         }
 
-        if (0 != Context->InternalRequest->Req.Create.SecurityDescriptor.Offset)
+        Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
+            (UINT64)(UINT_PTR)Context->File;
+        Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
+            Context->Lookup.GrantedAccess;
+        FuseAttrToFileInfo(Context->DeviceObject, &Context->Lookup.Attr,
+            &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
+        Context->InternalResponse->Rsp.Create.Opened.DisableCache =
+            Context->File->DisableCache;
+
+        if (Context->File->ChownOnCreate)
         {
             Context->InternalResponse->IoStatus.Status = FspPosixMapSecurityDescriptorToPermissions(
                 (PSECURITY_DESCRIPTOR)(Context->InternalRequest->Buffer +
@@ -672,18 +682,21 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 goto cleanup;
 
-            if (Uid != Context->OrigUid || Gid != Context->OrigGid)
-            {
-                Context->Fh = Context->InternalResponse->Rsp.Create.Opened.UserContext2;
-                coro_await (FuseProtoSendChownOrig(Context));
-                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status) &&
-                    STATUS_INVALID_DEVICE_REQUEST != Context->InternalResponse->IoStatus.Status)
-                    goto cleanup;
+            Context->Lookup.Attr.uid = Uid;
+            Context->Lookup.Attr.gid = Gid;
+            coro_await (FuseProtoSendChownOnCreate(Context));
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status) &&
+                STATUS_INVALID_DEVICE_REQUEST != Context->InternalResponse->IoStatus.Status)
+                goto cleanup;
 
-                FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.setattr.attr,
-                    &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
-            }
+            FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.setattr.attr,
+                &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
         }
+
+        Context->InternalResponse->IoStatus.Information = FILE_CREATED;
+
+        /* ensure that ContextFini will not free the newly opened file */
+        Context->File = 0;
 
         coro_break;
 
@@ -692,8 +705,6 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             coro_await (FuseProtoSendReleasedir(Context));
         else
             coro_await (FuseProtoSendRelease(Context));
-
-        Context->InternalResponse->IoStatus.Information = 0;
     }
 }
 
@@ -701,52 +712,74 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    VOID (*Fn)(FUSE_CONTEXT *) = 0;
+    UINT32 GrantedAccess, Type;
 
     coro_block (Context->CoroState)
     {
-        switch (Context->Lookup.Attr.mode & 0170000)
+        Context->File = FuseAlloc(sizeof(FUSE_FILE));
+        if (0 == Context->File)
         {
-        case 0040000: /* S_IFDIR */
-            /* FILE_ATTRIBUTE_DIRECTORY */
-            Fn = FuseProtoSendOpendir;
-            break;
-        case 0010000: /* S_IFIFO */
-        case 0020000: /* S_IFCHR */
-        case 0060000: /* S_IFBLK */
-        case 0140000: /* S_IFSOCK */
-            /* FILE_ATTRIBUTE_REPARSE_POINT/IO_REPARSE_TAG_NFS */
-            Fn = 0;
-            break;
-        case 0120000: /* S_IFLNK */
-            /* FILE_ATTRIBUTE_REPARSE_POINT/IO_REPARSE_TAG_SYMLINK */
-            Fn = 0;
-            break;
-        default:
-            Fn = FuseProtoSendOpen;
-            break;
-        }
-
-        if (0 == Fn)
-        {
-            // !!!: REVISIT!
-            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_OBJECT_NAME_NOT_FOUND;
+            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INSUFFICIENT_RESOURCES;
             coro_break;
         }
 
-        coro_await (Fn(Context));
-        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-            coro_break;
+        RtlZeroMemory(Context->File, sizeof(FUSE_FILE));
+        GrantedAccess = Context->Lookup.GrantedAccess & (FILE_READ_DATA | FILE_WRITE_DATA);
+        if (FILE_READ_DATA == GrantedAccess)
+            Context->File->OpenFlags = 0/*O_RDONLY*/;
+        else
+        if (FILE_WRITE_DATA == GrantedAccess)
+            Context->File->OpenFlags = 1/*O_WRONLY*/;
+        else
+        if ((FILE_READ_DATA | FILE_WRITE_DATA) == GrantedAccess)
+            Context->File->OpenFlags = 2/*O_RDWR*/;
+
+        Type = Context->Lookup.Attr.mode & 0170000;
+        if (0120000/* S_IFLNK  */ == Type ||
+            0010000/* S_IFIFO  */ == Type ||
+            0020000/* S_IFCHR  */ == Type ||
+            0060000/* S_IFBLK  */ == Type ||
+            0140000/* S_IFSOCK */ == Type)
+        {
+            Context->File->Fh = Context->Ino;
+            Context->File->IsReparsePoint = TRUE;
+            Context->File->DisableCache = TRUE;
+        }
+        else
+        if (0040000/* S_IFDIR  */ == Type)
+        {
+            coro_await (FuseProtoSendOpendir(Context));
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+
+            Context->File->Fh = Context->FuseResponse->rsp.open.fh;
+            Context->File->IsDirectory = TRUE;
+            Context->File->DisableCache =
+                BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
+        }
+        else
+        {
+            coro_await (FuseProtoSendOpen(Context));
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+
+            Context->File->Fh = Context->FuseResponse->rsp.open.fh;
+            Context->File->DisableCache =
+                BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
+        }
 
         Context->InternalResponse->IoStatus.Information = FILE_OPENED;
         Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
-            Context->FuseResponse->rsp.open.fh;
+            (UINT64)(UINT_PTR)Context->File;
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
             Context->Lookup.GrantedAccess;
         FuseAttrToFileInfo(Context->DeviceObject, &Context->Lookup.Attr,
             &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
         Context->InternalResponse->Rsp.Create.Opened.DisableCache =
-            BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
+            Context->File->DisableCache;
+
+        /* ensure that ContextFini will not free the newly opened file */
+        Context->File = 0;
     }
 }
 
@@ -877,7 +910,7 @@ BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    VOID (*Fn)(FUSE_CONTEXT *) = 0;
+    UINT32 Disposition;
     NTSTATUS Result;
 
     coro_block (Context->CoroState)
@@ -895,31 +928,24 @@ BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context)
             coro_break;
         }
 
+        Disposition = (Context->InternalRequest->Req.Create.CreateOptions >> 24) & 0xff;
         if (Context->InternalRequest->Req.Create.OpenTargetDirectory)
-            Fn = FuseOpCreate_FileOpenTargetDirectory;
+            coro_await (FuseOpCreate_FileOpenTargetDirectory(Context));
         else
-            switch ((Context->InternalRequest->Req.Create.CreateOptions >> 24) & 0xff)
-            {
-            case FILE_CREATE:
-                Fn = FuseOpCreate_FileCreate;
-                break;
-            case FILE_OPEN:
-                Fn = FuseOpCreate_FileOpen;
-                break;
-            case FILE_OPEN_IF:
-                Fn = FuseOpCreate_FileOpenIf;
-                break;
-            case FILE_OVERWRITE:
-                Fn = FuseOpCreate_FileOverwrite;
-                break;
-            case FILE_OVERWRITE_IF:
-            case FILE_SUPERSEDE:
-                Fn = FuseOpCreate_FileOverwriteIf;
-                break;
-            }
-
-        if (0 != Fn)
-            coro_await (Fn(Context));
+        if (FILE_CREATE == Disposition)
+            coro_await (FuseOpCreate_FileCreate(Context));
+        else
+        if (FILE_OPEN == Disposition)
+            coro_await (FuseOpCreate_FileOpen(Context));
+        else
+        if (FILE_OPEN_IF == Disposition)
+            coro_await (FuseOpCreate_FileOpenIf(Context));
+        else
+        if (FILE_OVERWRITE == Disposition)
+            coro_await (FuseOpCreate_FileOverwrite(Context));
+        else
+        if (FILE_OVERWRITE_IF == Disposition || FILE_SUPERSEDE == Disposition)
+            coro_await (FuseOpCreate_FileOverwriteIf(Context));
         else
             Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_PARAMETER;
     }

@@ -28,6 +28,7 @@
 /* disable warnings */
 #pragma warning(disable:4100)           /* unreferenced formal parameter */
 #pragma warning(disable:4200)           /* zero-sized array in struct/union */
+#pragma warning(disable:4201)           /* nameless struct/union */
 
 #include <winfuse/coro.h>
 #include <winfuse/proto.h>
@@ -55,9 +56,21 @@ FUSE_DEVICE_EXTENSION *FuseDeviceExtension(PDEVICE_OBJECT DeviceObject)
     return (PVOID)((PUINT8)DeviceObject->DeviceExtension + FuseProvider.DeviceExtensionOffset);
 }
 
+/* FUSE files */
+typedef struct _FUSE_FILE
+{
+    union
+    {
+        UINT64 Ino, Fh;
+    };
+    UINT32 OpenFlags;
+    UINT32 IsDirectory:1;
+    UINT32 IsReparsePoint:1;
+    UINT32 DisableCache:1;
+    UINT32 ChownOnCreate:1;
+} FUSE_FILE;
+
 /* FUSE processing context */
-#pragma warning(push)
-#pragma warning(disable:4201)           /* nameless struct/union */
 typedef struct _FUSE_CONTEXT FUSE_CONTEXT;
 typedef VOID FUSE_CONTEXT_FINI(FUSE_CONTEXT *Context);
 typedef BOOLEAN FUSE_PROCESS_DISPATCH(FUSE_CONTEXT *Context);
@@ -74,10 +87,8 @@ struct _FUSE_CONTEXT
     FUSE_PROTO_RSP *FuseResponse;
     SHORT CoroState[16];
     UINT32 OrigUid, OrigGid, OrigPid;
-    union
-    {
-        UINT64 Ino, Fh;
-    };
+    UINT64 Ino;
+    FUSE_FILE *File;
     union
     {
         struct
@@ -93,7 +104,6 @@ struct _FUSE_CONTEXT
         } Forget;
     };
 };
-#pragma warning(pop)
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
     PDEVICE_OBJECT DeviceObject, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
 VOID FuseContextDelete(FUSE_CONTEXT *Context);
@@ -161,7 +171,7 @@ VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
-VOID FuseProtoSendChownOrig(FUSE_CONTEXT *Context);
+VOID FuseProtoSendChownOnCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context);
