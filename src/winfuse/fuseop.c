@@ -612,6 +612,8 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
         RtlZeroMemory(Context->File, sizeof(FUSE_FILE));
         Context->File->OpenFlags = 0x0100 | 0x0400 | 2 /*O_CREAT|O_EXCL|O_RDWR*/;
 
+        Context->Lookup.Attr.rdev = 0;
+        Context->Lookup.Attr.mode = 0777;
         if (0 != Context->InternalRequest->Req.Create.SecurityDescriptor.Offset)
         {
             Context->InternalResponse->IoStatus.Status = FspPosixMapSecurityDescriptorToPermissions(
@@ -624,8 +626,6 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             Context->Lookup.Attr.mode = Mode;
             Context->Lookup.ChownOnCreate = Uid != Context->OrigUid || Gid != Context->OrigGid;
         }
-        else
-            Context->Lookup.Attr.mode = 0777;
 
         if (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DIRECTORY_FILE))
         {
@@ -689,6 +689,13 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 
         if (Context->Lookup.ChownOnCreate)
         {
+            if (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DIRECTORY_FILE))
+            {
+                coro_await (FuseLookupName(Context));
+                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                    goto cleanup;
+            }
+
             Context->InternalResponse->IoStatus.Status = FspPosixMapSecurityDescriptorToPermissions(
                 (PSECURITY_DESCRIPTOR)(Context->InternalRequest->Buffer +
                     Context->InternalRequest->Req.Create.SecurityDescriptor.Offset),

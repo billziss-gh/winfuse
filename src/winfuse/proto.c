@@ -97,6 +97,9 @@ NTSTATUS FuseProtoPostInit(PDEVICE_OBJECT DeviceObject)
 }
 
 VOID FuseProtoSendInit(FUSE_CONTEXT *Context)
+    /*
+     * Send INIT message.
+     */
 {
     PAGED_CODE();
 
@@ -117,6 +120,14 @@ VOID FuseProtoSendInit(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
+    /*
+     * Send LOOKUP message.
+     *
+     * Context->Lookup.Ino
+     *     parent directory inode number
+     * Context->Lookup.Name.Length
+     *     name to lookup
+     */
 {
     PAGED_CODE();
 
@@ -170,6 +181,12 @@ static VOID FuseProtoPostForget_ContextFini(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context)
+    /*
+     * Fill FORGET message. This message is used to forget a single inode number.
+     *
+     * Context->Forget.ForgetList
+     *     list that contains items to forget
+     */
 {
     PAGED_CODE();
 
@@ -185,6 +202,12 @@ VOID FuseProtoFillForget(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context)
+    /*
+     * Fill BATCH_FORGET message. This message is used to forget multiple inode numbers.
+     *
+     * Context->Forget.ForgetList
+     *     list that contains items to forget
+     */
 {
     PAGED_CODE();
 
@@ -206,6 +229,12 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context)
+    /*
+     * Send GETATTR message.
+     *
+     * Context->Lookup.Ino
+     *     inode number to get attributes for
+     */
 {
     PAGED_CODE();
 
@@ -222,6 +251,16 @@ VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
+    /*
+     * Send MKDIR message.
+     *
+     * Context->Lookup.Ino
+     *     parent directory inode number
+     * Context->Lookup.Name.Length
+     *     name of new directory
+     * Context->Lookup.Attr.mode
+     *     mode of new directory
+     */
 {
     PAGED_CODE();
 
@@ -245,6 +284,18 @@ VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
+    /*
+     * Send MKNOD message.
+     *
+     * Context->Lookup.Ino
+     *     parent directory inode number
+     * Context->Lookup.Name.Length
+     *     name of new file
+     * Context->Lookup.Attr.mode
+     *     mode of new file
+     * Context->Lookup.Attr.rdev
+     *     device number of new file (when file is a device)
+     */
 {
     PAGED_CODE();
 
@@ -255,7 +306,7 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
             FUSE_PROTO_OPCODE_MKDIR, Context->Lookup.Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
         Context->FuseRequest->req.mknod.mode = Context->Lookup.Attr.mode;
-        Context->FuseRequest->req.mknod.rdev = 0;           /* !!!: REVISIT */
+        Context->FuseRequest->req.mknod.rdev = Context->Lookup.Attr.rdev;
         Context->FuseRequest->req.mknod.umask = 0;          /* !!!: REVISIT */
         RtlCopyMemory(Context->FuseRequest->req.mknod.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
@@ -269,6 +320,14 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context)
+    /*
+     * Send RMDIR message.
+     *
+     * Context->Lookup.Ino
+     *     parent directory inode number
+     * Context->Lookup.Name.Length
+     *     name of directory
+     */
 {
     PAGED_CODE();
 
@@ -290,6 +349,14 @@ VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context)
+    /*
+     * Send UNLINK message.
+     *
+     * Context->Lookup.Ino
+     *     parent directory inode number
+     * Context->Lookup.Name.Length
+     *     name of file
+     */
 {
     PAGED_CODE();
 
@@ -311,6 +378,18 @@ VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
+    /*
+     * Send CREATE message.
+     *
+     * Context->Lookup.Ino
+     *     parent directory inode number
+     * Context->Lookup.Name.Length
+     *     name of new file
+     * Context->Lookup.Attr.mode
+     *     mode of new file
+     * Context->File->OpenFlags
+     *     open (O_*) flags
+     */
 {
     PAGED_CODE();
 
@@ -335,18 +414,46 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoSendChownOnCreate(FUSE_CONTEXT *Context)
+    /*
+     * Send SETATTR message after directory/file creation.
+     *
+     * Context->InternalRequest->Req.Create.CreateOptions & FILE_DIRECTORY_FILE
+     *     determines whether operation is applied to file (Context->File->Fh)
+     *     or directory (Context->Lookup.Ino)
+     * Context->File->Fh
+     *     handle of related file; valid when used on file
+     * Context->Lookup.Ino
+     *     inode number of related directory; valid when used on directory
+     * Context->Lookup.Attr.uid
+     *     uid of new file
+     * Context->Lookup.Attr.gid
+     *     gid of new file
+     */
 {
     PAGED_CODE();
 
     coro_block (Context->CoroState)
     {
-        FuseProtoInitRequest(Context,
-            FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, 0);
-        Context->FuseRequest->req.setattr.valid =
-            FUSE_PROTO_SETATTR_FH | FUSE_PROTO_SETATTR_UID | FUSE_PROTO_SETATTR_GID;
-        Context->FuseRequest->req.setattr.fh = Context->File->Fh;
-        Context->FuseRequest->req.setattr.uid = Context->Lookup.Attr.uid;
-        Context->FuseRequest->req.setattr.gid = Context->Lookup.Attr.gid;
+        if (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DIRECTORY_FILE))
+        {
+            FuseProtoInitRequest(Context,
+                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->Lookup.Ino);
+            Context->FuseRequest->req.setattr.valid =
+                FUSE_PROTO_SETATTR_UID | FUSE_PROTO_SETATTR_GID;
+            Context->FuseRequest->req.setattr.fh = Context->File->Fh;
+            Context->FuseRequest->req.setattr.uid = Context->Lookup.Attr.uid;
+            Context->FuseRequest->req.setattr.gid = Context->Lookup.Attr.gid;
+        }
+        else
+        {
+            FuseProtoInitRequest(Context,
+                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, 0);
+            Context->FuseRequest->req.setattr.valid =
+                FUSE_PROTO_SETATTR_FH | FUSE_PROTO_SETATTR_UID | FUSE_PROTO_SETATTR_GID;
+            Context->FuseRequest->req.setattr.fh = Context->File->Fh;
+            Context->FuseRequest->req.setattr.uid = Context->Lookup.Attr.uid;
+            Context->FuseRequest->req.setattr.gid = Context->Lookup.Attr.gid;
+        }
         coro_yield;
 
         if (0 != Context->FuseResponse->error)
@@ -356,6 +463,12 @@ VOID FuseProtoSendChownOnCreate(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context)
+    /*
+     * Send OPENDIR message.
+     *
+     * Context->Lookup.Ino
+     *     inode number of directory to open
+     */
 {
     PAGED_CODE();
 
@@ -372,6 +485,12 @@ VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context)
+    /*
+     * Send OPEN message.
+     *
+     * Context->Lookup.Ino
+     *     inode number of file to open
+     */
 {
     PAGED_CODE();
 
@@ -389,6 +508,14 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context)
+    /*
+     * Send RELEASEDIR message.
+     *
+     * Context->File->Fh
+     *     handle of related directory
+     * Context->File->OpenFlags
+     *     open (O_*) flags
+     */
 {
     PAGED_CODE();
 
@@ -407,6 +534,14 @@ VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context)
 }
 
 VOID FuseProtoSendRelease(FUSE_CONTEXT *Context)
+    /*
+     * Send RELEASE message.
+     *
+     * Context->File->Fh
+     *     handle of related file
+     * Context->File->OpenFlags
+     *     open (O_*) flags
+     */
 {
     PAGED_CODE();
 
