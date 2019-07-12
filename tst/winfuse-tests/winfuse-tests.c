@@ -19,11 +19,13 @@
  * associated repository.
  */
 
-#include <windows.h>
+#include <winfsp/winfsp.h>
 #include <tlib/testsuite.h>
 
 int main(int argc, char *argv[])
 {
+    FspLoad(0);
+
     TESTSUITE(coro_tests);
     TESTSUITE(path_tests);
     TESTSUITE(transact_tests);
