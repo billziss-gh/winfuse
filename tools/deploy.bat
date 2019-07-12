@@ -1,6 +1,7 @@
 @echo off
 
 setlocal
+setlocal EnableDelayedExpansion
 
 set CONFIG=Debug
 set SUFFIX=x64
@@ -9,13 +10,23 @@ if not X%1==X set TARGET_MACHINE=%1
 set TARGET_ACCOUNT=\Users\%USERNAME%\Downloads\winfuse\
 set TARGET=\\%TARGET_MACHINE%%TARGET_ACCOUNT%
 
+set RegKey="HKLM\SOFTWARE\WinFsp"
+set RegVal="InstallDir"
+reg query !RegKey! /v !RegVal! /reg:32 >nul 2>&1
+if !ERRORLEVEL! equ 0 (
+    for /f "tokens=2,*" %%i in ('reg query !RegKey! /v !RegVal! /reg:32 ^| findstr !RegVal!') do (
+        set InstallDir=%%j
+    )
+)
+if not exist "!InstallDir!" (echo cannot find WinFsp installation >&2 & goto fail)
+
 cd %~dp0..
 mkdir %TARGET% 2>nul
 for %%f in (winfuse-%SUFFIX%.sys winfuse-tests-%SUFFIX%.exe) do (
     copy build\VStudio\build\%CONFIG%\%%f %TARGET% >nul
 )
 for %%f in (winfsp-%SUFFIX%.sys winfsp-%SUFFIX%.dll) do (
-    copy ext\winfsp\build\VStudio\build\%CONFIG%\%%f %TARGET% >nul
+    copy "!InstallDir!bin\%%f" %TARGET% >nul
 )
 
 echo sc delete WinFsp                                                            >%TARGET%kminst.bat
@@ -23,3 +34,7 @@ echo sc delete WinFuse                                                          
 echo sc create WinFsp type=filesys binPath=%%~dp0winfsp-%SUFFIX%.sys            >>%TARGET%kminst.bat
 echo sc create WinFuse type=kernel binPath=%%~dp0winfuse-%SUFFIX%.sys           >>%TARGET%kminst.bat
 echo reg add HKLM\Software\WinFsp\Fsext /v 00093118 /d "winfuse" /f /reg:32     >>%TARGET%kminst.bat
+exit /b 0
+
+:fail
+exit /b 1
