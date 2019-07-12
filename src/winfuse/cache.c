@@ -319,38 +319,30 @@ NTSTATUS FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
     PAGED_CODE();
 
     UINT64 ExpirationTime = 0;
-    if (0 != Entry)
-    {
-        UINT64 EntryTimeout = Entry->entry_valid * 10000000 + Entry->entry_valid_nsec / 100;
-        UINT64 AttrTimeout = Entry->attr_valid * 10000000 + Entry->attr_valid_nsec / 100;
-        ExpirationTime = FuseExpirationTimeFromTimeout(EntryTimeout < AttrTimeout ?
-            EntryTimeout : AttrTimeout);
-    }
+    UINT64 EntryTimeout = Entry->entry_valid * 10000000 + Entry->entry_valid_nsec / 100;
+    UINT64 AttrTimeout = Entry->attr_valid * 10000000 + Entry->attr_valid_nsec / 100;
+    ExpirationTime = FuseExpirationTimeFromTimeout(EntryTimeout < AttrTimeout ?
+        EntryTimeout : AttrTimeout);
 
     FUSE_CACHE_ITEM *Item = 0, *NewItem = 0;
     ULONG Hash = FuseCacheHash(ParentIno, Name, Cache->CaseInsensitive);
 
     ExAcquireFastMutex(&Cache->Mutex);
 
-    if (0 != Entry)
+    Item = FuseCacheLookupHashedItem(Cache, Hash, ParentIno, Name);
+    if (0 != Item)
     {
-        Item = FuseCacheLookupHashedItem(Cache, Hash, ParentIno, Name);
-        if (0 != Item)
-        {
-            Item->ExpirationTime = ExpirationTime;
-            RtlCopyMemory(&Item->Entry, Entry, sizeof Item->Entry);
+        Item->ExpirationTime = ExpirationTime;
+        RtlCopyMemory(&Item->Entry, Entry, sizeof Item->Entry);
 
-            /* mark as most-recently used */
-            RemoveEntryList(&Item->ListEntry);
-            InsertTailList(&Cache->ItemList, &Item->ListEntry);
-        }
+        /* mark as most-recently used */
+        RemoveEntryList(&Item->ListEntry);
+        InsertTailList(&Cache->ItemList, &Item->ListEntry);
     }
-    else
-        ASSERT(0);
 
     ExReleaseFastMutex(&Cache->Mutex);
 
-    if (0 != Entry && 0 == Item)
+    if (0 == Item)
     {
         NewItem = FuseAlloc(FIELD_OFFSET(FUSE_CACHE_ITEM, NameBuf) + Name->Length);
         if (0 == NewItem)
