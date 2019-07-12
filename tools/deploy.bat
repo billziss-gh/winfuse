@@ -15,7 +15,7 @@ for %%f in (winfuse-%SUFFIX%.sys winfuse-tests-%SUFFIX%.exe) do (
     copy build\VStudio\build\%CONFIG%\%%f %TARGET% >nul
 )
 for %%f in (winfsp-%SUFFIX%.sys winfsp-%SUFFIX%.dll) do (
-    copy ..\winfsp\build\VStudio\build\%CONFIG%\%%f %TARGET% >nul
+    copy ext\winfsp\build\VStudio\build\%CONFIG%\%%f %TARGET% >nul
 )
 
 echo sc delete WinFsp                                                            >%TARGET%kminst.bat
