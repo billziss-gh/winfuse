@@ -436,7 +436,6 @@ VOID FuseProtoSendChownOnCreate(FUSE_CONTEXT *Context)
                 FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->Lookup.Ino);
             Context->FuseRequest->req.setattr.valid =
                 FUSE_PROTO_SETATTR_UID | FUSE_PROTO_SETATTR_GID;
-            Context->FuseRequest->req.setattr.fh = Context->File->Fh;
             Context->FuseRequest->req.setattr.uid = Context->Lookup.Attr.uid;
             Context->FuseRequest->req.setattr.gid = Context->Lookup.Attr.gid;
         }
