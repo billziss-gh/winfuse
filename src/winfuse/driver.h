@@ -90,6 +90,7 @@ struct _FUSE_CONTEXT
     {
         struct
         {
+            PVOID CacheGen;
             STRING OrigPath;
             STRING Remain, Name;
             UINT64 Ino;
@@ -129,16 +130,19 @@ FUSE_CONTEXT *FuseIoqNextPending(FUSE_IOQ *Ioq); /* does not block! */
 
 /* FUSE "entry" cache */
 typedef struct _FUSE_CACHE FUSE_CACHE;
+typedef struct _FUSE_CACHE_GEN FUSE_CACHE_GEN;
 NTSTATUS FuseCacheCreate(ULONG Capacity, BOOLEAN CaseInsensitive, FUSE_CACHE **PCache);
 VOID FuseCacheDelete(FUSE_CACHE *Cache);
-VOID FuseCacheDeleteItems(PLIST_ENTRY ItemList);
-BOOLEAN FuseCacheForgetNextItem(PLIST_ENTRY ItemList, PUINT64 PIno);
-VOID FuseCacheInvalidateExpired(FUSE_CACHE *Cache, UINT64 ExpirationTime,
-    PDEVICE_OBJECT DeviceObject);
+VOID FuseCacheExpirationRoutine(FUSE_CACHE *Cache,
+    PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
+NTSTATUS FuseCacheReferenceGen(FUSE_CACHE *Cache, PVOID *PGen);
+VOID FuseCacheDereferenceGen(FUSE_CACHE *Cache, PVOID Gen);
 BOOLEAN FuseCacheGetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
     FUSE_PROTO_ENTRY *Entry);
 NTSTATUS FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
     FUSE_PROTO_ENTRY *Entry);
+VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList);
+BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForgetOne);
 
 /* FUSE processing functions */
 FUSE_PROCESS_DISPATCH FuseOpReserved;
@@ -245,45 +249,6 @@ ULONG FuseHashMixPointer(PVOID Pointer)
 #else
     return (ULONG)FuseHashMix32((UINT32)Pointer);
 #endif
-}
-
-/* timeouts */
-#define FuseTimeoutInfinity32           ((UINT32)-1L)
-#define FuseTimeoutInfinity64           ((UINT64)-1LL)
-static inline
-UINT64 FuseTimeoutFromMillis(UINT32 Millis)
-{
-    /* if Millis is 0 or -1 then sign-extend else 10000ULL * Millis */
-    return 1 >= Millis + 1 ? (INT64)(INT32)Millis : 10000ULL * Millis;
-}
-static inline
-UINT64 FuseExpirationTimeFromMillis(UINT32 Millis)
-{
-    /* if Millis is 0 or -1 then sign-extend else KeQueryInterruptTime() + 10000ULL * Millis */
-    return 1 >= Millis + 1 ? (INT64)(INT32)Millis : KeQueryInterruptTime() + 10000ULL * Millis;
-}
-static inline
-UINT64 FuseExpirationTimeFromTimeout(UINT64 Timeout)
-{
-    /* if Timeout is 0 or -1 then Timeout else KeQueryInterruptTime() + Timeout */
-    return 1 >= Timeout + 1 ? Timeout : KeQueryInterruptTime() + Timeout;
-}
-static inline
-BOOLEAN FuseExpirationTimeValid(UINT64 ExpirationTime)
-{
-    /* if ExpirationTime is 0 or -1 then ExpirationTime else KeQueryInterruptTime() < ExpirationTime */
-    return 1 >= ExpirationTime + 1 ? (0 != ExpirationTime) : (KeQueryInterruptTime() < ExpirationTime);
-}
-static inline
-BOOLEAN FuseExpirationTimeValidEx(UINT64 ExpirationTime, UINT64 CurrentTime)
-{
-    /* if ExpirationTime is 0 or -1 then ExpirationTime else CurrentTime < ExpirationTime */
-    return 1 >= ExpirationTime + 1 ? (0 != ExpirationTime) : (CurrentTime < ExpirationTime);
-}
-static inline
-BOOLEAN FuseExpirationTimeValid2(UINT64 ExpirationTime, UINT64 CurrentTime)
-{
-    return CurrentTime < ExpirationTime;
 }
 
 #endif

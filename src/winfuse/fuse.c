@@ -92,7 +92,7 @@ VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationT
 
     FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
 
-    FuseCacheInvalidateExpired(DeviceExtension->Cache, ExpirationTime, DeviceObject);
+    FuseCacheExpirationRoutine(DeviceExtension->Cache, DeviceObject, ExpirationTime);
 }
 
 FUSE_PROCESS_DISPATCH *FuseProcessFunction[FspFsctlTransactKindCount];

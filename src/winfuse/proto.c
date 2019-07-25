@@ -177,7 +177,7 @@ static VOID FuseProtoPostForget_ContextFini(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    FuseCacheDeleteItems(&Context->Forget.ForgetList);
+    FuseCacheDeleteForgotten(&Context->Forget.ForgetList);
 }
 
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context)
@@ -190,15 +190,15 @@ VOID FuseProtoFillForget(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    UINT64 Ino;
+    FUSE_PROTO_FORGET_ONE ForgetOne;
     BOOLEAN Ok;
 
-    Ok = FuseCacheForgetNextItem(&Context->Forget.ForgetList, &Ino);
+    Ok = FuseCacheForgetOne(&Context->Forget.ForgetList, &ForgetOne);
     ASSERT(Ok);
 
     FuseProtoInitRequest(Context,
-        FUSE_PROTO_REQ_SIZE(forget), FUSE_PROTO_OPCODE_FORGET, Ino);
-    Context->FuseRequest->req.forget.nlookup = 1;
+        FUSE_PROTO_REQ_SIZE(forget), FUSE_PROTO_OPCODE_FORGET, ForgetOne.nodeid);
+    Context->FuseRequest->req.forget.nlookup = ForgetOne.nlookup;
 }
 
 VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context)
@@ -211,16 +211,12 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    UINT64 Ino;
     FUSE_PROTO_FORGET_ONE *StartP, *EndP, *P;
 
     StartP = (PVOID)((PUINT8)Context->FuseRequest + FUSE_PROTO_REQ_SIZE(batch_forget));
     EndP = (PVOID)((PUINT8)StartP + (FUSE_PROTO_REQ_SIZEMIN - FUSE_PROTO_REQ_SIZE(batch_forget)));
-    for (P = StartP; EndP > P && FuseCacheForgetNextItem(&Context->Forget.ForgetList, &Ino); P++)
-    {
-        P->nodeid = Ino;
-        P->nlookup = 1;
-    }
+    for (P = StartP; EndP > P && FuseCacheForgetOne(&Context->Forget.ForgetList, P); P++)
+        ;
 
     FuseProtoInitRequest(Context,
         (UINT32)((PUINT8)P - (PUINT8)Context->FuseRequest), FUSE_PROTO_OPCODE_BATCH_FORGET, 0);

@@ -246,6 +246,7 @@ static VOID FusePrepareLookup(FUSE_CONTEXT *Context)
     PAGED_CODE();
 
     UINT32 Uid = 0, Gid = 0, Pid = 0;
+    PVOID CacheGen = 0;
     PSTR PosixPath = 0;
     PWSTR FileName = 0;
     UINT64 AccessToken = 0;
@@ -278,6 +279,11 @@ static VOID FusePrepareLookup(FUSE_CONTEXT *Context)
 
     if (0 != FileName)
     {
+        Context->InternalResponse->IoStatus.Status = FuseCacheReferenceGen(
+            FuseDeviceExtension(Context->DeviceObject)->Cache, &CacheGen);
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            goto exit;
+
         Context->InternalResponse->IoStatus.Status = FspPosixMapWindowsToPosixPathEx(
             FileName, &PosixPath, TRUE);
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
@@ -308,6 +314,7 @@ static VOID FusePrepareLookup(FUSE_CONTEXT *Context)
     Context->OrigPid = Pid;
 
     RtlInitString(&Context->Lookup.OrigPath, PosixPath);
+    Context->Lookup.CacheGen = CacheGen;
     Context->Lookup.UserMode = UserMode;
     Context->Lookup.HasTraversePrivilege = HasTraversePrivilege;
 
@@ -317,7 +324,12 @@ static VOID FusePrepareLookup(FUSE_CONTEXT *Context)
 
 exit:
     if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-        FspPosixDeletePath(PosixPath); /* handles NULL paths */
+    {
+        FspPosixDeletePath(PosixPath);
+            /* handles NULL paths */
+        FuseCacheDereferenceGen(FuseDeviceExtension(Context->DeviceObject)->Cache, CacheGen);
+            /* handles NULL gens */
+    }
 }
 
 static VOID FusePrepareLookup_ContextFini(FUSE_CONTEXT *Context)
@@ -328,7 +340,10 @@ static VOID FusePrepareLookup_ContextFini(FUSE_CONTEXT *Context)
         0 != Context->File)
         FuseFree(Context->File);
 
-    FspPosixDeletePath(Context->Lookup.OrigPath.Buffer); /* handles NULL paths */
+    FspPosixDeletePath(Context->Lookup.OrigPath.Buffer);
+        /* handles NULL paths */
+    FuseCacheDereferenceGen(FuseDeviceExtension(Context->DeviceObject)->Cache, Context->Lookup.CacheGen);
+        /* handles NULL gens */
 }
 
 static VOID FuseLookupName(FUSE_CONTEXT *Context)
