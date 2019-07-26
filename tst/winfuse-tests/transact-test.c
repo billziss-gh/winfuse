@@ -188,25 +188,25 @@ static void transact_lookup_dotest(PWSTR DeviceName, PWSTR Prefix)
 
     if (0 < BytesTransferred)
     {
-        ASSERT(FUSE_PROTO_REQ_SIZE(lookup) == Request->len);
-        ASSERT(FUSE_PROTO_OPCODE_LOOKUP == Request->opcode);
+        ASSERT(FUSE_PROTO_REQ_SIZE(getattr) == Request->len);
+        ASSERT(FUSE_PROTO_OPCODE_GETATTR == Request->opcode);
         ASSERT(0 != Request->unique);
         ASSERT(FUSE_PROTO_ROOT_ID == Request->nodeid);
         ASSERT(0 != Request->uid);
         ASSERT(0 != Request->gid);
         ASSERT(0 != Request->pid);
         ASSERT(0 == Request->padding);
-        ASSERT(0 == strcmp(Request->req.lookup.name, "file0"));
+        ASSERT(0 == Request->req.getattr.getattr_flags);
+        ASSERT(0 == Request->req.getattr.fh);
 
-        memset(Response, 0, FUSE_PROTO_RSP_SIZE(lookup));
-        Response->len = FUSE_PROTO_RSP_SIZE(lookup);
+        memset(Response, 0, FUSE_PROTO_RSP_SIZE(getattr));
+        Response->len = FUSE_PROTO_RSP_SIZE(getattr);
         Response->unique = Request->unique;
-        Response->rsp.lookup.entry.nodeid = FUSE_PROTO_ROOT_ID + 1;
-        Response->rsp.lookup.entry.attr.ino = FUSE_PROTO_ROOT_ID + 1;
-        Response->rsp.lookup.entry.attr.mode = 0100777;
-        Response->rsp.lookup.entry.attr.nlink = 1;
-        Response->rsp.lookup.entry.attr.uid = Request->uid;
-        Response->rsp.lookup.entry.attr.uid = Request->gid;
+        Response->rsp.getattr.attr.ino = FUSE_PROTO_ROOT_ID;
+        Response->rsp.getattr.attr.mode = 0100777;
+        Response->rsp.getattr.attr.nlink = 1;
+        Response->rsp.getattr.attr.uid = Request->uid;
+        Response->rsp.getattr.attr.gid = Request->gid;
 
         Success = DeviceIoControl(VolumeHandle, FUSE_FSCTL_TRANSACT,
             Response, Response->len, 0, 0, &BytesTransferred, 0);

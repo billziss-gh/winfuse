@@ -364,6 +364,7 @@ static VOID FuseLookupName(FUSE_CONTEXT *Context)
                 if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                     coro_break;
 
+                RtlZeroMemory(Entry, sizeof *Entry);
                 Entry->nodeid = FUSE_PROTO_ROOT_ID;
                 Entry->entry_valid = Entry->attr_valid =
                     Context->FuseResponse->rsp.getattr.attr_valid;

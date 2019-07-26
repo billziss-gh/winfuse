@@ -92,9 +92,9 @@ struct _FUSE_CACHE
     BOOLEAN CaseInsensitive;
     FAST_MUTEX Mutex;
     LIST_ENTRY GenList;
-    ULONG ItemCount;
     LIST_ENTRY ItemList;
     LIST_ENTRY ForgetList;
+    ULONG ItemCount;
     ULONG ItemBucketCount;
     PVOID ItemBuckets[];
 };
@@ -412,6 +412,8 @@ NTSTATUS FuseCacheReferenceGen(FUSE_CACHE *Cache, PVOID *PGen)
         if (0 == Gen)
         {
             InsertTailList(&Cache->GenList, &NewGen->ListEntry);
+
+            Gen = NewGen;
             NewGen = 0;
         }
 
