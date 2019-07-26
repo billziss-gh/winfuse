@@ -79,11 +79,16 @@ VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
 
     FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
 
-    if (0 != DeviceExtension->Cache)
-        FuseCacheDelete(DeviceExtension->Cache);
+    /*
+     * The Ioq must be deleted before the Cache, because it may contain Contexts
+     * that hold CacheGen references.
+     */
 
     if (0 != DeviceExtension->Ioq)
         FuseIoqDelete(DeviceExtension->Ioq);
+
+    if (0 != DeviceExtension->Cache)
+        FuseCacheDelete(DeviceExtension->Cache);
 }
 
 VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime)
@@ -100,6 +105,9 @@ FUSE_PROCESS_DISPATCH *FuseProcessFunction[FspFsctlTransactKindCount];
 static inline BOOLEAN FuseContextProcess(FUSE_CONTEXT *Context,
     FUSE_PROTO_RSP *FuseResponse, FUSE_PROTO_REQ *FuseRequest)
 {
+    ASSERT(0 == FuseRequest || 0 == FuseResponse);
+    ASSERT(0 != FuseRequest || 0 != FuseResponse);
+
     UINT32 Kind = 0 == Context->InternalRequest ?
         FspFsctlTransactReservedKind : Context->InternalRequest->Kind;
 

@@ -117,6 +117,8 @@ VOID FuseContextDelete(FUSE_CONTEXT *Context);
     )
 #define FuseContextIsStatus(C)          ((UINT_PTR)0x0000FFFF >= (UINT_PTR)(C))
 #define FuseContextToStatus(C)          ((NTSTATUS)(0xC0000000 | (UINT32)(UINT_PTR)(C)))
+#define FuseContextWaitRequest(C)       do { coro_yield; } while (0 == (C)->FuseRequest)
+#define FuseContextWaitResponse(C)      do { coro_yield; } while (0 == (C)->FuseResponse)
 extern FUSE_PROCESS_DISPATCH *FuseProcessFunction[];
 
 /* FUSE I/O queue */

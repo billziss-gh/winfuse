@@ -160,6 +160,7 @@ static inline BOOLEAN FuseCacheExpireItem(FUSE_CACHE *Cache,
             Cache->ItemCount--;
             if (Item->NoForget)
                 FuseFree(Item);
+                    /* !!!: should we attempt to free outside the mutex? */
             else
                 InsertTailList(&Cache->ForgetList, &Item->ListEntry);
             return TRUE;
@@ -442,11 +443,10 @@ VOID FuseCacheDereferenceGen(FUSE_CACHE *Cache, PVOID Gen0)
     if (0 == RefCount)
     {
         ExAcquireFastMutex(&Cache->Mutex);
-
         RemoveEntryList(&Gen->ListEntry);
-        FuseFree(Gen);
-
         ExReleaseFastMutex(&Cache->Mutex);
+
+        FuseFree(Gen);
     }
 }
 

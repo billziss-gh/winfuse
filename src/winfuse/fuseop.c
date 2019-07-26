@@ -159,15 +159,10 @@ static BOOLEAN FuseOpReserved_Forget(FUSE_CONTEXT *Context)
         {
             if (16 > DeviceExtension->VersionMinor ||
                 &Context->Forget.ForgetList == Context->Forget.ForgetList.Flink->Flink)
-            {
                 FuseProtoFillForget(Context); /* !coro */
-                coro_yield;
-            }
             else
-            {
                 FuseProtoFillBatchForget(Context); /* !coro */
-                coro_yield;
-            }
+            coro_yield;
         }
     }
 
@@ -456,6 +451,8 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
                     }
                 }
             }
+
+            FuseContextWaitRequest(Context);
 
             if (LastName)
                 coro_break;

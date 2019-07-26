@@ -111,7 +111,7 @@ VOID FuseProtoSendInit(FUSE_CONTEXT *Context)
         Context->FuseRequest->req.init.minor = FUSE_PROTO_MINOR_VERSION;
         Context->FuseRequest->req.init.max_readahead = 0;   /* !!!: REVISIT */
         Context->FuseRequest->req.init.flags = 0;           /* !!!: REVISIT */
-        coro_yield;
+        FuseContextWaitResponse(Context);
 
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
@@ -140,7 +140,7 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
         RtlCopyMemory(Context->FuseRequest->req.lookup.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.lookup.name[Context->Lookup.Name.Length] = '\0';
-        coro_yield;
+        FuseContextWaitResponse(Context);
 
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
@@ -238,7 +238,7 @@ VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context)
     {
         FuseProtoInitRequest(Context,
             FUSE_PROTO_REQ_SIZE(getattr), FUSE_PROTO_OPCODE_GETATTR, Context->Lookup.Ino);
-        coro_yield;
+        FuseContextWaitResponse(Context);
 
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
@@ -271,7 +271,7 @@ VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
         RtlCopyMemory(Context->FuseRequest->req.mkdir.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.mkdir.name[Context->Lookup.Name.Length] = '\0';
-        coro_yield;
+        FuseContextWaitResponse(Context);
 
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
@@ -307,7 +307,7 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
         RtlCopyMemory(Context->FuseRequest->req.mknod.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.mknod.name[Context->Lookup.Name.Length] = '\0';
-        coro_yield;
+        FuseContextWaitResponse(Context);
 
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
@@ -336,7 +336,7 @@ VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context)
         RtlCopyMemory(Context->FuseRequest->req.rmdir.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.rmdir.name[Context->Lookup.Name.Length] = '\0';
-        coro_yield;
+        FuseContextWaitResponse(Context);
 
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
@@ -365,7 +365,7 @@ VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context)
         RtlCopyMemory(Context->FuseRequest->req.unlink.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.unlink.name[Context->Lookup.Name.Length] = '\0';
-        coro_yield;
+        FuseContextWaitResponse(Context);
 
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
@@ -401,7 +401,7 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
         RtlCopyMemory(Context->FuseRequest->req.create.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.create.name[Context->Lookup.Name.Length] = '\0';
-        coro_yield;
+        FuseContextWaitResponse(Context);
 
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
@@ -449,7 +449,7 @@ VOID FuseProtoSendChownOnCreate(FUSE_CONTEXT *Context)
             Context->FuseRequest->req.setattr.uid = Context->Lookup.Attr.uid;
             Context->FuseRequest->req.setattr.gid = Context->Lookup.Attr.gid;
         }
-        coro_yield;
+        FuseContextWaitResponse(Context);
 
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
@@ -471,7 +471,7 @@ VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context)
     {
         FuseProtoInitRequest(Context,
             FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPENDIR, Context->Lookup.Ino);
-        coro_yield;
+        FuseContextWaitResponse(Context);
 
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
@@ -494,7 +494,7 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context)
         FuseProtoInitRequest(Context,
             FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPEN, Context->Lookup.Ino);
         Context->FuseRequest->req.open.flags = Context->File->OpenFlags;
-        coro_yield;
+        FuseContextWaitResponse(Context);
 
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
@@ -520,7 +520,7 @@ VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context)
             FUSE_PROTO_REQ_SIZE(release), FUSE_PROTO_OPCODE_RELEASEDIR, 0);
         Context->FuseRequest->req.release.fh = Context->File->Fh;
         Context->FuseRequest->req.release.flags = Context->File->OpenFlags;
-        coro_yield;
+        FuseContextWaitResponse(Context);
 
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
@@ -548,7 +548,7 @@ VOID FuseProtoSendRelease(FUSE_CONTEXT *Context)
         Context->FuseRequest->req.release.flags = Context->File->OpenFlags;
         Context->FuseRequest->req.release.release_flags = 0;/* !!!: REVISIT */
         Context->FuseRequest->req.release.lock_owner = 0;   /* !!!: REVISIT */
-        coro_yield;
+        FuseContextWaitResponse(Context);
 
         if (0 != Context->FuseResponse->error)
             Context->InternalResponse->IoStatus.Status =
