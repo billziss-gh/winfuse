@@ -55,6 +55,7 @@ static void transact_init_dotest(PWSTR DeviceName, PWSTR Prefix)
         0, 0, RequestBuf, sizeof RequestBuf, &BytesTransferred, 0);
     ASSERT(Success);
 
+    ASSERT(BytesTransferred == Request->len);
     ASSERT(FUSE_PROTO_REQ_SIZE(init) == Request->len);
     ASSERT(FUSE_PROTO_OPCODE_INIT == Request->opcode);
     ASSERT(0 != Request->unique);
@@ -147,6 +148,7 @@ static void transact_lookup_dotest(PWSTR DeviceName, PWSTR Prefix)
         0, 0, RequestBuf, sizeof RequestBuf, &BytesTransferred, 0);
     ASSERT(Success);
 
+    ASSERT(BytesTransferred == Request->len);
     ASSERT(FUSE_PROTO_REQ_SIZE(init) == Request->len);
     ASSERT(FUSE_PROTO_OPCODE_INIT == Request->opcode);
     ASSERT(0 != Request->unique);
@@ -186,32 +188,61 @@ static void transact_lookup_dotest(PWSTR DeviceName, PWSTR Prefix)
         ASSERT(Success);
     }
 
-    if (0 < BytesTransferred)
+    if (FUSE_PROTO_OPCODE_STATFS == Request->opcode)
     {
-        ASSERT(FUSE_PROTO_REQ_SIZE(getattr) == Request->len);
-        ASSERT(FUSE_PROTO_OPCODE_GETATTR == Request->opcode);
+        ASSERT(BytesTransferred == Request->len);
+        ASSERT(FUSE_PROTO_REQ_HEADER_SIZE == Request->len);
+        ASSERT(FUSE_PROTO_OPCODE_STATFS == Request->opcode);
         ASSERT(0 != Request->unique);
-        ASSERT(FUSE_PROTO_ROOT_ID == Request->nodeid);
-        ASSERT(0 != Request->uid);
-        ASSERT(0 != Request->gid);
-        ASSERT(0 != Request->pid);
+        ASSERT(0 == Request->nodeid);
+        ASSERT(0 == Request->uid);
+        ASSERT(0 == Request->gid);
+        ASSERT(0 == Request->pid);
         ASSERT(0 == Request->padding);
-        ASSERT(0 == Request->req.getattr.getattr_flags);
-        ASSERT(0 == Request->req.getattr.fh);
 
-        memset(Response, 0, FUSE_PROTO_RSP_SIZE(getattr));
-        Response->len = FUSE_PROTO_RSP_SIZE(getattr);
+        memset(Response, 0, FUSE_PROTO_RSP_SIZE(statfs));
+        Response->len = FUSE_PROTO_RSP_SIZE(statfs);
         Response->unique = Request->unique;
-        Response->rsp.getattr.attr.ino = FUSE_PROTO_ROOT_ID;
-        Response->rsp.getattr.attr.mode = 0100777;
-        Response->rsp.getattr.attr.nlink = 1;
-        Response->rsp.getattr.attr.uid = Request->uid;
-        Response->rsp.getattr.attr.gid = Request->gid;
+        Response->rsp.statfs.st.blocks = 1000;
+        Response->rsp.statfs.st.bfree = 1000;
+        Response->rsp.statfs.st.frsize = 4096;
 
         Success = DeviceIoControl(VolumeHandle, FUSE_FSCTL_TRANSACT,
-            Response, Response->len, 0, 0, &BytesTransferred, 0);
+            Response, Response->len, RequestBuf, sizeof RequestBuf, &BytesTransferred, 0);
         ASSERT(Success);
+
+        while (0 == BytesTransferred)
+        {
+            Success = DeviceIoControl(VolumeHandle, FUSE_FSCTL_TRANSACT,
+                0, 0, RequestBuf, sizeof RequestBuf, &BytesTransferred, 0);
+            ASSERT(Success);
+        }
     }
+
+    ASSERT(BytesTransferred == Request->len);
+    ASSERT(FUSE_PROTO_REQ_SIZE(getattr) == Request->len);
+    ASSERT(FUSE_PROTO_OPCODE_GETATTR == Request->opcode);
+    ASSERT(0 != Request->unique);
+    ASSERT(FUSE_PROTO_ROOT_ID == Request->nodeid);
+    ASSERT(0 != Request->uid);
+    ASSERT(0 != Request->gid);
+    ASSERT(0 != Request->pid);
+    ASSERT(0 == Request->padding);
+    ASSERT(0 == Request->req.getattr.getattr_flags);
+    ASSERT(0 == Request->req.getattr.fh);
+
+    memset(Response, 0, FUSE_PROTO_RSP_SIZE(getattr));
+    Response->len = FUSE_PROTO_RSP_SIZE(getattr);
+    Response->unique = Request->unique;
+    Response->rsp.getattr.attr.ino = FUSE_PROTO_ROOT_ID;
+    Response->rsp.getattr.attr.mode = 0100777;
+    Response->rsp.getattr.attr.nlink = 1;
+    Response->rsp.getattr.attr.uid = Request->uid;
+    Response->rsp.getattr.attr.gid = Request->gid;
+
+    Success = DeviceIoControl(VolumeHandle, FUSE_FSCTL_TRANSACT,
+        Response, Response->len, 0, 0, &BytesTransferred, 0);
+    ASSERT(Success);
 
     Success = CloseHandle(VolumeHandle);
     ASSERT(Success);

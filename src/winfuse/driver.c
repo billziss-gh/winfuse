@@ -38,8 +38,8 @@ NTSTATUS DriverEntry(
     FuseProcessFunction[FspFsctlTransactReservedKind] = FuseOpReserved;
     FuseProcessFunction[FspFsctlTransactCreateKind] = FuseOpCreate;
     //FuseProcessFunction[FspFsctlTransactOverwriteKind] = FuseOpOverwrite;
-    //FuseProcessFunction[FspFsctlTransactCleanupKind] = FuseOpCleanup;
-    //FuseProcessFunction[FspFsctlTransactCloseKind] = FuseOpClose;
+    FuseProcessFunction[FspFsctlTransactCleanupKind] = FuseOpCleanup;
+    FuseProcessFunction[FspFsctlTransactCloseKind] = FuseOpClose;
     //FuseProcessFunction[FspFsctlTransactReadKind] = FuseOpRead;
     //FuseProcessFunction[FspFsctlTransactWriteKind] = FuseOpWrite;
     //FuseProcessFunction[FspFsctlTransactQueryInformationKind] = FuseOpQueryInformation;
@@ -47,7 +47,7 @@ NTSTATUS DriverEntry(
     //FuseProcessFunction[FspFsctlTransactQueryEaKind] = FuseOpQueryEa;
     //FuseProcessFunction[FspFsctlTransactSetEaKind] = FuseOpSetEa;
     //FuseProcessFunction[FspFsctlTransactFlushBuffersKind] = FuseOpFlushBuffers;
-    //FuseProcessFunction[FspFsctlTransactQueryVolumeInformationKind] = FuseOpQueryVolumeInformation;
+    FuseProcessFunction[FspFsctlTransactQueryVolumeInformationKind] = FuseOpQueryVolumeInformation;
     //FuseProcessFunction[FspFsctlTransactSetVolumeInformationKind] = FuseOpSetVolumeInformation;
     //FuseProcessFunction[FspFsctlTransactQueryDirectoryKind] = FuseOpQueryDirectory;
     //FuseProcessFunction[FspFsctlTransactFileSystemControlKind] = FuseOpFileSystemControl;

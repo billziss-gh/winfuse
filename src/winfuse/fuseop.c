@@ -1096,7 +1096,19 @@ BOOLEAN FuseOpQueryVolumeInformation(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    return FALSE;
+    coro_block (Context->CoroState)
+    {
+        coro_await (FuseProtoSendStatfs(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        Context->InternalResponse->Rsp.QueryVolumeInformation.VolumeInfo.TotalSize =
+            (UINT64)Context->Statfs.blocks * (UINT64)Context->Statfs.frsize;
+        Context->InternalResponse->Rsp.QueryVolumeInformation.VolumeInfo.FreeSize =
+            (UINT64)Context->Statfs.bfree * (UINT64)Context->Statfs.frsize;
+    }
+
+    return coro_active();
 }
 
 BOOLEAN FuseOpSetVolumeInformation(FUSE_CONTEXT *Context)

@@ -105,6 +105,7 @@ struct _FUSE_CONTEXT
         {
             LIST_ENTRY ForgetList;
         } Forget;
+        FUSE_PROTO_STATFS Statfs;
     };
 };
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
@@ -175,6 +176,7 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context);
 NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList);
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context);
 VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
+VOID FuseProtoSendStatfs(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);

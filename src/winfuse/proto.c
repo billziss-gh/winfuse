@@ -28,6 +28,7 @@ NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList
 static VOID FuseProtoPostForget_ContextFini(FUSE_CONTEXT *Context);
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context);
 VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
+VOID FuseProtoSendStatfs(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
@@ -51,6 +52,7 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoPostForget_ContextFini)
 #pragma alloc_text(PAGE, FuseProtoFillForget)
 #pragma alloc_text(PAGE, FuseProtoFillBatchForget)
+#pragma alloc_text(PAGE, FuseProtoSendStatfs)
 #pragma alloc_text(PAGE, FuseProtoSendGetattr)
 #pragma alloc_text(PAGE, FuseProtoSendMkdir)
 #pragma alloc_text(PAGE, FuseProtoSendMknod)
@@ -222,6 +224,25 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context)
         (UINT32)((PUINT8)P - (PUINT8)Context->FuseRequest), FUSE_PROTO_OPCODE_BATCH_FORGET, 0);
     ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
     Context->FuseRequest->req.batch_forget.count = (ULONG)(P - StartP);
+}
+
+VOID FuseProtoSendStatfs(FUSE_CONTEXT *Context)
+    /*
+     * Send STATFS message.
+     */
+{
+    PAGED_CODE();
+
+    coro_block (Context->CoroState)
+    {
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_HEADER_SIZE, FUSE_PROTO_OPCODE_STATFS, 0);
+        FuseContextWaitResponse(Context);
+
+        if (0 != Context->FuseResponse->error)
+            Context->InternalResponse->IoStatus.Status =
+                FuseNtStatusFromErrno(Context->FuseResponse->error);
+    }
 }
 
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context)
