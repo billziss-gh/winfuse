@@ -57,6 +57,8 @@ NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *Vo
     DeviceExtension->Cache = Cache;
     KeInitializeEvent(&DeviceExtension->InitEvent, NotificationEvent, FALSE);
 
+    FuseFileDeviceInit(DeviceObject);
+
     Result = FuseProtoPostInit(DeviceObject);
     if (!NT_SUCCESS(Result))
         goto fail;
@@ -82,6 +84,9 @@ VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
     /*
      * The Ioq must be deleted before the Cache, because it may contain Contexts
      * that hold CacheGen references.
+     *
+     * Likewise the Ioq must be deleted before FuseFileDeviceFini, because it may
+     * contain Contexts that hold File's.
      */
 
     if (0 != DeviceExtension->Ioq)
@@ -89,6 +94,8 @@ VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
 
     if (0 != DeviceExtension->Cache)
         FuseCacheDelete(DeviceExtension->Cache);
+
+    FuseFileDeviceFini(DeviceObject);
 }
 
 VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime)

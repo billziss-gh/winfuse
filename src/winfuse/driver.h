@@ -44,6 +44,8 @@ typedef struct _FUSE_DEVICE_EXTENSION
     PVOID Cache;
     KEVENT InitEvent;
     UINT32 VersionMajor, VersionMinor;
+    KSPIN_LOCK FileListLock;
+    LIST_ENTRY FileList;
 } FUSE_DEVICE_EXTENSION;
 NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *VolumeParams);
 VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject);
@@ -59,6 +61,7 @@ FUSE_DEVICE_EXTENSION *FuseDeviceExtension(PDEVICE_OBJECT DeviceObject)
 /* FUSE files */
 typedef struct _FUSE_FILE
 {
+    LIST_ENTRY ListEntry;
     union
     {
         UINT64 Ino, Fh;
@@ -67,6 +70,10 @@ typedef struct _FUSE_FILE
     UINT32 IsDirectory:1;
     UINT32 IsReparsePoint:1;
 } FUSE_FILE;
+VOID FuseFileDeviceInit(PDEVICE_OBJECT DeviceObject);
+VOID FuseFileDeviceFini(PDEVICE_OBJECT DeviceObject);
+NTSTATUS FuseFileCreate(PDEVICE_OBJECT DeviceObject, FUSE_FILE **PFile);
+VOID FuseFileDelete(PDEVICE_OBJECT DeviceObject, FUSE_FILE *File);
 
 /* FUSE processing context */
 typedef struct _FUSE_CONTEXT FUSE_CONTEXT;

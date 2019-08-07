@@ -333,7 +333,7 @@ static VOID FusePrepareLookup_ContextFini(FUSE_CONTEXT *Context)
 
     if (FspFsctlTransactCreateKind == Context->InternalRequest->Kind &&
         0 != Context->File)
-        FuseFree(Context->File);
+        FuseFileDelete(Context->DeviceObject, Context->File);
 
     FspPosixDeletePath(Context->Lookup.OrigPath.Buffer);
         /* handles NULL paths */
@@ -613,14 +613,10 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->File = FuseAlloc(sizeof(FUSE_FILE));
-        if (0 == Context->File)
-        {
-            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INSUFFICIENT_RESOURCES;
+        Context->InternalResponse->IoStatus.Status = FuseFileCreate(Context->DeviceObject, &Context->File);
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
-        }
 
-        RtlZeroMemory(Context->File, sizeof(FUSE_FILE));
         Context->File->OpenFlags = 0x0100 | 0x0400 | 2 /*O_CREAT|O_EXCL|O_RDWR*/;
 
         Context->Lookup.Attr.rdev = 0;
@@ -748,14 +744,10 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->File = FuseAlloc(sizeof(FUSE_FILE));
-        if (0 == Context->File)
-        {
-            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INSUFFICIENT_RESOURCES;
+        Context->InternalResponse->IoStatus.Status = FuseFileCreate(Context->DeviceObject, &Context->File);
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
-        }
 
-        RtlZeroMemory(Context->File, sizeof(FUSE_FILE));
         GrantedAccess = Context->Lookup.GrantedAccess & (FILE_READ_DATA | FILE_WRITE_DATA);
         if (FILE_READ_DATA == GrantedAccess)
             Context->File->OpenFlags = 0/*O_RDONLY*/;
@@ -1036,7 +1028,7 @@ BOOLEAN FuseOpClose(FUSE_CONTEXT *Context)
         else
             coro_await (FuseProtoSendRelease(Context));
 
-        FuseFree(Context->File);
+        FuseFileDelete(Context->DeviceObject, Context->File);
         Context->File = 0;
     }
 
