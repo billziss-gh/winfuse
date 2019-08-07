@@ -49,6 +49,7 @@ BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpClose(FUSE_CONTEXT *Context);
+static VOID FuseOpClose_ContextFini(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpRead(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpWrite(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpQueryInformation(FUSE_CONTEXT *Context);
@@ -91,6 +92,7 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpOverwrite)
 #pragma alloc_text(PAGE, FuseOpCleanup)
 #pragma alloc_text(PAGE, FuseOpClose)
+#pragma alloc_text(PAGE, FuseOpClose_ContextFini)
 #pragma alloc_text(PAGE, FuseOpRead)
 #pragma alloc_text(PAGE, FuseOpWrite)
 #pragma alloc_text(PAGE, FuseOpQueryInformation)
@@ -1020,6 +1022,7 @@ BOOLEAN FuseOpClose(FUSE_CONTEXT *Context)
         /* NOTE: CLOSE cannot report failure! */
 
         Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.Close.UserContext2;
+        Context->Fini = FuseOpClose_ContextFini;
 
         if (Context->File->IsReparsePoint)
             /* reparse points are not opened; ignore */;
@@ -1027,12 +1030,17 @@ BOOLEAN FuseOpClose(FUSE_CONTEXT *Context)
             coro_await (FuseProtoSendReleasedir(Context));
         else
             coro_await (FuseProtoSendRelease(Context));
-
-        FuseFileDelete(Context->DeviceObject, Context->File);
-        Context->File = 0;
     }
 
     return coro_active();
+}
+
+static VOID FuseOpClose_ContextFini(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    if (0 != Context->File)
+        FuseFileDelete(Context->DeviceObject, Context->File);
 }
 
 BOOLEAN FuseOpRead(FUSE_CONTEXT *Context)
