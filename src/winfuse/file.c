@@ -50,7 +50,8 @@ NTSTATUS FuseFileCreate(PDEVICE_OBJECT DeviceObject, FUSE_FILE **PFile)
 
     *PFile = 0;
 
-    File = FuseAlloc(sizeof *File);
+    File = FuseAllocNonPaged(sizeof *File);
+        /* spinlocks must operate on non-paged memory */
     if (0 == File)
         return STATUS_INSUFFICIENT_RESOURCES;
 
