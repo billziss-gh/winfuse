@@ -235,7 +235,7 @@ static void transact_lookup_dotest(PWSTR DeviceName, PWSTR Prefix)
     Response->len = FUSE_PROTO_RSP_SIZE(getattr);
     Response->unique = Request->unique;
     Response->rsp.getattr.attr.ino = FUSE_PROTO_ROOT_ID;
-    Response->rsp.getattr.attr.mode = 0100777;
+    Response->rsp.getattr.attr.mode = 0040777;
     Response->rsp.getattr.attr.nlink = 1;
     Response->rsp.getattr.attr.uid = Request->uid;
     Response->rsp.getattr.attr.gid = Request->gid;
@@ -266,8 +266,231 @@ static void transact_lookup_test(void)
 #endif
 }
 
+static unsigned __stdcall transact_openclose_dotest_thread(void *FilePath)
+{
+    FspDebugLog(__FUNCTION__ ": \"%S\"\n", FilePath);
+
+    HANDLE Handle;
+    Handle = CreateFileW(FilePath,
+        FILE_GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+    if (INVALID_HANDLE_VALUE == Handle)
+        return GetLastError();
+    CloseHandle(Handle);
+    return 0;
+}
+
+static void transact_openclose_dotest(PWSTR DeviceName, PWSTR Prefix)
+{
+    FSP_FSCTL_VOLUME_PARAMS VolumeParams = { .Version = sizeof VolumeParams };
+    HANDLE VolumeHandle;
+    WCHAR VolumeName[MAX_PATH];
+    WCHAR FilePath[MAX_PATH];
+    HANDLE Thread;
+    DWORD ExitCode;
+    BOOL Success;
+    NTSTATUS Result;
+
+    wcscpy_s(VolumeParams.Prefix, sizeof VolumeParams.Prefix / sizeof(WCHAR),
+        L"\\winfuse-tests\\share");
+    VolumeParams.FsextControlCode = FUSE_FSCTL_TRANSACT;
+    Result = FspFsctlCreateVolume(DeviceName, &VolumeParams,
+        VolumeName, sizeof VolumeName, &VolumeHandle);
+    ASSERT(STATUS_SUCCESS == Result);
+    ASSERT(0 == wcsncmp(L"\\Device\\Volume{", VolumeName, 15));
+    ASSERT(INVALID_HANDLE_VALUE != VolumeHandle);
+
+    StringCbPrintfW(FilePath, sizeof FilePath, L"%s%s\\file0",
+        Prefix ? L"" : L"\\\\?\\GLOBALROOT", Prefix ? Prefix : VolumeName);
+    Thread = (HANDLE)_beginthreadex(0, 0, transact_openclose_dotest_thread, FilePath, 0, 0);
+    ASSERT(0 != Thread);
+
+    Sleep(1000); /* give some time to the thread to execute */
+
+    FSP_FSCTL_DECLSPEC_ALIGN UINT8 RequestBuf[FUSE_PROTO_REQ_SIZEMIN];
+    FUSE_PROTO_RSP ResponseBuf;
+    FUSE_PROTO_REQ *Request = (PVOID)RequestBuf;
+    FUSE_PROTO_RSP *Response = &ResponseBuf;
+    DWORD BytesTransferred;
+
+    for (BOOLEAN Loop = TRUE; Loop;)
+    {
+        do
+        {
+            Success = DeviceIoControl(VolumeHandle, FUSE_FSCTL_TRANSACT,
+                0, 0, RequestBuf, sizeof RequestBuf, &BytesTransferred, 0);
+            ASSERT(Success);
+        } while (0 == BytesTransferred);
+
+        ASSERT(FUSE_PROTO_REQ_HEADER_SIZE <= BytesTransferred);
+        ASSERT(Request->len == BytesTransferred);
+
+        Response->len = 0;
+        switch (Request->opcode)
+        {
+        case FUSE_PROTO_OPCODE_INIT:
+            ASSERT(FUSE_PROTO_REQ_SIZE(init) == Request->len);
+            ASSERT(FUSE_PROTO_OPCODE_INIT == Request->opcode);
+            ASSERT(0 != Request->unique);
+            ASSERT(0 == Request->nodeid);
+            ASSERT(0 == Request->uid);
+            ASSERT(0 == Request->gid);
+            ASSERT(0 == Request->pid);
+            ASSERT(0 == Request->padding);
+            ASSERT(FUSE_PROTO_VERSION == Request->req.init.major);
+            ASSERT(FUSE_PROTO_MINOR_VERSION == Request->req.init.minor);
+            // max_readahead
+            // flags
+
+            memset(Response, 0, FUSE_PROTO_RSP_SIZE(init));
+            Response->len = FUSE_PROTO_RSP_SIZE(init);
+            Response->unique = Request->unique;
+            Response->rsp.init.major = Request->req.init.major;
+            Response->rsp.init.minor = Request->req.init.minor;
+            // max_readahead
+            // flags
+            // max_background
+            // congestion_threshold
+            // max_write
+            // time_gran
+            // max_pages
+            // padding
+            // unused
+            break;
+
+        case FUSE_PROTO_OPCODE_STATFS:
+            ASSERT(FUSE_PROTO_REQ_HEADER_SIZE == Request->len);
+            ASSERT(FUSE_PROTO_OPCODE_STATFS == Request->opcode);
+            ASSERT(0 != Request->unique);
+            ASSERT(0 == Request->nodeid);
+            ASSERT(0 == Request->uid);
+            ASSERT(0 == Request->gid);
+            ASSERT(0 == Request->pid);
+            ASSERT(0 == Request->padding);
+
+            memset(Response, 0, FUSE_PROTO_RSP_SIZE(statfs));
+            Response->len = FUSE_PROTO_RSP_SIZE(statfs);
+            Response->unique = Request->unique;
+            Response->rsp.statfs.st.blocks = 1000;
+            Response->rsp.statfs.st.bfree = 1000;
+            Response->rsp.statfs.st.frsize = 4096;
+            break;
+
+        case FUSE_PROTO_OPCODE_GETATTR:
+            ASSERT(FUSE_PROTO_REQ_SIZE(getattr) == Request->len);
+            ASSERT(FUSE_PROTO_OPCODE_GETATTR == Request->opcode);
+            ASSERT(0 != Request->unique);
+            ASSERT(FUSE_PROTO_ROOT_ID == Request->nodeid);
+            ASSERT(0 != Request->uid);
+            ASSERT(0 != Request->gid);
+            ASSERT(0 != Request->pid);
+            ASSERT(0 == Request->padding);
+            ASSERT(0 == Request->req.getattr.getattr_flags);
+            ASSERT(0 == Request->req.getattr.fh);
+
+            memset(Response, 0, FUSE_PROTO_RSP_SIZE(getattr));
+            Response->len = FUSE_PROTO_RSP_SIZE(getattr);
+            Response->unique = Request->unique;
+            Response->rsp.getattr.attr.ino = FUSE_PROTO_ROOT_ID;
+            Response->rsp.getattr.attr.mode = 0040777;
+            Response->rsp.getattr.attr.nlink = 1;
+            Response->rsp.getattr.attr.uid = Request->uid;
+            Response->rsp.getattr.attr.gid = Request->gid;
+            break;
+
+        case FUSE_PROTO_OPCODE_LOOKUP:
+            ASSERT(FUSE_PROTO_REQ_SIZE(lookup) + sizeof "file0" == Request->len);
+            ASSERT(FUSE_PROTO_OPCODE_LOOKUP == Request->opcode);
+            ASSERT(0 != Request->unique);
+            ASSERT(FUSE_PROTO_ROOT_ID == Request->nodeid);
+            ASSERT(0 != Request->uid);
+            ASSERT(0 != Request->gid);
+            ASSERT(0 != Request->pid);
+            ASSERT(0 == Request->padding);
+            ASSERT(0 == strcmp("file0", Request->req.lookup.name));
+
+            memset(Response, 0, FUSE_PROTO_RSP_SIZE(lookup));
+            Response->len = FUSE_PROTO_RSP_SIZE(lookup);
+            Response->unique = Request->unique;
+            Response->rsp.lookup.entry.nodeid = FUSE_PROTO_ROOT_ID + 1;
+            Response->rsp.lookup.entry.attr.ino = FUSE_PROTO_ROOT_ID + 1;
+            Response->rsp.lookup.entry.attr.mode = 0100777;
+            Response->rsp.lookup.entry.attr.nlink = 1;
+            Response->rsp.lookup.entry.attr.uid = Request->uid;
+            Response->rsp.lookup.entry.attr.gid = Request->gid;
+            break;
+
+        case FUSE_PROTO_OPCODE_OPEN:
+            ASSERT(FUSE_PROTO_REQ_SIZE(open) == Request->len);
+            ASSERT(FUSE_PROTO_OPCODE_OPEN == Request->opcode);
+            ASSERT(0 != Request->unique);
+            ASSERT(FUSE_PROTO_ROOT_ID + 1 == Request->nodeid);
+            ASSERT(0 != Request->uid);
+            ASSERT(0 != Request->gid);
+            ASSERT(0 != Request->pid);
+            ASSERT(0 == Request->padding);
+            ASSERT(0 == Request->req.open.flags);
+            ASSERT(0 == Request->req.open.unused);
+
+            memset(Response, 0, FUSE_PROTO_RSP_SIZE(open));
+            Response->len = FUSE_PROTO_RSP_SIZE(open);
+            Response->unique = Request->unique;
+            Response->rsp.open.fh = 42;
+            break;
+
+        case FUSE_PROTO_OPCODE_RELEASE:
+            ASSERT(FUSE_PROTO_REQ_SIZE(release) == Request->len);
+            ASSERT(FUSE_PROTO_OPCODE_RELEASE == Request->opcode);
+            ASSERT(0 != Request->unique);
+            ASSERT(0 == Request->nodeid);
+            ASSERT(0 == Request->uid);
+            ASSERT(0 == Request->gid);
+            ASSERT(0 == Request->pid);
+            ASSERT(0 == Request->padding);
+            ASSERT(42 == Request->req.release.fh);
+            ASSERT(0 == Request->req.release.flags);
+            ASSERT(0 == Request->req.release.release_flags);
+            ASSERT(0 == Request->req.release.lock_owner);
+
+            memset(Response, 0, FUSE_PROTO_RSP_HEADER_SIZE);
+            Response->len = FUSE_PROTO_RSP_HEADER_SIZE;
+            Response->unique = Request->unique;
+
+            Loop = FALSE;
+            break;
+        }
+
+        Success = DeviceIoControl(VolumeHandle, FUSE_FSCTL_TRANSACT,
+            Response, Response->len, 0, 0, &BytesTransferred, 0);
+        ASSERT(Success);
+
+        ASSERT(0 == BytesTransferred);
+    }
+
+    Success = CloseHandle(VolumeHandle);
+    ASSERT(Success);
+
+    WaitForSingleObject(Thread, INFINITE);
+    GetExitCodeThread(Thread, &ExitCode);
+    CloseHandle(Thread);
+
+    ASSERT(0 == ExitCode);
+}
+
+static void transact_openclose_test(void)
+{
+    transact_openclose_dotest(L"WinFsp.Disk", 0);
+#if 0
+    /*
+     * This test fails because MUP appears to not be initialized
+     * when transact_lookup_dotest_thread executes.
+     */
+    transact_openclose_dotest(L"WinFsp.Net", L"\\\\winfsp-tests\\share");
+#endif
+}
+
 void transact_tests(void)
 {
     TEST(transact_init_test);
     TEST(transact_lookup_test);
+    TEST(transact_openclose_test);
 }

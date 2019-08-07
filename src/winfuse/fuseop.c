@@ -407,7 +407,7 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
             /*
              * - RootName:
              *     - UserMode:
-             *         - !LastName && TravPriv:
+             *         - !LastName && !TravPriv:
              *             - Lookup
              *             - TraverseCheck
              *         - LastName:
@@ -416,12 +416,12 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
              * - !RootName:
              *     - Lookup
              *     - UserMode:
-             *         - !LastName && TravPriv:
+             *         - !LastName && !TravPriv:
              *             - TraverseCheck
              *         - LastName:
              *             - AccessCheck
              */
-            if (!RootName || (UserMode && (TravPriv || LastName)))
+            if (!RootName || (UserMode && (!TravPriv || LastName)))
             {
                 coro_await (FuseLookupName(Context));
                 if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
@@ -429,7 +429,7 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
 
                 if (UserMode)
                 {
-                    if (!LastName && TravPriv)
+                    if (!LastName && !TravPriv)
                     {
                         Context->InternalResponse->IoStatus.Status = FuseAccessCheck(
                             Context->Lookup.Attr.uid, Context->Lookup.Attr.gid,
@@ -451,8 +451,6 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
                     }
                 }
             }
-
-            FuseContextWaitRequest(Context);
 
             if (LastName)
                 coro_break;
@@ -1028,6 +1026,8 @@ BOOLEAN FuseOpClose(FUSE_CONTEXT *Context)
     coro_block (Context->CoroState)
     {
         /* NOTE: CLOSE cannot report failure! */
+
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.Close.UserContext2;
 
         if (Context->File->IsReparsePoint)
             /* reparse points are not opened; ignore */;
