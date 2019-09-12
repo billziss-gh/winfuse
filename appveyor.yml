@@ -27,6 +27,8 @@ build_script:
 - tools\build.bat %CONFIGURATION%
 
 test_script:
+- sc create WinFuse type=kernel binPath=C:\projects\winfuse\build\VStudio\build\%CONFIGURATION%\winfuse-x64.sys
+- reg add HKLM\Software\WinFsp\Fsext /v 00093118 /d "WinFuse" /f /reg:32
 - build\VStudio\build\%CONFIGURATION%\winfuse-tests-x64.exe
 - if exist %SystemRoot%\memory.dmp exit 1
 
