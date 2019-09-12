@@ -1,0 +1,36 @@
+version: '{build}'
+
+image: Visual Studio 2019
+
+environment:
+  matrix:
+  - CONFIGURATION: Debug
+  - CONFIGURATION: Release
+
+init:
+#- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
+install:
+- git submodule update --init --recursive
+- appveyor AddMessage "Install WinFsp" -Category Information
+- appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5B2/winfsp-1.5.19192.msi
+- for %%f in ("winfsp-*.msi") do start /wait msiexec /i %%f /qn INSTALLLEVEL=1000
+- appveyor AddMessage "Change boot configuration and reboot" -Category Information
+- bcdedit /set testsigning on
+- verifier /standard /driver winfuse-x64.sys
+- if exist %SystemRoot%\memory.dmp del %SystemRoot%\memory.dmp
+- ps: Restart-Computer -Force
+- ps: Start-Sleep -s 60
+
+build_script:
+- appveyor AddMessage "Reboot complete" -Category Information
+- tools\build.bat %CONFIGURATION%
+
+test_script:
+- build\VStudio\build\%CONFIGURATION%\winfuse-tests-x64.exe
+- if exist %SystemRoot%\memory.dmp exit 1
+
+on_finish:
+- if exist %SystemRoot%\memory.dmp (7z a memory.dmp.zip %SystemRoot%\memory.dmp && appveyor PushArtifact memory.dmp.zip)
+- verifier /query
+#- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
