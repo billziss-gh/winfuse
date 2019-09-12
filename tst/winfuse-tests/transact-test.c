@@ -266,7 +266,9 @@ static void transact_lookup_test(void)
 #endif
 }
 
-static unsigned __stdcall transact_openclose_dotest_thread(void *FilePath)
+static HANDLE transact_open_close_dotest_VolumeHandle;
+
+static unsigned __stdcall transact_open_close_dotest_thread(void *FilePath)
 {
     FspDebugLog(__FUNCTION__ ": \"%S\"\n", FilePath);
 
@@ -275,11 +277,16 @@ static unsigned __stdcall transact_openclose_dotest_thread(void *FilePath)
         FILE_GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
     if (INVALID_HANDLE_VALUE == Handle)
         return GetLastError();
+    if (INVALID_HANDLE_VALUE != transact_open_close_dotest_VolumeHandle)
+    {
+        Sleep(300);
+        CloseHandle(transact_open_close_dotest_VolumeHandle);
+    }
     CloseHandle(Handle);
     return 0;
 }
 
-static void transact_openclose_dotest(PWSTR DeviceName, PWSTR Prefix)
+static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, BOOLEAN Abandon)
 {
     FSP_FSCTL_VOLUME_PARAMS VolumeParams = { .Version = sizeof VolumeParams };
     HANDLE VolumeHandle;
@@ -299,9 +306,11 @@ static void transact_openclose_dotest(PWSTR DeviceName, PWSTR Prefix)
     ASSERT(0 == wcsncmp(L"\\Device\\Volume{", VolumeName, 15));
     ASSERT(INVALID_HANDLE_VALUE != VolumeHandle);
 
+    transact_open_close_dotest_VolumeHandle = Abandon ? VolumeHandle : INVALID_HANDLE_VALUE;
+
     StringCbPrintfW(FilePath, sizeof FilePath, L"%s%s\\file0",
         Prefix ? L"" : L"\\\\?\\GLOBALROOT", Prefix ? Prefix : VolumeName);
-    Thread = (HANDLE)_beginthreadex(0, 0, transact_openclose_dotest_thread, FilePath, 0, 0);
+    Thread = (HANDLE)_beginthreadex(0, 0, transact_open_close_dotest_thread, FilePath, 0, 0);
     ASSERT(0 != Thread);
 
     Sleep(1000); /* give some time to the thread to execute */
@@ -318,7 +327,9 @@ static void transact_openclose_dotest(PWSTR DeviceName, PWSTR Prefix)
         {
             Success = DeviceIoControl(VolumeHandle, FUSE_FSCTL_TRANSACT,
                 0, 0, RequestBuf, sizeof RequestBuf, &BytesTransferred, 0);
-            ASSERT(Success);
+            ASSERT(Success || ERROR_INVALID_HANDLE == GetLastError() || ERROR_OPERATION_ABORTED == GetLastError());
+            if (!Success && (ERROR_INVALID_HANDLE == GetLastError() || ERROR_OPERATION_ABORTED == GetLastError()))
+                goto loopexit;
         } while (0 == BytesTransferred);
 
         ASSERT(FUSE_PROTO_REQ_HEADER_SIZE <= BytesTransferred);
@@ -461,13 +472,19 @@ static void transact_openclose_dotest(PWSTR DeviceName, PWSTR Prefix)
 
         Success = DeviceIoControl(VolumeHandle, FUSE_FSCTL_TRANSACT,
             Response, Response->len, 0, 0, &BytesTransferred, 0);
-        ASSERT(Success);
+        ASSERT(Success || ERROR_INVALID_HANDLE == GetLastError() || ERROR_OPERATION_ABORTED == GetLastError());
+        if (!Success && (ERROR_INVALID_HANDLE == GetLastError() || ERROR_OPERATION_ABORTED == GetLastError()))
+            goto loopexit;
 
         ASSERT(0 == BytesTransferred);
     }
+loopexit:
 
-    Success = CloseHandle(VolumeHandle);
-    ASSERT(Success);
+    if (!Abandon)
+    {
+        Success = CloseHandle(VolumeHandle);
+        ASSERT(Success);
+    }
 
     WaitForSingleObject(Thread, INFINITE);
     GetExitCodeThread(Thread, &ExitCode);
@@ -476,15 +493,27 @@ static void transact_openclose_dotest(PWSTR DeviceName, PWSTR Prefix)
     ASSERT(0 == ExitCode);
 }
 
-static void transact_openclose_test(void)
+static void transact_open_close_test(void)
 {
-    transact_openclose_dotest(L"WinFsp.Disk", 0);
+    transact_open_close_dotest(L"WinFsp.Disk", 0, FALSE);
 #if 0
     /*
      * This test fails because MUP appears to not be initialized
      * when transact_lookup_dotest_thread executes.
      */
-    transact_openclose_dotest(L"WinFsp.Net", L"\\\\winfsp-tests\\share");
+    transact_open_close_dotest(L"WinFsp.Net", L"\\\\winfsp-tests\\share", FALSE);
+#endif
+}
+
+static void transact_open_abandon_test(void)
+{
+    transact_open_close_dotest(L"WinFsp.Disk", 0, TRUE);
+#if 0
+    /*
+     * This test fails because MUP appears to not be initialized
+     * when transact_lookup_dotest_thread executes.
+     */
+    transact_open_close_dotest(L"WinFsp.Net", L"\\\\winfsp-tests\\share", TRUE);
 #endif
 }
 
@@ -492,5 +521,6 @@ void transact_tests(void)
 {
     TEST(transact_init_test);
     TEST(transact_lookup_test);
-    TEST(transact_openclose_test);
+    TEST(transact_open_close_test);
+    TEST(transact_open_abandon_test);
 }
