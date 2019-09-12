@@ -17,7 +17,7 @@ install:
 - for %%f in ("winfsp-*.msi") do start /wait msiexec /i %%f /qn INSTALLLEVEL=1000
 - appveyor AddMessage "Change boot configuration and reboot" -Category Information
 - bcdedit /set testsigning on
-- verifier /standard /driver winfuse-x64.sys
+- verifier /standard /driver winfuse-x64.sys || ver>nul
 - if exist %SystemRoot%\memory.dmp del %SystemRoot%\memory.dmp
 - ps: Restart-Computer -Force
 - ps: Start-Sleep -s 60
