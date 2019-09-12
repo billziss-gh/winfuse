@@ -218,7 +218,7 @@ VOID FusePosixPathPrefix(PSTRING Path, PSTRING Prefix, PSTRING Remain);
 VOID FusePosixPathSuffix(PSTRING Path, PSTRING Remain, PSTRING Suffix);
 
 /* utility */
-NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid);
+NTSTATUS FuseGetTokenUid(PACCESS_TOKEN Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid);
 NTSTATUS FuseSendTransactInternalIrp(PDEVICE_OBJECT DeviceObject, PFILE_OBJECT FileObject,
     FSP_FSCTL_TRANSACT_RSP *Response, FSP_FSCTL_TRANSACT_REQ **PRequest);
 
@@ -227,6 +227,7 @@ NTSTATUS FuseSendTransactInternalIrp(PDEVICE_OBJECT DeviceObject, PFILE_OBJECT F
 #define FuseAlloc(Size)                 ExAllocatePoolWithTag(PagedPool, Size, FUSE_ALLOC_TAG)
 #define FuseAllocNonPaged(Size)         ExAllocatePoolWithTag(NonPagedPool, Size, FUSE_ALLOC_TAG)
 #define FuseFree(Pointer)               ExFreePoolWithTag(Pointer, FUSE_ALLOC_TAG)
+#define FuseFreeExternal(Pointer)       ExFreePool(Pointer)
 
 /* hash mix */
 /* Based on the MurmurHash3 fmix32/fmix64 function:

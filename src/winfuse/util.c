@@ -21,7 +21,7 @@
 
 #include <winfuse/driver.h>
 
-NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid);
+NTSTATUS FuseGetTokenUid(PACCESS_TOKEN Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid);
 NTSTATUS FuseSendTransactInternalIrp(PDEVICE_OBJECT DeviceObject, PFILE_OBJECT FileObject,
     FSP_FSCTL_TRANSACT_RSP *Response, FSP_FSCTL_TRANSACT_REQ **PRequest);
 static NTSTATUS FuseSendIrpCompletion(
@@ -33,24 +33,17 @@ static NTSTATUS FuseSendIrpCompletion(
 // !#pragma alloc_text(PAGE, FuseSendIrpCompletion)
 #endif
 
-NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid)
+NTSTATUS FuseGetTokenUid(PACCESS_TOKEN Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid)
 {
     PAGED_CODE();
 
-    PSID *PSid;
-    struct
-    {
-        union
-        {
-            TOKEN_USER U;
-            TOKEN_OWNER O;
-            TOKEN_PRIMARY_GROUP G;
-        } u;
-        FSP_FSCTL_DECLSPEC_ALIGN UINT8 B[SECURITY_MAX_SID_SIZE];
-    } InfoBuf;
-    PVOID Info = &InfoBuf;
-    ULONG Size;
     NTSTATUS Result;
+    PVOID Info = 0;
+    PSID *PSid;
+
+    Result = SeQueryInformationToken(Token, InfoClass, &Info);
+    if (!NT_SUCCESS(Result))
+        goto exit;
 
     switch (InfoClass)
     {
@@ -65,14 +58,17 @@ NTSTATUS FuseGetTokenUid(HANDLE Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT3
         break;
     default:
         ASSERT(0);
-        return STATUS_INVALID_PARAMETER;
+        Result = STATUS_INVALID_PARAMETER;
+        goto exit;
     }
 
-    Result = ZwQueryInformationToken(Token, InfoClass, Info, sizeof InfoBuf, &Size);
-    if (!NT_SUCCESS(Result))
-        return Result;
+    Result = FspPosixMapSidToUid(*PSid, PUid);
 
-    return FspPosixMapSidToUid(*PSid, PUid);
+exit:
+    if (0 != Info)
+        FuseFreeExternal(Info);
+
+    return Result;
 }
 
 typedef struct

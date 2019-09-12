@@ -247,21 +247,22 @@ static VOID FusePrepareLookup(FUSE_CONTEXT *Context)
     PSTR PosixPath = 0;
     PWSTR FileName = 0;
     UINT64 AccessToken = 0;
-    UINT32 UserMode = 1;
+    PACCESS_TOKEN AccessTokenObject = 0;
+    UINT32 IsUserMode = 1;
     UINT32 HasTraversePrivilege = 0;
 
     if (FspFsctlTransactCreateKind == Context->InternalRequest->Kind)
     {
         FileName = (PWSTR)Context->InternalRequest->Buffer;
         AccessToken = Context->InternalRequest->Req.Create.AccessToken;
-        UserMode = Context->InternalRequest->Req.Create.UserMode;
+        IsUserMode = Context->InternalRequest->Req.Create.UserMode;
         HasTraversePrivilege = Context->InternalRequest->Req.Create.HasTraversePrivilege;
     }
     else if (FspFsctlTransactCleanupKind == Context->InternalRequest->Kind &&
         Context->InternalRequest->Req.Cleanup.Delete)
     {
         FileName = (PWSTR)Context->InternalRequest->Buffer;
-        UserMode = 0;
+        IsUserMode = 0;
         HasTraversePrivilege = 1;
     }
     else if (FspFsctlTransactSetInformationKind == Context->InternalRequest->Kind &&
@@ -270,7 +271,7 @@ static VOID FusePrepareLookup(FUSE_CONTEXT *Context)
         FileName = (PWSTR)(Context->InternalRequest->Buffer +
             Context->InternalRequest->Req.SetInformation.Info.Rename.NewFileName.Offset);
         AccessToken = Context->InternalRequest->Req.SetInformation.Info.Rename.AccessToken;
-        UserMode = 1;
+        IsUserMode = 1;
         HasTraversePrivilege = 1;
     }
 
@@ -289,19 +290,27 @@ static VOID FusePrepareLookup(FUSE_CONTEXT *Context)
 
     if (0 != AccessToken)
     {
-        Context->InternalResponse->IoStatus.Status = FuseGetTokenUid(
+        Context->InternalResponse->IoStatus.Status = ObReferenceObjectByHandle(
             FSP_FSCTL_TRANSACT_REQ_TOKEN_HANDLE(AccessToken),
-            TokenUser,
-            &Uid);
+            TOKEN_QUERY,
+            *SeTokenObjectType,
+            UserMode,
+            &AccessTokenObject,
+            0/*HandleInformation*/);
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             goto exit;
 
         Context->InternalResponse->IoStatus.Status = FuseGetTokenUid(
-            FSP_FSCTL_TRANSACT_REQ_TOKEN_HANDLE(AccessToken),
-            TokenPrimaryGroup,
-            &Gid);
+            AccessTokenObject, TokenUser, &Uid);
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             goto exit;
+
+        Context->InternalResponse->IoStatus.Status = FuseGetTokenUid(
+            AccessTokenObject, TokenPrimaryGroup, &Gid);
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            goto exit;
+
+        ObDereferenceObject(AccessTokenObject);
 
         Pid = FSP_FSCTL_TRANSACT_REQ_TOKEN_PID(AccessToken);
     }
