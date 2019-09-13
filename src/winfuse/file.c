@@ -32,12 +32,20 @@ VOID FuseFileDeviceInit(PDEVICE_OBJECT DeviceObject)
 VOID FuseFileDeviceFini(PDEVICE_OBJECT DeviceObject)
 {
     FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
+    KIRQL Irql;
+    PLIST_ENTRY Entry;
     FUSE_FILE *File;
 
-    for (PLIST_ENTRY Entry = DeviceExtension->FileList.Flink;
-        &DeviceExtension->FileList != Entry; Entry = Entry->Flink)
+    for (;;)
     {
-        File = CONTAINING_RECORD(Entry, FUSE_FILE, ListEntry);
+        KeAcquireSpinLock(&DeviceExtension->FileListLock, &Irql);
+        Entry = RemoveHeadList(&DeviceExtension->FileList);
+        File = &DeviceExtension->FileList != Entry ?
+            CONTAINING_RECORD(Entry, FUSE_FILE, ListEntry) : 0;
+        KeReleaseSpinLock(&DeviceExtension->FileListLock, Irql);
+        if (0 == File)
+            break;
+
         FuseFree(File);
     }
 }
