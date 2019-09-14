@@ -3,7 +3,7 @@
 </h1>
 
 <p align="center">
-    <b style="color:red">THIS PROJECT IS WORK IN PROGRESS</b>
+    <b>THIS PROJECT IS WORK IN PROGRESS</b>
     <br/>
     <br/>
     <a href="https://ci.appveyor.com/project/billziss-gh/winfuse">
