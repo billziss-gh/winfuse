@@ -1,0 +1,38 @@
+skinparam componentStyle uml2
+
+together {
+    component winfsp #Salmon
+    component winfuse #Salmon
+    component wslfuse #Salmon
+    component lxldr #Salmon
+    winfsp -[hidden]- winfuse
+    winfuse -[hidden]- wslfuse
+    wslfuse -[hidden]- lxldr
+}
+
+together {
+    interface "FSP_FSCTL\nTRANSACT" as FSP_FSCTL_TRANSACT #Salmon
+    interface "FUSE_FSCTL\nTRANSACT" as FUSE_FSCTL_TRANSACT #Salmon
+    interface "/dev/fuse" as devfuse #Salmon
+    FSP_FSCTL_TRANSACT -[hidden]- FUSE_FSCTL_TRANSACT
+    FUSE_FSCTL_TRANSACT -[hidden]- devfuse
+}
+
+together {
+    component "Windows FS" as winfs
+    component "Linux FS" as wslfs
+    winfs -[hidden]- wslfs
+    wslfs -[hidden]- winfs
+}
+
+winfsp .down.> winfuse: <<load>>
+lxldr .up.> wslfuse: <<load>>
+
+winfsp -right- FSP_FSCTL_TRANSACT
+winfuse -right- FUSE_FSCTL_TRANSACT
+winfuse -up-> FSP_FSCTL_TRANSACT
+wslfuse -right- devfuse
+wslfuse -up-> FUSE_FSCTL_TRANSACT
+
+winfs -left-> FUSE_FSCTL_TRANSACT
+wslfs -left-> devfuse

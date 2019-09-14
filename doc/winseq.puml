@@ -2,11 +2,11 @@ hide footbox
 
 box "Originating Process Context"
     participant "Originating Process" as OP
-    participant "winfsp" as winfspOP
+    participant "winfsp" as winfspOP #Salmon
 end box
 box "File System Process Context"
-    participant "winfsp" as winfspFS
-    participant winfuse
+    participant "winfsp" as winfspFS #Salmon
+    participant winfuse #Salmon
     participant "Windows FS" as FS
 end box
 

@@ -13,9 +13,9 @@
 
 ## Design
 
-### Deployment Diagram
+### Component Diagram
 
-![Deployment Diagram](doc/deployment.png)
+![Component Diagram](doc/Component.png)
 
 ### Windows File System Sequence Diagram
 
