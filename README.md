@@ -15,7 +15,7 @@
 
 ### Component Diagram
 
-![Component Diagram](doc/Component.png)
+![Component Diagram](doc/component.png)
 
 ### Windows File System Sequence Diagram
 
