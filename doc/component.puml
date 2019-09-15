@@ -1,27 +1,38 @@
 skinparam componentStyle uml2
 skinparam nodesep 100
 skinparam ranksep 30
+skinparam package {
+    fontcolor grey
+    borderColor grey
+    shadowing false
+}
 
 package WinFsp {
-    component winfsp #Salmon
-    interface "FSP_FSCTL\nTRANSACT" as FSP_FSCTL_TRANSACT #Salmon
-    winfsp -right- FSP_FSCTL_TRANSACT
+    together {
+        component winfsp #Salmon
+        interface "FSP_FSCTL\nTRANSACT" as FSP_FSCTL_TRANSACT #Salmon
+        winfsp -right- FSP_FSCTL_TRANSACT
+    }
 }
 
 package WinFuse {
-    component winfuse #Salmon
-    interface "FUSE_FSCTL\nTRANSACT" as FUSE_FSCTL_TRANSACT #Salmon
-    winfuse -right- FUSE_FSCTL_TRANSACT
-    component wslfuse #Salmon
-    interface "/dev/fuse" as devfuse #Salmon
-    wslfuse -right- devfuse
+    together {
+        component winfuse #Salmon
+        interface "FUSE_FSCTL\nTRANSACT" as FUSE_FSCTL_TRANSACT #Salmon
+        winfuse -right- FUSE_FSCTL_TRANSACT
+        component wslfuse #Salmon
+        interface "/dev/fuse" as devfuse #Salmon
+        wslfuse -right- devfuse
 
-    winfuse -[hidden]- wslfuse
-    FUSE_FSCTL_TRANSACT -[hidden]- devfuse
+        winfuse -[hidden]- wslfuse
+        FUSE_FSCTL_TRANSACT -[hidden]- devfuse
+    }
 }
 
 package LxDK {
-    component lxldr #Salmon
+    together {
+        component lxldr #Salmon
+    }
 }
 
 winfsp -[hidden]- winfuse
