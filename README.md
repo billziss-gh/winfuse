@@ -13,14 +13,14 @@
 
 ## Design
 
-### Component Diagram
+### Structural Diagram
 
 ![Component Diagram](doc/component.png)
 
-### Windows File System Sequence Diagram
+### Windows FUSE File System Behavioral Diagram
 
 ![Windows FS Sequence Diagram](doc/winseq.png)
 
-### Linux File System Sequence Diagram
+### Linux FUSE File System Behavioral Diagram
 
 ![Linux FS Sequence Diagram](doc/wslseq.png)
