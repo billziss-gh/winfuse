@@ -1,38 +1,44 @@
 skinparam componentStyle uml2
+skinparam nodesep 100
+skinparam ranksep 30
 
-together {
+package WinFsp {
     component winfsp #Salmon
-    component winfuse #Salmon
-    component wslfuse #Salmon
-    component lxldr #Salmon
-    winfsp -[hidden]- winfuse
-    winfuse -[hidden]- wslfuse
-    wslfuse -[hidden]- lxldr
+    interface "FSP_FSCTL\nTRANSACT" as FSP_FSCTL_TRANSACT #Salmon
+    winfsp -right- FSP_FSCTL_TRANSACT
 }
 
-together {
-    interface "FSP_FSCTL\nTRANSACT" as FSP_FSCTL_TRANSACT #Salmon
+package WinFuse {
+    component winfuse #Salmon
     interface "FUSE_FSCTL\nTRANSACT" as FUSE_FSCTL_TRANSACT #Salmon
+    winfuse -right- FUSE_FSCTL_TRANSACT
+    component wslfuse #Salmon
     interface "/dev/fuse" as devfuse #Salmon
-    FSP_FSCTL_TRANSACT -[hidden]- FUSE_FSCTL_TRANSACT
+    wslfuse -right- devfuse
+
+    winfuse -[hidden]- wslfuse
     FUSE_FSCTL_TRANSACT -[hidden]- devfuse
 }
 
-together {
-    component "Windows FS" as winfs
-    component "Linux FS" as wslfs
-    winfs -[hidden]- wslfs
-    wslfs -[hidden]- winfs
+package LxDK {
+    component lxldr #Salmon
 }
 
-winfsp .down.> winfuse: <<load>>
-lxldr .up.> wslfuse: <<load>>
+winfsp -[hidden]- winfuse
+wslfuse -[hidden]- lxldr
+FSP_FSCTL_TRANSACT -[hidden]- FUSE_FSCTL_TRANSACT
 
-winfsp -right- FSP_FSCTL_TRANSACT
-winfuse -right- FUSE_FSCTL_TRANSACT
 winfuse -up-> FSP_FSCTL_TRANSACT
-wslfuse -right- devfuse
 wslfuse -up-> FUSE_FSCTL_TRANSACT
+
+winfsp .down.> winfuse: loads
+lxldr .up.> wslfuse: loads
+
+component "Windows FS" as winfs
+component "Linux FS" as wslfs
+winfs -[hidden]- wslfs
+winfuse -[hidden] winfs
+wslfuse -[hidden] wslfs
 
 winfs -left-> FUSE_FSCTL_TRANSACT
 wslfs -left-> devfuse
