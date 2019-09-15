@@ -1,49 +1,51 @@
 skinparam componentStyle uml2
-skinparam nodesep 100
-skinparam ranksep 30
+skinparam nodesep 50
+skinparam ranksep 10
 skinparam package {
     fontcolor grey
     borderColor grey
     shadowing false
 }
 
-package WinFsp {
-    together {
-        component winfsp #Salmon
-        interface "FSP_FSCTL\nTRANSACT" as FSP_FSCTL_TRANSACT #Salmon
-        winfsp -right- FSP_FSCTL_TRANSACT
+together {
+    package WinFsp {
+        together {
+            component winfsp #Salmon
+            interface "FSP_FSCTL\nTRANSACT" as FSP_FSCTL_TRANSACT #Salmon
+            winfsp -right- FSP_FSCTL_TRANSACT
+        }
     }
-}
 
-package WinFuse {
-    together {
-        component winfuse #Salmon
-        interface "FUSE_FSCTL\nTRANSACT" as FUSE_FSCTL_TRANSACT #Salmon
-        winfuse -right- FUSE_FSCTL_TRANSACT
-        component wslfuse #Salmon
-        interface "/dev/fuse" as devfuse #Salmon
-        wslfuse -right- devfuse
+    package WinFuse {
+        together {
+            component winfuse #Salmon
+            interface "FUSE_FSCTL\nTRANSACT" as FUSE_FSCTL_TRANSACT #Salmon
+            winfuse -right- FUSE_FSCTL_TRANSACT
+            component wslfuse #Salmon
+            interface "/dev/fuse" as devfuse #Salmon
+            wslfuse -right- devfuse
 
-        winfuse -[hidden]- wslfuse
-        FUSE_FSCTL_TRANSACT -[hidden]- devfuse
+            winfuse -[hidden]- wslfuse
+            FUSE_FSCTL_TRANSACT -[hidden]- devfuse
+        }
     }
-}
 
-package LxDK {
-    together {
-        component lxldr #Salmon
+    package LxDK {
+        together {
+            component lxldr #Salmon
+        }
     }
+
+    winfsp -[hidden]- winfuse
+    wslfuse -[hidden]- lxldr
+    FSP_FSCTL_TRANSACT -[hidden]- FUSE_FSCTL_TRANSACT
+
+    winfuse -up-> FSP_FSCTL_TRANSACT
+    wslfuse -up-> FUSE_FSCTL_TRANSACT
+
+    winfsp .down.> winfuse: loads
+    lxldr .up.> wslfuse: loads
 }
-
-winfsp -[hidden]- winfuse
-wslfuse -[hidden]- lxldr
-FSP_FSCTL_TRANSACT -[hidden]- FUSE_FSCTL_TRANSACT
-
-winfuse -up-> FSP_FSCTL_TRANSACT
-wslfuse -up-> FUSE_FSCTL_TRANSACT
-
-winfsp .down.> winfuse: loads
-lxldr .up.> wslfuse: loads
 
 component "Windows FS" as winfs
 component "Linux FS" as wslfs
