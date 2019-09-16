@@ -1,14 +1,14 @@
 hide footbox
 
 box "Originating Process Context"
-    participant "Originating Process" as OP
+    participant "Originating\nProcess" as OP
     participant "winfsp" as winfspOP
 end box
 box "File System Process Context"
     participant "winfsp" as winfspFS
     participant winfuse #Salmon
     participant wslfuse #Salmon
-    participant "Linux FUSE FS" as FS
+    participant "Linux\nFUSE FS" as FS
 end box
 
 activate OP

@@ -1,4 +1,5 @@
 left to right direction
+skinparam componentStyle uml2
 skinparam nodesep 80
 skinparam ranksep 10
 skinparam rectangle {
@@ -36,11 +37,11 @@ rectangle NTOS {
     wslfuse -up--( FUSE_FSCTL_TRANSACT
 }
 
-component "Windows WinFsp FS" as fspfs
+component "Windows\nWinFsp FS" as fspfs
 fspfs -left-( FSP_FSCTL_TRANSACT
 
-component "Windows FUSE FS" as winfs
+component "Windows\nFUSE FS" as winfs
 winfs -left-( FUSE_FSCTL_TRANSACT
 
-component "Linux FUSE FS" as wslfs
+component "Linux\nFUSE FS" as wslfs
 wslfs -left-( devfuse
