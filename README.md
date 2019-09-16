@@ -49,7 +49,9 @@ The following sequence diagrams show how the WinFuse project components interact
 
 ![Windows FS Sequence Diagram](doc/winseq.svg)
 
-- The I/O originates with a Windows process, which uses a familiar API like `ReadFile` or `WriteFile`.
+- The I/O originates with one of:
+    - A Windows process which uses a familiar API like `ReadFile` or `WriteFile`.
+    - A WSL (Linux) process which uses an API like `read(2)` or `write(2)` that LXCORE translates into the equivalent `NtReadFile` or `NtWriteFile`.
 - The Windows OS (NTOS) packages this I/O into an IRP (I/O Request Packet) and routes it to the **winfsp** FSD.
 - The **winfsp** FSD posts the request into an internal I/O queue. This request is retrieved at a later time and in a different process context via an `FSP_FSCTL_TRANSACT` (issued via `DeviceIoControl`) by the **winfuse** driver.
 - The **winfuse** driver translates the request to equivalent FUSE requests, which are then retrieved via an `FUSE_FSCTL_TRANSACT` (issued via `DeviceIoControl`) by the Windows FUSE file system.
@@ -61,4 +63,4 @@ The following sequence diagrams show how the WinFuse project components interact
 
 ![Linux FS Sequence Diagram](doc/wslseq.svg)
 
-This case is similar to the first case except that there is an additional driver **wslfuse** that acts as a bridge between the `FUSE_FSCTL_TRANSACT` interface and the **/dev/fuse** interface that Linux FUSE file system understands.
+This case is similar to the first case except that there is an additional driver **wslfuse** that acts as a bridge between the `FUSE_FSCTL_TRANSACT` interface and the **/dev/fuse** interface that the Linux FUSE file system understands.
