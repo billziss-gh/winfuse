@@ -36,6 +36,9 @@ rectangle NTOS {
     wslfuse -up--( FUSE_FSCTL_TRANSACT
 }
 
+component "Windows WinFsp FS" as fspfs
+fspfs -left-( FSP_FSCTL_TRANSACT
+
 component "Windows FUSE FS" as winfs
 winfs -left-( FUSE_FSCTL_TRANSACT
 
