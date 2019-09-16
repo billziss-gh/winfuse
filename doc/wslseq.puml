@@ -8,7 +8,7 @@ box "File System Process Context"
     participant "winfsp" as winfspFS
     participant winfuse #Salmon
     participant wslfuse #Salmon
-    participant "Linux FS" as FS
+    participant "Linux FUSE FS" as FS
 end box
 
 activate OP

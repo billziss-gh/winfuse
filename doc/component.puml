@@ -36,8 +36,8 @@ rectangle NTOS {
     wslfuse -up--( FUSE_FSCTL_TRANSACT
 }
 
-component "Windows FS" as winfs
+component "Windows FUSE FS" as winfs
 winfs -left-( FUSE_FSCTL_TRANSACT
 
-component "Linux FS" as wslfs
+component "Linux FUSE FS" as wslfs
 wslfs -left-( devfuse
