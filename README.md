@@ -15,12 +15,12 @@
 
 ### Structural Diagram
 
-![Component Diagram](doc/component.png)
+![Component Diagram](doc/component.svg)
 
 ### Windows FUSE File System Behavioral Diagram
 
-![Windows FS Sequence Diagram](doc/winseq.png)
+![Windows FS Sequence Diagram](doc/winseq.svg)
 
 ### Linux FUSE File System Behavioral Diagram
 
-![Linux FS Sequence Diagram](doc/wslseq.png)
+![Linux FS Sequence Diagram](doc/wslseq.svg)

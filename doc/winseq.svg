@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentScriptType="application/ecmascript" contentStyleType="text/css" height="368px" preserveAspectRatio="none" style="width:805px;height:368px;" version="1.1" viewBox="0 0 805 368" width="805px" zoomAndPan="magnify"><defs><filter height="300%" id="fm1exlaozu793" width="300%" x="-1" y="-1"><feGaussianBlur result="blurOut" stdDeviation="2.0"/><feColorMatrix in="blurOut" result="blurOut2" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .4 0"/><feOffset dx="4.0" dy="4.0" in="blurOut2" result="blurOut3"/><feBlend in="SourceGraphic" in2="blurOut3" mode="normal"/></filter></defs><g><rect fill="#DDDDDD" height="346.2832" style="stroke: #A80036; stroke-width: 1.0;" width="233" x="4" y="4"/><text fill="#000000" font-family="sans-serif" font-size="13" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="189" x="26" y="16.5684">Originating Process Context</text><rect fill="#DDDDDD" height="346.2832" style="stroke: #A80036; stroke-width: 1.0;" width="492" x="290" y="4"/><text fill="#000000" font-family="sans-serif" font-size="13" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="186" x="443" y="16.5684">File System Process Context</text><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="21.3105" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="79" y="68.7988"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="9" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="79" y="338.2832"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="29.3105" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="196.5" y="90.1094"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="29.3105" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="320.5" y="119.4199"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="29.3105" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="320.5" y="308.9727"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="29.3105" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="517.5" y="148.7305"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="29.3105" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="517.5" y="279.6621"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="101.6211" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="723.5" y="178.041"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="28" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="728.5" y="215.3516"/><line style="stroke: #A80036; stroke-width: 1.0; stroke-dasharray: 5.0,5.0;" x1="84" x2="84" y1="58.7988" y2="356.2832"/><line style="stroke: #A80036; stroke-width: 1.0; stroke-dasharray: 5.0,5.0;" x1="201" x2="201" y1="58.7988" y2="356.2832"/><line style="stroke: #A80036; stroke-width: 1.0; stroke-dasharray: 5.0,5.0;" x1="325" x2="325" y1="58.7988" y2="356.2832"/><line style="stroke: #A80036; stroke-width: 1.0; stroke-dasharray: 5.0,5.0;" x1="522" x2="522" y1="58.7988" y2="356.2832"/><line style="stroke: #A80036; stroke-width: 1.0; stroke-dasharray: 5.0,5.0;" x1="728" x2="728" y1="58.7988" y2="356.2832"/><rect fill="#FEFECE" filter="url(#fm1exlaozu793)" height="30.4883" style="stroke: #A80036; stroke-width: 1.5;" width="148" x="8" y="23.3105"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="134" x="15" y="43.8457">Originating Process</text><rect fill="#FEFECE" filter="url(#fm1exlaozu793)" height="30.4883" style="stroke: #A80036; stroke-width: 1.5;" width="59" x="170" y="23.3105"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="45" x="177" y="43.8457">winfsp</text><rect fill="#FEFECE" filter="url(#fm1exlaozu793)" height="30.4883" style="stroke: #A80036; stroke-width: 1.5;" width="59" x="294" y="23.3105"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="45" x="301" y="43.8457">winfsp</text><rect fill="#FA8072" filter="url(#fm1exlaozu793)" height="30.4883" style="stroke: #A80036; stroke-width: 1.5;" width="67" x="487" y="23.3105"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="53" x="494" y="43.8457">winfuse</text><rect fill="#FEFECE" filter="url(#fm1exlaozu793)" height="30.4883" style="stroke: #A80036; stroke-width: 1.5;" width="95" x="679" y="23.3105"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="81" x="686" y="43.8457">Windows FS</text><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="21.3105" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="79" y="68.7988"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="9" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="79" y="338.2832"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="29.3105" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="196.5" y="90.1094"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="29.3105" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="320.5" y="119.4199"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="29.3105" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="320.5" y="308.9727"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="29.3105" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="517.5" y="148.7305"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="29.3105" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="517.5" y="279.6621"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="101.6211" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="723.5" y="178.041"/><rect fill="#FFFFFF" filter="url(#fm1exlaozu793)" height="28" style="stroke: #A80036; stroke-width: 1.0;" width="10" x="728.5" y="215.3516"/><polygon fill="#A80036" points="184.5,86.1094,194.5,90.1094,184.5,94.1094,188.5,90.1094" style="stroke: #A80036; stroke-width: 1.0;"/><line style="stroke: #A80036; stroke-width: 1.0;" x1="84" x2="190.5" y1="90.1094" y2="90.1094"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="21" x="91" y="85.3672">I/O</text><polygon fill="#A80036" points="308.5,115.4199,318.5,119.4199,308.5,123.4199,312.5,119.4199" style="stroke: #A80036; stroke-width: 1.0;"/><line style="stroke: #A80036; stroke-width: 1.0; stroke-dasharray: 2.0,2.0;" x1="201.5" x2="314.5" y1="119.4199" y2="119.4199"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="95" x="208.5" y="114.6777">Context Switch</text><polygon fill="#A80036" points="505.5,144.7305,515.5,148.7305,505.5,152.7305,509.5,148.7305" style="stroke: #A80036; stroke-width: 1.0;"/><line style="stroke: #A80036; stroke-width: 1.0;" x1="325.5" x2="511.5" y1="148.7305" y2="148.7305"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="168" x="332.5" y="143.9883">FSP_FSCTL_TRANSACT Req</text><polygon fill="#A80036" points="711.5,174.041,721.5,178.041,711.5,182.041,715.5,178.041" style="stroke: #A80036; stroke-width: 1.0;"/><line style="stroke: #A80036; stroke-width: 1.0;" x1="522.5" x2="717.5" y1="178.041" y2="178.041"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="177" x="529.5" y="173.2988">FUSE_FSCTL_TRANSACT Req</text><line style="stroke: #A80036; stroke-width: 1.0;" x1="738.5" x2="780.5" y1="207.3516" y2="207.3516"/><line style="stroke: #A80036; stroke-width: 1.0;" x1="780.5" x2="780.5" y1="207.3516" y2="220.3516"/><line style="stroke: #A80036; stroke-width: 1.0;" x1="739.5" x2="780.5" y1="220.3516" y2="220.3516"/><polygon fill="#A80036" points="749.5,216.3516,739.5,220.3516,749.5,224.3516,745.5,220.3516" style="stroke: #A80036; stroke-width: 1.0;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="48" x="745.5" y="202.6094">Process</text><polygon fill="#A80036" points="538.5,275.6621,528.5,279.6621,538.5,283.6621,534.5,279.6621" style="stroke: #A80036; stroke-width: 1.0;"/><line style="stroke: #A80036; stroke-width: 1.0;" x1="532.5" x2="727.5" y1="279.6621" y2="279.6621"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="177" x="544.5" y="274.9199">FUSE_FSCTL_TRANSACT Rsp</text><polygon fill="#A80036" points="341.5,304.9727,331.5,308.9727,341.5,312.9727,337.5,308.9727" style="stroke: #A80036; stroke-width: 1.0;"/><line style="stroke: #A80036; stroke-width: 1.0;" x1="335.5" x2="521.5" y1="308.9727" y2="308.9727"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="168" x="347.5" y="304.2305">FSP_FSCTL_TRANSACT Rsp</text><polygon fill="#A80036" points="100,334.2832,90,338.2832,100,342.2832,96,338.2832" style="stroke: #A80036; stroke-width: 1.0;"/><line style="stroke: #A80036; stroke-width: 1.0; stroke-dasharray: 2.0,2.0;" x1="94" x2="324.5" y1="338.2832" y2="338.2832"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="167" x="106" y="333.541">Context Switch and Return</text><!--
+@startuml
+hide footbox
+
+box "Originating Process Context"
+    participant "Originating Process" as OP
+    participant "winfsp" as winfspOP
+end box
+box "File System Process Context"
+    participant "winfsp" as winfspFS
+    participant winfuse #Salmon
+    participant "Windows FS" as FS
+end box
+
+activate OP
+OP->winfspOP: I/O
+deactivate OP
+activate winfspOP
+winfspOP- ->winfspFS: Context Switch
+deactivate winfspOP
+activate winfspFS
+winfspFS->winfuse: FSP_FSCTL_TRANSACT Req
+deactivate winfspFS
+activate winfuse
+winfuse->FS: FUSE_FSCTL_TRANSACT Req
+deactivate winfuse
+activate FS
+FS->FS: Process
+activate FS
+deactivate FS
+FS->winfuse: FUSE_FSCTL_TRANSACT Rsp
+deactivate FS
+activate winfuse
+winfuse->winfspFS: FSP_FSCTL_TRANSACT Rsp
+deactivate winfuse
+activate winfspFS
+winfspFS- ->OP: Context Switch and Return
+deactivate winfspFS
+activate OP
+
+@enduml
+
+PlantUML version 1.2019.09(Mon Aug 26 09:19:51 PDT 2019)
+(GPL source distribution)
+Java Runtime: Java(TM) SE Runtime Environment
+JVM: Java HotSpot(TM) 64-Bit Server VM
+Java Version: 11.0.2+9-LTS
+Operating System: Mac OS X
+OS Version: 10.14.6
+Default Encoding: UTF-8
+Language: en
+Country: US
+--></g></svg>
