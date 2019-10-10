@@ -524,6 +524,7 @@ VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context)
 
         FuseProtoInitRequest(Context,
             FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPENDIR, Context->Lookup.Ino);
+        Context->FuseRequest->req.open.flags = Context->File->OpenFlags;
 
         FuseContextWaitResponse(Context);
 
