@@ -20,6 +20,8 @@ if exist build\ for /R build\ %%d in (%Configuration%) do (
 
 devenv winfuse.sln /build "%Configuration%|x64"
 if errorlevel 1 goto fail
+devenv winfuse.sln /build "%Configuration%|x86"
+if errorlevel 1 goto fail
 
 exit /b 0
 
