@@ -100,6 +100,7 @@ static void transact_init_test(void)
 }
 
 static HANDLE transact_open_close_dotest_VolumeHandle;
+static HANDLE transact_open_close_dotest_MainThread;
 
 static unsigned __stdcall transact_open_close_dotest_thread(void *FilePath)
 {
@@ -115,17 +116,27 @@ static unsigned __stdcall transact_open_close_dotest_thread(void *FilePath)
         Sleep(300);
         CloseHandle(transact_open_close_dotest_VolumeHandle);
     }
+    if (0 != transact_open_close_dotest_MainThread)
+    {
+        Sleep(300);
+        if (!CancelSynchronousIo(transact_open_close_dotest_MainThread))
+        {
+            DWORD LastError = GetLastError();
+            CloseHandle(Handle);
+            return LastError;
+        }
+    }
     CloseHandle(Handle);
     return 0;
 }
 
-static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, BOOLEAN Abandon)
+static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Abandon)
 {
     FSP_FSCTL_VOLUME_PARAMS VolumeParams = { .Version = sizeof VolumeParams };
     HANDLE VolumeHandle;
     WCHAR VolumeName[MAX_PATH];
     WCHAR FilePath[MAX_PATH];
-    HANDLE Thread;
+    HANDLE Thread, MainThread = 0;
     DWORD ExitCode;
     BOOL Success;
     NTSTATUS Result;
@@ -140,7 +151,17 @@ static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, BOOLEAN A
     ASSERT(0 == wcsncmp(L"\\Device\\Volume{", VolumeName, 15));
     ASSERT(INVALID_HANDLE_VALUE != VolumeHandle);
 
-    transact_open_close_dotest_VolumeHandle = Abandon ? VolumeHandle : INVALID_HANDLE_VALUE;
+    transact_open_close_dotest_VolumeHandle = 'CLOS' == Abandon ? VolumeHandle : INVALID_HANDLE_VALUE;
+    transact_open_close_dotest_MainThread = 'CNCL' == Abandon &&
+        DuplicateHandle(
+            GetCurrentProcess(),
+            GetCurrentThread(),
+            GetCurrentProcess(),
+            &MainThread,
+            0,
+            FALSE,
+            DUPLICATE_SAME_ACCESS) ?
+        MainThread : 0;
 
     StringCbPrintfW(FilePath, sizeof FilePath, L"%s%s\\file0",
         Prefix ? L"" : L"\\\\?\\GLOBALROOT", Prefix ? Prefix : VolumeName);
@@ -323,9 +344,14 @@ static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, BOOLEAN A
     }
 loopexit:
 
-    if (!Abandon)
+    if ('CLOS' != Abandon)
     {
         Success = CloseHandle(VolumeHandle);
+        ASSERT(Success);
+    }
+    if ('CNCL' == Abandon)
+    {
+        Success = CloseHandle(MainThread);
         ASSERT(Success);
     }
 
@@ -338,14 +364,20 @@ loopexit:
 
 static void transact_open_close_test(void)
 {
-    transact_open_close_dotest(L"WinFsp.Disk", 0, FALSE);
-    transact_open_close_dotest(L"WinFsp.Net", L"\\\\winfuse-tests\\share", FALSE);
+    transact_open_close_dotest(L"WinFsp.Disk", 0, 0);
+    transact_open_close_dotest(L"WinFsp.Net", L"\\\\winfuse-tests\\share", 0);
 }
 
 static void transact_open_abandon_test(void)
 {
-    transact_open_close_dotest(L"WinFsp.Disk", 0, TRUE);
-    transact_open_close_dotest(L"WinFsp.Net", L"\\\\winfuse-tests\\share", TRUE);
+    transact_open_close_dotest(L"WinFsp.Disk", 0, 'CLOS');
+    transact_open_close_dotest(L"WinFsp.Net", L"\\\\winfuse-tests\\share", 'CLOS');
+}
+
+static void transact_open_cancel_test(void)
+{
+    transact_open_close_dotest(L"WinFsp.Disk", 0, 'CNCL');
+    transact_open_close_dotest(L"WinFsp.Net", L"\\\\winfuse-tests\\share", 'CNCL');
 }
 
 void transact_tests(void)
@@ -353,4 +385,5 @@ void transact_tests(void)
     TEST(transact_init_test);
     TEST(transact_open_close_test);
     TEST(transact_open_abandon_test);
+    TEST(transact_open_cancel_test);
 }
