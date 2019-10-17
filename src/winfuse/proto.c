@@ -564,6 +564,8 @@ VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context)
     /*
      * Send RELEASEDIR message.
      *
+     * Context->File->Ino
+     *     inode number of related directory
      * Context->File->Fh
      *     handle of related directory
      * Context->File->OpenFlags
@@ -577,7 +579,7 @@ VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context)
         FuseContextWaitRequest(Context);
 
         FuseProtoInitRequest(Context,
-            FUSE_PROTO_REQ_SIZE(release), FUSE_PROTO_OPCODE_RELEASEDIR, 0);
+            FUSE_PROTO_REQ_SIZE(release), FUSE_PROTO_OPCODE_RELEASEDIR, Context->File->Ino);
         Context->FuseRequest->req.release.fh = Context->File->Fh;
         Context->FuseRequest->req.release.flags = Context->File->OpenFlags;
 
@@ -593,6 +595,8 @@ VOID FuseProtoSendRelease(FUSE_CONTEXT *Context)
     /*
      * Send RELEASE message.
      *
+     * Context->File->Ino
+     *     inode number of related directory
      * Context->File->Fh
      *     handle of related file
      * Context->File->OpenFlags
@@ -606,7 +610,7 @@ VOID FuseProtoSendRelease(FUSE_CONTEXT *Context)
         FuseContextWaitRequest(Context);
 
         FuseProtoInitRequest(Context,
-            FUSE_PROTO_REQ_SIZE(release), FUSE_PROTO_OPCODE_RELEASE, 0);
+            FUSE_PROTO_REQ_SIZE(release), FUSE_PROTO_OPCODE_RELEASE, Context->File->Ino);
         Context->FuseRequest->req.release.fh = Context->File->Fh;
         Context->FuseRequest->req.release.flags = Context->File->OpenFlags;
         Context->FuseRequest->req.release.release_flags = 0;/* !!!: REVISIT */

@@ -313,7 +313,7 @@ static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Aband
             ASSERT(FUSE_PROTO_REQ_SIZE(release) == Request->len);
             ASSERT(FUSE_PROTO_OPCODE_RELEASEDIR == Request->opcode || FUSE_PROTO_OPCODE_RELEASE == Request->opcode);
             ASSERT(0 != Request->unique);
-            ASSERT(0 == Request->nodeid);
+            ASSERT(FUSE_PROTO_ROOT_ID == Request->nodeid || FUSE_PROTO_ROOT_ID + 1 == Request->nodeid);
             ASSERT(0 == Request->uid);
             ASSERT(0 == Request->gid);
             ASSERT(0 == Request->pid);

@@ -62,10 +62,8 @@ FUSE_DEVICE_EXTENSION *FuseDeviceExtension(PDEVICE_OBJECT DeviceObject)
 typedef struct _FUSE_FILE
 {
     LIST_ENTRY ListEntry;
-    union
-    {
-        UINT64 Ino, Fh;
-    };
+    UINT64 Ino;
+    UINT64 Fh;
     UINT32 OpenFlags;
     UINT32 IsDirectory:1;
     UINT32 IsReparsePoint:1;

@@ -660,6 +660,7 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             Context->Lookup.DisableCache =
                 BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
 
+            Context->File->Ino = Context->Lookup.Ino;
             Context->File->Fh = Context->FuseResponse->rsp.open.fh;
             Context->File->IsDirectory = TRUE;
         }
@@ -672,6 +673,7 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
                 Context->Lookup.DisableCache =
                     BooleanFlagOn(Context->FuseResponse->rsp.create.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
 
+                Context->File->Ino = Context->Lookup.Ino;
                 Context->File->Fh = Context->FuseResponse->rsp.create.fh;
             }
             else
@@ -692,6 +694,7 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
                 Context->Lookup.DisableCache =
                     BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
 
+                Context->File->Ino = Context->Lookup.Ino;
                 Context->File->Fh = Context->FuseResponse->rsp.open.fh;
             }
         }
@@ -791,6 +794,7 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
             Context->Lookup.DisableCache =
                 BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
 
+            Context->File->Ino = Context->Lookup.Ino;
             Context->File->Fh = Context->FuseResponse->rsp.open.fh;
             Context->File->IsDirectory = TRUE;
         }
@@ -803,6 +807,7 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
             Context->Lookup.DisableCache =
                 BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
 
+            Context->File->Ino = Context->Lookup.Ino;
             Context->File->Fh = Context->FuseResponse->rsp.open.fh;
         }
 
