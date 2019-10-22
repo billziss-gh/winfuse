@@ -22,12 +22,12 @@
     <ClCompile Include="..\..\..\tst\winfuse-tests\path-test.c">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\ext\winfsp\ext\tlib\testsuite.c">
+    <ClCompile Include="..\..\..\ext\tlib\testsuite.c">
       <Filter>Source\tlib</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\ext\winfsp\ext\tlib\testsuite.h">
+    <ClInclude Include="..\..\..\ext\tlib\testsuite.h">
       <Filter>Source\tlib</Filter>
     </ClInclude>
   </ItemGroup>
