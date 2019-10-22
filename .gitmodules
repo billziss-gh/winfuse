@@ -1,6 +1,3 @@
-[submodule "ext/winfsp"]
-	path = ext/winfsp
-	url = https://github.com/billziss-gh/winfsp.git
 [submodule "ext/libfuse"]
 	path = ext/libfuse
 	url = https://github.com/billziss-gh/libfuse.git
