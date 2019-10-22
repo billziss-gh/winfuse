@@ -28,6 +28,11 @@ for %%f in (winfuse-%SUFFIX%.sys winfuse-tests-%SUFFIX%.exe) do (
 for %%f in (winfsp-%SUFFIX%.sys winfsp-%SUFFIX%.dll) do (
     copy "!InstallDir!bin\%%f" %TARGET% >nul
 )
+if exist tst\memfs-fuse3\build\%CONFIG% (
+    for %%f in (memfs-fuse3-%SUFFIX%.exe fuse3.dll) do (
+        copy tst\memfs-fuse3\build\%CONFIG%\%%f %TARGET% >nul
+    )
+)
 
 echo sc delete WinFsp                                                            >%TARGET%kminst.bat
 echo sc delete WinFuse                                                          >>%TARGET%kminst.bat
