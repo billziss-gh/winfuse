@@ -1,0 +1,5 @@
+Taken from github.com/billziss-gh/winfsp/ext/tlib codebase:
+    commit 847eab3da4e558e2c88504edfe18a51e4450f9e0
+
+Originally from secfs.core/src/tlib codebase:
+    commit 16296d2ac64a7d532b1c486dd3c44af5865d4851
