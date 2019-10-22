@@ -13,7 +13,7 @@ init:
 install:
 - git submodule update --init --recursive
 - appveyor AddMessage "Install WinFsp" -Category Information
-- appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5B2/winfsp-1.5.19192.msi
+- appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5B3/winfsp-1.5.19295.msi
 - for %%f in ("winfsp-*.msi") do start /wait msiexec /i %%f /qn INSTALLLEVEL=1000
 - appveyor AddMessage "Change boot configuration and reboot" -Category Information
 - bcdedit /set testsigning on
