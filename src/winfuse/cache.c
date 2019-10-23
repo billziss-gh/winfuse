@@ -306,9 +306,10 @@ VOID FuseCacheDelete(FUSE_CACHE *Cache)
 {
     PAGED_CODE();
 
-    for (PLIST_ENTRY Entry = Cache->GenList.Flink; &Cache->GenList != Entry; Entry = Entry->Flink)
+    for (PLIST_ENTRY Entry = Cache->GenList.Flink; &Cache->GenList != Entry;)
     {
         FUSE_CACHE_GEN *Gen = CONTAINING_RECORD(Entry, FUSE_CACHE_GEN, ListEntry);
+        Entry = Entry->Flink;
         FuseFree(Gen);
     }
 
