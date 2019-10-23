@@ -130,7 +130,7 @@ static unsigned __stdcall transact_open_close_dotest_thread(void *FilePath)
     return 0;
 }
 
-static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Abandon)
+static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Scenario)
 {
     FSP_FSCTL_VOLUME_PARAMS VolumeParams = { .Version = sizeof VolumeParams };
     HANDLE VolumeHandle;
@@ -151,8 +151,8 @@ static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Aband
     ASSERT(0 == wcsncmp(L"\\Device\\Volume{", VolumeName, 15));
     ASSERT(INVALID_HANDLE_VALUE != VolumeHandle);
 
-    transact_open_close_dotest_VolumeHandle = 'CLOS' == Abandon ? VolumeHandle : INVALID_HANDLE_VALUE;
-    transact_open_close_dotest_MainThread = 'CNCL' == Abandon &&
+    transact_open_close_dotest_VolumeHandle = 'CLOS' == Scenario ? VolumeHandle : INVALID_HANDLE_VALUE;
+    transact_open_close_dotest_MainThread = 'CNCL' == Scenario &&
         DuplicateHandle(
             GetCurrentProcess(),
             GetCurrentThread(),
@@ -329,6 +329,9 @@ static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Aband
             Response->len = FUSE_PROTO_RSP_HEADER_SIZE;
             Response->unique = Request->unique;
 
+            if ('BOGU' == Scenario)
+                Response->unique = Response->unique ^ rand();
+
             if (100 + FUSE_PROTO_ROOT_ID + 1 == Request->req.release.fh)
                 Loop = FALSE;
             break;
@@ -344,12 +347,12 @@ static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Aband
     }
 loopexit:
 
-    if ('CLOS' != Abandon)
+    if ('CLOS' != Scenario)
     {
         Success = CloseHandle(VolumeHandle);
         ASSERT(Success);
     }
-    if ('CNCL' == Abandon)
+    if ('CNCL' == Scenario)
     {
         Success = CloseHandle(MainThread);
         ASSERT(Success);
@@ -380,10 +383,17 @@ static void transact_open_cancel_test(void)
     transact_open_close_dotest(L"WinFsp.Net", L"\\\\winfuse-tests\\share", 'CNCL');
 }
 
+static void transact_open_bogus_test(void)
+{
+    transact_open_close_dotest(L"WinFsp.Disk", 0, 'BOGU');
+    transact_open_close_dotest(L"WinFsp.Net", L"\\\\winfuse-tests\\share", 'BOGU');
+}
+
 void transact_tests(void)
 {
     TEST(transact_init_test);
     TEST(transact_open_close_test);
     TEST(transact_open_abandon_test);
     TEST(transact_open_cancel_test);
+    TEST(transact_open_bogus_test);
 }

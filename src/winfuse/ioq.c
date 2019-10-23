@@ -121,9 +121,8 @@ FUSE_CONTEXT *FuseIoqEndProcessing(FUSE_IOQ *Ioq, UINT64 Unique)
     ExAcquireFastMutex(&Ioq->Mutex);
 
     ULONG Index = FuseHashMixPointer(ContextHint) % Ioq->ProcessBucketCount;
-    for (FUSE_CONTEXT **PContext = &Ioq->ProcessBuckets[Index];; PContext = &(*PContext)->DictNext)
+    for (FUSE_CONTEXT **PContext = &Ioq->ProcessBuckets[Index]; *PContext; PContext = &(*PContext)->DictNext)
     {
-        ASSERT(0 != *PContext);
         if (*PContext == ContextHint)
         {
             *PContext = ContextHint->DictNext;
