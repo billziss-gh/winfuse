@@ -74,16 +74,16 @@ VOID FuseIoqDelete(FUSE_IOQ *Ioq)
 {
     PAGED_CODE();
 
-    for (PLIST_ENTRY ListEntry = Ioq->PendingList.Flink; &Ioq->PendingList != ListEntry;)
+    for (PLIST_ENTRY Entry = Ioq->PendingList.Flink; &Ioq->PendingList != Entry;)
     {
-        FUSE_CONTEXT *Context = CONTAINING_RECORD(ListEntry, FUSE_CONTEXT, ListEntry);
-        ListEntry = ListEntry->Flink;
+        FUSE_CONTEXT *Context = CONTAINING_RECORD(Entry, FUSE_CONTEXT, ListEntry);
+        Entry = Entry->Flink;
         FuseContextDelete(Context);
     }
-    for (PLIST_ENTRY ListEntry = Ioq->ProcessList.Flink; &Ioq->ProcessList != ListEntry;)
+    for (PLIST_ENTRY Entry = Ioq->ProcessList.Flink; &Ioq->ProcessList != Entry;)
     {
-        FUSE_CONTEXT *Context = CONTAINING_RECORD(ListEntry, FUSE_CONTEXT, ListEntry);
-        ListEntry = ListEntry->Flink;
+        FUSE_CONTEXT *Context = CONTAINING_RECORD(Entry, FUSE_CONTEXT, ListEntry);
+        Entry = Entry->Flink;
         FuseContextDelete(Context);
     }
     FuseFree(Ioq);
@@ -155,9 +155,9 @@ FUSE_CONTEXT *FuseIoqNextPending(FUSE_IOQ *Ioq)
 
     ExAcquireFastMutex(&Ioq->Mutex);
 
-    PLIST_ENTRY ListEntry = Ioq->PendingList.Flink;
-    FUSE_CONTEXT *Context = &Ioq->PendingList != ListEntry ?
-        CONTAINING_RECORD(ListEntry, FUSE_CONTEXT, ListEntry) : 0;
+    PLIST_ENTRY Entry = Ioq->PendingList.Flink;
+    FUSE_CONTEXT *Context = &Ioq->PendingList != Entry ?
+        CONTAINING_RECORD(Entry, FUSE_CONTEXT, ListEntry) : 0;
 
     if (0 != Context)
         RemoveEntryList(&Context->ListEntry);
