@@ -68,6 +68,17 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseNtStatusFromErrno)
 #endif
 
+#define FUSE_PROTO_SEND_BEGIN           \
+    coro_block(Context->CoroState)      \
+    {                                   \
+        FuseContextWaitRequest(Context);
+#define FUSE_PROTO_SEND_END             \
+        FuseContextWaitResponse(Context);\
+        if (0 != Context->FuseResponse->error)\
+            Context->InternalResponse->IoStatus.Status =\
+                FuseNtStatusFromErrno(Context->FuseResponse->error);\
+    }
+
 static inline VOID FuseProtoInitRequest(FUSE_CONTEXT *Context,
     UINT32 len, UINT32 opcode, UINT64 nodeid)
 {
@@ -105,9 +116,7 @@ VOID FuseProtoSendInit(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
             FUSE_PROTO_REQ_SIZE(init), FUSE_PROTO_OPCODE_INIT, 0);
@@ -116,12 +125,7 @@ VOID FuseProtoSendInit(FUSE_CONTEXT *Context)
         Context->FuseRequest->req.init.max_readahead = 0;   /* !!!: REVISIT */
         Context->FuseRequest->req.init.flags = 0;           /* !!!: REVISIT */
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
@@ -136,9 +140,7 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(lookup) + Context->Lookup.Name.Length + 1),
@@ -148,12 +150,7 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.lookup.name[Context->Lookup.Name.Length] = '\0';
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList)
@@ -239,19 +236,12 @@ VOID FuseProtoSendStatfs(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
             FUSE_PROTO_REQ_HEADER_SIZE, FUSE_PROTO_OPCODE_STATFS, 0);
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context)
@@ -264,19 +254,12 @@ VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
             FUSE_PROTO_REQ_SIZE(getattr), FUSE_PROTO_OPCODE_GETATTR, Context->Lookup.Ino);
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
@@ -293,9 +276,7 @@ VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(mkdir) + Context->Lookup.Name.Length + 1),
@@ -307,12 +288,7 @@ VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.mkdir.name[Context->Lookup.Name.Length] = '\0';
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
@@ -331,9 +307,7 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(mknod) + Context->Lookup.Name.Length + 1),
@@ -346,12 +320,7 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.mknod.name[Context->Lookup.Name.Length] = '\0';
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context)
@@ -366,9 +335,7 @@ VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(rmdir) + Context->Lookup.Name.Length + 1),
@@ -378,12 +345,7 @@ VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context)
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.rmdir.name[Context->Lookup.Name.Length] = '\0';
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context)
@@ -398,9 +360,7 @@ VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(unlink) + Context->Lookup.Name.Length + 1),
@@ -410,12 +370,7 @@ VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context)
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.unlink.name[Context->Lookup.Name.Length] = '\0';
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
@@ -434,9 +389,7 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(create) + Context->Lookup.Name.Length + 1),
@@ -449,12 +402,7 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.create.name[Context->Lookup.Name.Length] = '\0';
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 VOID FuseProtoSendChownOnCreate(FUSE_CONTEXT *Context)
@@ -476,9 +424,7 @@ VOID FuseProtoSendChownOnCreate(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         if (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DIRECTORY_FILE))
         {
@@ -500,12 +446,7 @@ VOID FuseProtoSendChownOnCreate(FUSE_CONTEXT *Context)
             Context->FuseRequest->req.setattr.gid = Context->Lookup.Attr.gid;
         }
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context)
@@ -518,20 +459,13 @@ VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
             FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPENDIR, Context->Lookup.Ino);
         Context->FuseRequest->req.open.flags = Context->File->OpenFlags;
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context)
@@ -544,20 +478,13 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
             FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPEN, Context->Lookup.Ino);
         Context->FuseRequest->req.open.flags = Context->File->OpenFlags;
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context)
@@ -574,21 +501,14 @@ VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
             FUSE_PROTO_REQ_SIZE(release), FUSE_PROTO_OPCODE_RELEASEDIR, Context->File->Ino);
         Context->FuseRequest->req.release.fh = Context->File->Fh;
         Context->FuseRequest->req.release.flags = Context->File->OpenFlags;
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 VOID FuseProtoSendRelease(FUSE_CONTEXT *Context)
@@ -605,9 +525,7 @@ VOID FuseProtoSendRelease(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    coro_block (Context->CoroState)
-    {
-        FuseContextWaitRequest(Context);
+    FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
             FUSE_PROTO_REQ_SIZE(release), FUSE_PROTO_OPCODE_RELEASE, Context->File->Ino);
@@ -616,12 +534,7 @@ VOID FuseProtoSendRelease(FUSE_CONTEXT *Context)
         Context->FuseRequest->req.release.release_flags = 0;/* !!!: REVISIT */
         Context->FuseRequest->req.release.lock_owner = 0;   /* !!!: REVISIT */
 
-        FuseContextWaitResponse(Context);
-
-        if (0 != Context->FuseResponse->error)
-            Context->InternalResponse->IoStatus.Status =
-                FuseNtStatusFromErrno(Context->FuseResponse->error);
-    }
+    FUSE_PROTO_SEND_END
 }
 
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
