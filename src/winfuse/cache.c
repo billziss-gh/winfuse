@@ -552,9 +552,10 @@ VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList)
 {
     PAGED_CODE();
 
-    for (PLIST_ENTRY Entry = ForgetList->Flink; ForgetList != Entry; Entry = Entry->Flink)
+    for (PLIST_ENTRY Entry = ForgetList->Flink; ForgetList != Entry;)
     {
         FUSE_CACHE_ITEM *Item = CONTAINING_RECORD(Entry, FUSE_CACHE_ITEM, ListEntry);
+        Entry = Entry->Flink;
         FuseFree(Item);
     }
 }
