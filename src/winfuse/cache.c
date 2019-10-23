@@ -342,7 +342,7 @@ VOID FuseCacheExpirationRoutine(FUSE_CACHE *Cache,
     {
         if (0 != DeviceObject)
         {
-            BOOLEAN Success = /*DEBUGTEST(90) &&*/
+            BOOLEAN Success = DEBUGTEST(90) &&
                 NT_SUCCESS(FuseProtoPostForget(DeviceObject, &ForgetList));
             if (!Success)
             {

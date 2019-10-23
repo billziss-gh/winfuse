@@ -33,6 +33,19 @@
 #include <winfuse/coro.h>
 #include <winfuse/proto.h>
 
+#define DRIVER_NAME                     "WinFuse"
+
+/* debug */
+#if DBG
+ULONG DebugRandom(VOID);
+#define DEBUGLOG(fmt, ...)              \
+    DbgPrint("[%d] " DRIVER_NAME "!" __FUNCTION__ ": " fmt "\n", KeGetCurrentIrql(), __VA_ARGS__)
+#define DEBUGTEST(Percent)              (DebugRandom() <= (Percent) * 0x7fff / 100)
+#else
+#define DEBUGLOG(fmt, ...)              ((void)0)
+#define DEBUGTEST(Percent)              (TRUE)
+#endif
+
 #define FUSE_FSCTL_TRANSACT             \
     CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0xC00 + 'F', METHOD_BUFFERED, FILE_ANY_ACCESS)
 

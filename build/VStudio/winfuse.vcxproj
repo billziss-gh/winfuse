@@ -130,6 +130,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\winfuse\cache.c" />
+    <ClCompile Include="..\..\src\winfuse\debug.c" />
     <ClCompile Include="..\..\src\winfuse\driver.c" />
     <ClCompile Include="..\..\src\winfuse\file.c" />
     <ClCompile Include="..\..\src\winfuse\fuse.c" />

@@ -34,6 +34,9 @@
     <ClCompile Include="..\..\src\winfuse\file.c">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\winfuse\debug.c">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\winfuse\driver.h">
