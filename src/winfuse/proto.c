@@ -35,11 +35,13 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
-VOID FuseProtoSendChownOnCreate(FUSE_CONTEXT *Context);
+VOID FuseProtoSendCreateChown(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRelease(FUSE_CONTEXT *Context);
+VOID FuseProtoSendReaddir(FUSE_CONTEXT *Context);
+VOID FuseProtoSendReaddirGetattr(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
@@ -59,11 +61,13 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoSendRmdir)
 #pragma alloc_text(PAGE, FuseProtoSendUnlink)
 #pragma alloc_text(PAGE, FuseProtoSendCreate)
-#pragma alloc_text(PAGE, FuseProtoSendChownOnCreate)
+#pragma alloc_text(PAGE, FuseProtoSendCreateChown)
 #pragma alloc_text(PAGE, FuseProtoSendOpendir)
 #pragma alloc_text(PAGE, FuseProtoSendOpen)
 #pragma alloc_text(PAGE, FuseProtoSendReleasedir)
 #pragma alloc_text(PAGE, FuseProtoSendRelease)
+#pragma alloc_text(PAGE, FuseProtoSendReaddir)
+#pragma alloc_text(PAGE, FuseProtoSendReaddirGetattr)
 #pragma alloc_text(PAGE, FuseAttrToFileInfo)
 #pragma alloc_text(PAGE, FuseNtStatusFromErrno)
 #endif
@@ -405,7 +409,7 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_END
 }
 
-VOID FuseProtoSendChownOnCreate(FUSE_CONTEXT *Context)
+VOID FuseProtoSendCreateChown(FUSE_CONTEXT *Context)
     /*
      * Send SETATTR message after directory/file creation.
      *
@@ -516,7 +520,7 @@ VOID FuseProtoSendRelease(FUSE_CONTEXT *Context)
      * Send RELEASE message.
      *
      * Context->File->Ino
-     *     inode number of related directory
+     *     inode number of related file
      * Context->File->Fh
      *     handle of related file
      * Context->File->OpenFlags
@@ -533,6 +537,54 @@ VOID FuseProtoSendRelease(FUSE_CONTEXT *Context)
         Context->FuseRequest->req.release.flags = Context->File->OpenFlags;
         Context->FuseRequest->req.release.release_flags = 0;/* !!!: REVISIT */
         Context->FuseRequest->req.release.lock_owner = 0;   /* !!!: REVISIT */
+
+    FUSE_PROTO_SEND_END
+}
+
+VOID FuseProtoSendReaddir(FUSE_CONTEXT *Context)
+    /*
+     * Send READDIR message.
+     *
+     * Context->File->Ino
+     *     inode number of related directory
+     * Context->File->Fh
+     *     handle of related directory
+     * Context->Readdir.NextOffset
+     *     offset of next directory entry or 0
+     * Context->Readdir.Length
+     *     readdir buffer length
+     */
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_SEND_BEGIN
+
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_SIZE(read), FUSE_PROTO_OPCODE_READDIR, Context->File->Ino);
+        Context->FuseRequest->req.read.fh = Context->File->Fh;
+        Context->FuseRequest->req.read.offset = Context->Readdir.NextOffset;
+        Context->FuseRequest->req.read.size = Context->Readdir.Length;
+        Context->FuseRequest->req.read.read_flags = 0;   /* !!!: REVISIT */
+        Context->FuseRequest->req.read.lock_owner = 0;   /* !!!: REVISIT */
+        Context->FuseRequest->req.read.flags = Context->File->OpenFlags;
+
+    FUSE_PROTO_SEND_END
+}
+
+VOID FuseProtoSendReaddirGetattr(FUSE_CONTEXT *Context)
+    /*
+     * Send GETATTR message during READDIR.
+     *
+     * Context->Readdir.Ino
+     *     inode number to get attributes for
+     */
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_SEND_BEGIN
+
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_SIZE(getattr), FUSE_PROTO_OPCODE_GETATTR, Context->Readdir.Ino);
 
     FUSE_PROTO_SEND_END
 }

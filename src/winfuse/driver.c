@@ -49,7 +49,7 @@ NTSTATUS DriverEntry(
     //FuseProcessFunction[FspFsctlTransactFlushBuffersKind] = FuseOpFlushBuffers;
     FuseProcessFunction[FspFsctlTransactQueryVolumeInformationKind] = FuseOpQueryVolumeInformation;
     //FuseProcessFunction[FspFsctlTransactSetVolumeInformationKind] = FuseOpSetVolumeInformation;
-    //FuseProcessFunction[FspFsctlTransactQueryDirectoryKind] = FuseOpQueryDirectory;
+    FuseProcessFunction[FspFsctlTransactQueryDirectoryKind] = FuseOpQueryDirectory;
     //FuseProcessFunction[FspFsctlTransactFileSystemControlKind] = FuseOpFileSystemControl;
     //FuseProcessFunction[FspFsctlTransactDeviceControlKind] = FuseOpDeviceControl;
     //FuseProcessFunction[FspFsctlTransactQuerySecurityKind] = FuseOpQuerySecurity;

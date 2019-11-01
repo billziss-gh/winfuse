@@ -44,6 +44,19 @@ NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *Vo
     FUSE_CACHE *Cache = 0;
     NTSTATUS Result;
 
+    /* ensure that VolumeParams can be used for FUSE operations */
+    VolumeParams->CaseSensitiveSearch = 1;
+    VolumeParams->CasePreservedNames = 1;
+    VolumeParams->PersistentAcls = 1;
+    VolumeParams->ReparsePoints = 1;
+    VolumeParams->ReparsePointsAccessCheck = 0;
+    VolumeParams->NamedStreams = 0;
+    VolumeParams->ReadOnlyVolume = 0;
+    VolumeParams->PostCleanupWhenModifiedOnly = 1;
+    VolumeParams->PassQueryDirectoryFileName = 1;
+    VolumeParams->DeviceControl = 1;
+    //VolumeParams->DirectoryMarkerAsNextOffset = 1;
+
     Result = FuseIoqCreate(&Ioq);
     if (!NT_SUCCESS(Result))
         goto fail;

@@ -59,7 +59,13 @@ BOOLEAN FuseOpSetEa(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpFlushBuffers(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpQueryVolumeInformation(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpSetVolumeInformation(FUSE_CONTEXT *Context);
+static BOOLEAN FuseAddDirInfo(FUSE_CONTEXT *Context,
+    PSTRING Name, UINT64 NextOffset, FUSE_PROTO_ATTR *Attr,
+    PVOID Buffer, ULONG Length, PULONG PBytesTransferred);
+static BOOLEAN FuseOpQueryDirectory_GetDirInfoByName(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpQueryDirectory_ReadDirectory(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpQueryDirectory(FUSE_CONTEXT *Context);
+static VOID FuseOpQueryDirectory_ContextFini(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpFileSystemControl(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpDeviceControl(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpQuerySecurity(FUSE_CONTEXT *Context);
@@ -102,7 +108,11 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpFlushBuffers)
 #pragma alloc_text(PAGE, FuseOpQueryVolumeInformation)
 #pragma alloc_text(PAGE, FuseOpSetVolumeInformation)
+#pragma alloc_text(PAGE, FuseAddDirInfo)
+#pragma alloc_text(PAGE, FuseOpQueryDirectory_GetDirInfoByName)
+#pragma alloc_text(PAGE, FuseOpQueryDirectory_ReadDirectory)
 #pragma alloc_text(PAGE, FuseOpQueryDirectory)
+#pragma alloc_text(PAGE, FuseOpQueryDirectory_ContextFini)
 #pragma alloc_text(PAGE, FuseOpFileSystemControl)
 #pragma alloc_text(PAGE, FuseOpDeviceControl)
 #pragma alloc_text(PAGE, FuseOpQuerySecurity)
@@ -251,28 +261,42 @@ static VOID FusePrepareLookup(FUSE_CONTEXT *Context)
     UINT32 IsUserMode = 1;
     UINT32 HasTraversePrivilege = 0;
 
-    if (FspFsctlTransactCreateKind == Context->InternalRequest->Kind)
+    switch (Context->InternalRequest->Kind)
     {
+    case FspFsctlTransactCreateKind:
         FileName = (PWSTR)Context->InternalRequest->Buffer;
         AccessToken = Context->InternalRequest->Req.Create.AccessToken;
         IsUserMode = Context->InternalRequest->Req.Create.UserMode;
         HasTraversePrivilege = Context->InternalRequest->Req.Create.HasTraversePrivilege;
-    }
-    else if (FspFsctlTransactCleanupKind == Context->InternalRequest->Kind &&
-        Context->InternalRequest->Req.Cleanup.Delete)
-    {
+        break;
+    case FspFsctlTransactCleanupKind:
+        ASSERT(Context->InternalRequest->Req.Cleanup.Delete);
         FileName = (PWSTR)Context->InternalRequest->Buffer;
         IsUserMode = 0;
         HasTraversePrivilege = 1;
-    }
-    else if (FspFsctlTransactSetInformationKind == Context->InternalRequest->Kind &&
-        FileRenameInformation == Context->InternalRequest->Req.SetInformation.FileInformationClass)
-    {
+        break;
+    case FspFsctlTransactSetInformationKind:
+        ASSERT(FileRenameInformation ==
+            Context->InternalRequest->Req.SetInformation.FileInformationClass);
         FileName = (PWSTR)(Context->InternalRequest->Buffer +
             Context->InternalRequest->Req.SetInformation.Info.Rename.NewFileName.Offset);
         AccessToken = Context->InternalRequest->Req.SetInformation.Info.Rename.AccessToken;
         IsUserMode = 1;
         HasTraversePrivilege = 1;
+        break;
+    case FspFsctlTransactQueryDirectoryKind:
+        ASSERT(
+            0 != Context->InternalRequest->Req.QueryDirectory.Pattern.Size &&
+            Context->InternalRequest->Req.QueryDirectory.PatternIsFileName);
+        FileName = (PWSTR)(Context->InternalRequest->Buffer +
+            Context->InternalRequest->Req.QueryDirectory.Pattern.Offset);
+        IsUserMode = 1;
+        HasTraversePrivilege = 1;
+        break;
+    default:
+        ASSERT(FALSE);
+        Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_PARAMETER;
+        goto exit;
     }
 
     if (0 != FileName)
@@ -726,7 +750,7 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 
             Context->Lookup.Attr.uid = Uid;
             Context->Lookup.Attr.gid = Gid;
-            coro_await (FuseProtoSendChownOnCreate(Context));
+            coro_await (FuseProtoSendCreateChown(Context));
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status) &&
                 STATUS_INVALID_DEVICE_REQUEST != Context->InternalResponse->IoStatus.Status)
                 goto cleanup;
@@ -1117,9 +1141,11 @@ BOOLEAN FuseOpQueryVolumeInformation(FUSE_CONTEXT *Context)
             coro_break;
 
         Context->InternalResponse->Rsp.QueryVolumeInformation.VolumeInfo.TotalSize =
-            (UINT64)Context->Statfs.blocks * (UINT64)Context->Statfs.frsize;
+            (UINT64)Context->FuseResponse->rsp.statfs.st.blocks *
+            (UINT64)Context->FuseResponse->rsp.statfs.st.frsize;
         Context->InternalResponse->Rsp.QueryVolumeInformation.VolumeInfo.FreeSize =
-            (UINT64)Context->Statfs.bfree * (UINT64)Context->Statfs.frsize;
+            (UINT64)Context->FuseResponse->rsp.statfs.st.bfree *
+            (UINT64)Context->FuseResponse->rsp.statfs.st.frsize;
     }
 
     return coro_active();
@@ -1132,11 +1158,233 @@ BOOLEAN FuseOpSetVolumeInformation(FUSE_CONTEXT *Context)
     return FALSE;
 }
 
+static BOOLEAN FuseAddDirInfo(FUSE_CONTEXT *Context,
+    PSTRING Name, UINT64 NextOffset, FUSE_PROTO_ATTR *Attr,
+    PVOID Buffer, ULONG Length, PULONG PBytesTransferred)
+{
+    PAGED_CODE();
+
+    NTSTATUS Result;
+    PVOID BufferEnd = (PUINT8)Buffer + Length;
+    FSP_FSCTL_DIR_INFO *DirInfo = Buffer;
+    ULONG WideNameLength, DirInfoSize, AlignedSize;
+    WCHAR WideName[255];
+
+    if (0 != Name)
+    {
+        Result = RtlUTF8ToUnicodeN(
+            WideName, sizeof WideName, &WideNameLength,
+            Name->Buffer, Name->Length);
+        if (STATUS_SOME_NOT_MAPPED == Result)
+            Result = STATUS_SUCCESS;
+        else if (!NT_SUCCESS(Result))
+            return TRUE; /* return SUCCESS but IGNORE */
+        FspPosixDecodeWindowsPath(WideName, WideNameLength / sizeof(WCHAR));
+
+        DirInfoSize = sizeof(FSP_FSCTL_DIR_INFO) + WideNameLength;
+        AlignedSize = FSP_FSCTL_DEFAULT_ALIGN_UP(DirInfoSize);
+
+        Buffer = (PVOID)((PUINT8)Buffer + *PBytesTransferred);
+        if ((PUINT8)Buffer + AlignedSize > (PUINT8)BufferEnd)
+            return FALSE;
+
+        DirInfo->Size = (UINT16)DirInfoSize;
+        FuseAttrToFileInfo(Context->DeviceObject, Attr, &DirInfo->FileInfo);
+        *(PUINT64)DirInfo->Padding = NextOffset;
+        RtlCopyMemory(DirInfo->FileNameBuf, WideName, WideNameLength);
+    }
+    else
+    {
+        DirInfoSize = sizeof(UINT16);
+        AlignedSize = DirInfoSize;
+
+        Buffer = (PVOID)((PUINT8)Buffer + *PBytesTransferred);
+        if ((PUINT8)Buffer + AlignedSize > (PUINT8)BufferEnd)
+            return FALSE;
+
+        *(PUINT16)Buffer = 0;
+    }
+
+    *PBytesTransferred += AlignedSize;
+
+    return TRUE;
+}
+
+static BOOLEAN FuseOpQueryDirectory_GetDirInfoByName(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    coro_block (Context->CoroState)
+    {
+        FusePrepareLookup(Context);
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.QueryDirectory.UserContext2;
+        Context->Lookup.Name = Context->Lookup.OrigPath;
+        Context->Lookup.Ino = Context->File->Ino;
+
+        coro_await (FuseLookupName(Context));
+
+        try
+        {
+            PVOID Buffer = (PVOID)(UINT_PTR)Context->InternalRequest->Req.QueryDirectory.Address;
+            ULONG Length = Context->InternalRequest->Req.QueryDirectory.Length;
+            ULONG BytesTransferred = 0;
+
+            if (NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            {
+                if (FuseAddDirInfo(Context,
+                    &Context->Lookup.Name, 0, &Context->Lookup.Attr, Buffer, Length, &BytesTransferred))
+                    FuseAddDirInfo(Context, 0, 0, 0, Buffer, Length, &BytesTransferred);
+            }
+            else if (STATUS_OBJECT_NAME_NOT_FOUND == Context->InternalResponse->IoStatus.Status)
+            {
+                Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+                FuseAddDirInfo(Context, 0, 0, 0, Buffer, Length, &BytesTransferred);
+            }
+
+            Context->InternalResponse->IoStatus.Information = BytesTransferred;
+        }
+        except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            Context->InternalResponse->IoStatus.Status = GetExceptionCode();
+            if (FsRtlIsNtstatusExpected(Context->InternalResponse->IoStatus.Status))
+                Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_USER_BUFFER;
+        }
+    }
+
+    return coro_active();
+}
+
+static BOOLEAN FuseOpQueryDirectory_ReadDirectory(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    coro_block (Context->CoroState)
+    {
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.QueryDirectory.UserContext2;
+        Context->Fini = FuseOpQueryDirectory_ContextFini;
+
+        Context->Readdir.NextOffset =
+            sizeof(UINT64) == Context->InternalRequest->Req.QueryDirectory.Marker.Size ?
+                *(PUINT64)(Context->InternalRequest->Buffer +
+                    Context->InternalRequest->Req.QueryDirectory.Marker.Offset) :
+                0;
+
+        /*
+         * The FSD has sent us a buffer of QueryDirectory.Length size that holds FSP_FSCTL_DIR_INFO
+         * entries. Assuming that the average file name length is 24 we approximate how many entries
+         * (N) we can fit in that buffer:
+         *
+         * N = QueryDirectory.Length / (sizeof(FSP_FSCTL_DIR_INFO) + (24 * sizeof(WCHAR)))
+         *
+         * We now approximate the FUSE READDIR buffer size required to fit N entries:
+         *
+         * read.size = FUSE_PROTO_RSP_HEADER_SIZE + N * (sizeof(FUSE_PROTO_DIRENT) + 24)
+         */
+        UINT32 N = Context->InternalRequest->Req.QueryDirectory.Length /
+            (sizeof(FSP_FSCTL_DIR_INFO) + (24 * sizeof(WCHAR)));
+        Context->Readdir.Length = FUSE_PROTO_RSP_HEADER_SIZE +
+            N * (sizeof(FUSE_PROTO_DIRENT) + 24);
+
+        coro_await (FuseProtoSendReaddir(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        if (Context->FuseResponse->len > Context->Readdir.Length)
+        {
+            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INTERNAL_ERROR;
+            coro_break;
+        }
+
+        Context->Readdir.Buffer = FuseAlloc(Context->FuseResponse->len);
+        if (0 == Context->Readdir.Buffer)
+        {
+            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INSUFFICIENT_RESOURCES;
+            coro_break;
+        }
+
+        RtlCopyMemory(Context->Readdir.Buffer, Context->FuseResponse, Context->FuseResponse->len);
+        Context->Readdir.BufferEndP = Context->Readdir.Buffer + Context->FuseResponse->len;
+        Context->Readdir.BufferP = Context->Readdir.Buffer + FUSE_PROTO_RSP_HEADER_SIZE;
+
+        for (;;)
+        {
+            if (Context->Readdir.BufferEndP <
+                    Context->Readdir.BufferP + FSP_FSCTL_ALIGN_UP(
+                        FIELD_OFFSET(FUSE_PROTO_DIRENT, name),
+                        8) ||
+                Context->Readdir.BufferEndP <
+                    Context->Readdir.BufferP + FSP_FSCTL_ALIGN_UP(
+                        FIELD_OFFSET(FUSE_PROTO_DIRENT, name) +
+                            ((FUSE_PROTO_DIRENT *)Context->Readdir.BufferP)->namelen,
+                        8))
+            {
+                /* add end-of-dir marker */
+                FuseAddDirInfo(Context, 0, 0, 0,
+                    (PVOID)Context->InternalRequest->Req.QueryDirectory.Address,
+                    Context->InternalRequest->Req.QueryDirectory.Length,
+                    &Context->Readdir.BytesTransferred);
+                break;
+            }
+
+            coro_await (FuseProtoSendReaddirGetattr(Context));
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+
+            BOOLEAN Added = FALSE;
+            try
+            {
+                STRING Name;
+                Name.Length = Name.MaximumLength =
+                    (USHORT)((FUSE_PROTO_DIRENT *)Context->Readdir.BufferP)->namelen;
+                Name.Buffer = ((FUSE_PROTO_DIRENT *)Context->Readdir.BufferP)->name;
+                Added = FuseAddDirInfo(
+                    Context,
+                    &Name,
+                    ((FUSE_PROTO_DIRENT *)Context->Readdir.BufferP)->off,
+                    &Context->FuseResponse->rsp.getattr.attr,
+                    (PVOID)Context->InternalRequest->Req.QueryDirectory.Address,
+                    Context->InternalRequest->Req.QueryDirectory.Length,
+                    &Context->Readdir.BytesTransferred);
+            }
+            except (EXCEPTION_EXECUTE_HANDLER)
+            {
+                Context->InternalResponse->IoStatus.Status = GetExceptionCode();
+                if (FsRtlIsNtstatusExpected(Context->InternalResponse->IoStatus.Status))
+                    Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_USER_BUFFER;
+            }
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+            if (!Added)
+                break;
+        }
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+        Context->InternalResponse->IoStatus.Information = Context->Readdir.BytesTransferred;
+    }
+
+    return coro_active();
+}
+
 BOOLEAN FuseOpQueryDirectory(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    return FALSE;
+    if (0 != Context->InternalRequest->Req.QueryDirectory.Pattern.Size &&
+        Context->InternalRequest->Req.QueryDirectory.PatternIsFileName)
+        return FuseOpQueryDirectory_GetDirInfoByName(Context);
+    else
+        return FuseOpQueryDirectory_ReadDirectory(Context);
+}
+
+static VOID FuseOpQueryDirectory_ContextFini(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    if (0 != Context->Readdir.Buffer)
+        FuseFree(Context->Readdir.Buffer);
 }
 
 BOOLEAN FuseOpFileSystemControl(FUSE_CONTEXT *Context)

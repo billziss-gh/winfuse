@@ -123,7 +123,14 @@ struct _FUSE_CONTEXT
         {
             LIST_ENTRY ForgetList;
         } Forget;
-        FUSE_PROTO_STATFS Statfs;
+        struct
+        {
+            UINT64 NextOffset;
+            UINT32 Length;
+            ULONG BytesTransferred;
+            PUINT8 Buffer, BufferEndP, BufferP;
+            UINT64 Ino;
+        } Readdir;
     };
 };
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
@@ -201,11 +208,13 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
-VOID FuseProtoSendChownOnCreate(FUSE_CONTEXT *Context);
+VOID FuseProtoSendCreateChown(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRelease(FUSE_CONTEXT *Context);
+VOID FuseProtoSendReaddir(FUSE_CONTEXT *Context);
+VOID FuseProtoSendReaddirGetattr(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 static inline
