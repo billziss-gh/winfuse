@@ -55,7 +55,7 @@ NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *Vo
     VolumeParams->PostCleanupWhenModifiedOnly = 1;
     VolumeParams->PassQueryDirectoryFileName = 1;
     VolumeParams->DeviceControl = 1;
-    //VolumeParams->DirectoryMarkerAsNextOffset = 1;
+    VolumeParams->DirectoryMarkerAsNextOffset = 1;
 
     Result = FuseIoqCreate(&Ioq);
     if (!NT_SUCCESS(Result))

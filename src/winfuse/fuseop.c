@@ -1190,7 +1190,7 @@ static BOOLEAN FuseAddDirInfo(FUSE_CONTEXT *Context,
 
         DirInfo->Size = (UINT16)DirInfoSize;
         FuseAttrToFileInfo(Context->DeviceObject, Attr, &DirInfo->FileInfo);
-        *(PUINT64)DirInfo->Padding = NextOffset;
+        DirInfo->NextOffset = NextOffset;
         RtlCopyMemory(DirInfo->FileNameBuf, WideName, WideNameLength);
     }
     else
