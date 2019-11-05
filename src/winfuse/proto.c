@@ -41,7 +41,7 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRelease(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReaddir(FUSE_CONTEXT *Context);
-VOID FuseProtoSendReaddirGetattr(FUSE_CONTEXT *Context);
+VOID FuseProtoSendReaddirLookup(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
@@ -67,7 +67,7 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoSendReleasedir)
 #pragma alloc_text(PAGE, FuseProtoSendRelease)
 #pragma alloc_text(PAGE, FuseProtoSendReaddir)
-#pragma alloc_text(PAGE, FuseProtoSendReaddirGetattr)
+#pragma alloc_text(PAGE, FuseProtoSendReaddirLookup)
 #pragma alloc_text(PAGE, FuseAttrToFileInfo)
 #pragma alloc_text(PAGE, FuseNtStatusFromErrno)
 #endif
@@ -571,12 +571,14 @@ VOID FuseProtoSendReaddir(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_END
 }
 
-VOID FuseProtoSendReaddirGetattr(FUSE_CONTEXT *Context)
+VOID FuseProtoSendReaddirLookup(FUSE_CONTEXT *Context)
     /*
-     * Send GETATTR message during READDIR.
+     * Send LOOKUP message during READDIR.
      *
-     * Context->Readdir.Ino
-     *     inode number to get attributes for
+     * Context->File->Ino
+     *     inode number of related directory
+     * Context->Lookup.Name.Length
+     *     name to lookup
      */
 {
     PAGED_CODE();
@@ -584,7 +586,12 @@ VOID FuseProtoSendReaddirGetattr(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
-            FUSE_PROTO_REQ_SIZE(getattr), FUSE_PROTO_OPCODE_GETATTR, Context->Readdir.Ino);
+            (UINT32)(FUSE_PROTO_REQ_SIZE(lookup) + Context->Readdir.Name.Length + 1),
+            FUSE_PROTO_OPCODE_LOOKUP, Context->File->Ino);
+        ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
+        RtlCopyMemory(Context->FuseRequest->req.lookup.name, Context->Readdir.Name.Buffer,
+            Context->Readdir.Name.Length);
+        Context->FuseRequest->req.lookup.name[Context->Readdir.Name.Length] = '\0';
 
     FUSE_PROTO_SEND_END
 }

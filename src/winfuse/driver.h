@@ -125,11 +125,13 @@ struct _FUSE_CONTEXT
         } Forget;
         struct
         {
+            PVOID CacheGen;
+            STRING OrigName;
             UINT64 NextOffset;
             UINT32 Length;
             ULONG BytesTransferred;
             PUINT8 Buffer, BufferEndP, BufferP;
-            UINT64 Ino;
+            STRING Name;
         } Readdir;
     };
 };
@@ -214,7 +216,7 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRelease(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReaddir(FUSE_CONTEXT *Context);
-VOID FuseProtoSendReaddirGetattr(FUSE_CONTEXT *Context);
+VOID FuseProtoSendReaddirLookup(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 static inline
