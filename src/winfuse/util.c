@@ -21,14 +21,45 @@
 
 #include <winfuse/driver.h>
 
+PVOID FuseAllocatePoolMustSucceed(POOL_TYPE PoolType, SIZE_T Size, ULONG Tag);
 NTSTATUS FuseGetTokenUid(PACCESS_TOKEN Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid);
 NTSTATUS FuseSendTransactInternalIrp(PDEVICE_OBJECT DeviceObject, PFILE_OBJECT FileObject,
     FSP_FSCTL_TRANSACT_RSP *Response, FSP_FSCTL_TRANSACT_REQ **PRequest);
 
 #ifdef ALLOC_PRAGMA
+// !#pragma alloc_text(PAGE, FuseAllocatePoolMustSucceed)
 #pragma alloc_text(PAGE, FuseGetTokenUid)
 #pragma alloc_text(PAGE, FuseSendTransactInternalIrp)
 #endif
+
+static const LONG Delays[] =
+{
+     10/*ms*/ * -10000,
+     10/*ms*/ * -10000,
+     50/*ms*/ * -10000,
+     50/*ms*/ * -10000,
+    100/*ms*/ * -10000,
+    100/*ms*/ * -10000,
+    300/*ms*/ * -10000,
+};
+
+PVOID FuseAllocatePoolMustSucceed(POOL_TYPE PoolType, SIZE_T Size, ULONG Tag)
+{
+    // !PAGED_CODE();
+
+    PVOID Result;
+    LARGE_INTEGER Delay;
+
+    for (ULONG i = 0, n = sizeof(Delays) / sizeof(Delays[0]);; i++)
+    {
+        Result = DEBUGTEST(99) ? ExAllocatePoolWithTag(PoolType, Size, Tag) : 0;
+        if (0 != Result)
+            return Result;
+
+        Delay.QuadPart = n > i ? Delays[i] : Delays[n - 1];
+        KeDelayExecutionThread(KernelMode, FALSE, &Delay);
+    }
+}
 
 NTSTATUS FuseGetTokenUid(PACCESS_TOKEN Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid)
 {

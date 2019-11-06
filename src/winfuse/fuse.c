@@ -291,7 +291,7 @@ request:
 
 exit:
     if (0 != InternalRequest)
-        FuseFree(InternalRequest);
+        FuseFreeExternal(InternalRequest);
 
     return Result;
 }
