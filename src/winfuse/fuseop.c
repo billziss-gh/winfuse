@@ -378,7 +378,7 @@ static VOID FuseLookupName(FUSE_CONTEXT *Context)
         if (!FuseCacheGetEntry(FuseDeviceExtension(Context->DeviceObject)->Cache,
             Context->Lookup.Ino, &Context->Lookup.Name, Entry))
         {
-            if (FUSE_PROTO_ROOT_ID == Context->Lookup.Ino &&
+            if (FUSE_PROTO_ROOT_INO == Context->Lookup.Ino &&
                 1 == Context->Lookup.Name.Length && '/' == Context->Lookup.Name.Buffer[0])
             {
                 coro_await (FuseProtoSendGetattr(Context));
@@ -386,7 +386,7 @@ static VOID FuseLookupName(FUSE_CONTEXT *Context)
                     coro_break;
 
                 RtlZeroMemory(Entry, sizeof *Entry);
-                Entry->nodeid = FUSE_PROTO_ROOT_ID;
+                Entry->nodeid = FUSE_PROTO_ROOT_INO;
                 Entry->entry_valid = Entry->attr_valid =
                     Context->FuseResponse->rsp.getattr.attr_valid;
                 Entry->entry_valid_nsec = Entry->attr_valid_nsec =
@@ -425,7 +425,7 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->Create.Ino = FUSE_PROTO_ROOT_ID;
+        Context->Create.Ino = FUSE_PROTO_ROOT_INO;
         while (1) /* for (;;) produces "warning C4702: unreachable code" */
         {
             FusePosixPathPrefix(&Context->Create.Remain, &Context->Create.Name, &Context->Create.Remain);
@@ -1327,14 +1327,39 @@ static VOID FuseOpQueryDirectory_ReadDirectory(FUSE_CONTEXT *Context)
                         ((FUSE_PROTO_DIRENT *)Context->QueryDirectory.BufferP)->namelen)
                 break;
 
-            Context->QueryDirectory.Ino = Context->File->Ino;
             Context->QueryDirectory.Name.Length = Context->QueryDirectory.Name.MaximumLength = (USHORT)
                 ((FUSE_PROTO_DIRENT *)Context->QueryDirectory.BufferP)->namelen;
             Context->QueryDirectory.Name.Buffer =
                 ((FUSE_PROTO_DIRENT *)Context->QueryDirectory.BufferP)->name;
-            coro_await (FuseLookupName(Context));
-            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-                coro_break;
+
+            if ((1 == Context->QueryDirectory.Name.Length &&
+                '.' == Context->QueryDirectory.Name.Buffer[0]) ||
+                (2 == Context->QueryDirectory.Name.Length &&
+                '.' == Context->QueryDirectory.Name.Buffer[0] &&
+                '.' == Context->QueryDirectory.Name.Buffer[1]))
+            {
+                /*
+                 * If the file system gave us a real inode number try getattr on it.
+                 * Otherwise try with the inode number from the file descriptor (this
+                 * is obviously incorrect for the parent "..", but we are doing the
+                 * best we can).
+                 */
+                Context->QueryDirectory.Ino =
+                    FUSE_PROTO_UNKNOWN_INO != ((FUSE_PROTO_DIRENT *)Context->QueryDirectory.BufferP)->ino ?
+                        ((FUSE_PROTO_DIRENT *)Context->QueryDirectory.BufferP)->ino :
+                        Context->File->Ino;
+                coro_await (FuseProtoSendGetattr(Context));
+                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                    coro_break;
+                Context->Lookup.Attr = Context->FuseResponse->rsp.getattr.attr;
+            }
+            else
+            {
+                Context->QueryDirectory.Ino = Context->File->Ino;
+                coro_await (FuseLookupName(Context));
+                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                    coro_break;
+            }
 
             BOOLEAN Added = FuseAddDirInfo(
                 Context,

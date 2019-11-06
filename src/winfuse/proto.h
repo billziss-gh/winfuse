@@ -29,7 +29,9 @@
 #define FUSE_PROTO_VERSION              7
 #define FUSE_PROTO_MINOR_VERSION        29
 
-#define FUSE_PROTO_ROOT_ID              1
+#define FUSE_PROTO_ROOT_INO             1
+
+#define FUSE_PROTO_UNKNOWN_INO          0xffffffff
 
 enum FUSE_PROTO_OPCODE
 {

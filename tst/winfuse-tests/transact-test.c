@@ -245,7 +245,7 @@ static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Scena
             ASSERT(FUSE_PROTO_REQ_SIZE(getattr) == Request->len);
             ASSERT(FUSE_PROTO_OPCODE_GETATTR == Request->opcode);
             ASSERT(0 != Request->unique);
-            ASSERT(FUSE_PROTO_ROOT_ID == Request->nodeid || FUSE_PROTO_ROOT_ID + 1 == Request->nodeid);
+            ASSERT(FUSE_PROTO_ROOT_INO == Request->nodeid || FUSE_PROTO_ROOT_INO + 1 == Request->nodeid);
             ASSERT(0 != Request->uid);
             ASSERT(0 != Request->gid);
             ASSERT(0 != Request->pid);
@@ -267,7 +267,7 @@ static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Scena
             ASSERT(FUSE_PROTO_REQ_SIZE(lookup) + sizeof "file0" == Request->len);
             ASSERT(FUSE_PROTO_OPCODE_LOOKUP == Request->opcode);
             ASSERT(0 != Request->unique);
-            ASSERT(FUSE_PROTO_ROOT_ID == Request->nodeid);
+            ASSERT(FUSE_PROTO_ROOT_INO == Request->nodeid);
             ASSERT(0 != Request->uid);
             ASSERT(0 != Request->gid);
             ASSERT(0 != Request->pid);
@@ -277,8 +277,8 @@ static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Scena
             memset(Response, 0, FUSE_PROTO_RSP_SIZE(lookup));
             Response->len = FUSE_PROTO_RSP_SIZE(lookup);
             Response->unique = Request->unique;
-            Response->rsp.lookup.entry.nodeid = FUSE_PROTO_ROOT_ID + 1;
-            Response->rsp.lookup.entry.attr.ino = FUSE_PROTO_ROOT_ID + 1;
+            Response->rsp.lookup.entry.nodeid = FUSE_PROTO_ROOT_INO + 1;
+            Response->rsp.lookup.entry.attr.ino = FUSE_PROTO_ROOT_INO + 1;
             Response->rsp.lookup.entry.attr.mode = 0040777;
             Response->rsp.lookup.entry.attr.nlink = 1;
             Response->rsp.lookup.entry.attr.uid = Request->uid;
@@ -294,7 +294,7 @@ static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Scena
             ASSERT(FUSE_PROTO_REQ_SIZE(open) == Request->len);
             ASSERT(FUSE_PROTO_OPCODE_OPENDIR == Request->opcode || FUSE_PROTO_OPCODE_OPEN == Request->opcode);
             ASSERT(0 != Request->unique);
-            ASSERT(FUSE_PROTO_ROOT_ID == Request->nodeid || FUSE_PROTO_ROOT_ID + 1 == Request->nodeid);
+            ASSERT(FUSE_PROTO_ROOT_INO == Request->nodeid || FUSE_PROTO_ROOT_INO + 1 == Request->nodeid);
             ASSERT(0 != Request->uid);
             ASSERT(0 != Request->gid);
             ASSERT(0 != Request->pid);
@@ -313,14 +313,14 @@ static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Scena
             ASSERT(FUSE_PROTO_REQ_SIZE(release) == Request->len);
             ASSERT(FUSE_PROTO_OPCODE_RELEASEDIR == Request->opcode || FUSE_PROTO_OPCODE_RELEASE == Request->opcode);
             ASSERT(0 != Request->unique);
-            ASSERT(FUSE_PROTO_ROOT_ID == Request->nodeid || FUSE_PROTO_ROOT_ID + 1 == Request->nodeid);
+            ASSERT(FUSE_PROTO_ROOT_INO == Request->nodeid || FUSE_PROTO_ROOT_INO + 1 == Request->nodeid);
             ASSERT(0 == Request->uid);
             ASSERT(0 == Request->gid);
             ASSERT(0 == Request->pid);
             ASSERT(0 == Request->padding);
             ASSERT(
-                100 + FUSE_PROTO_ROOT_ID == Request->req.release.fh ||
-                100 + FUSE_PROTO_ROOT_ID + 1 == Request->req.release.fh);
+                100 + FUSE_PROTO_ROOT_INO == Request->req.release.fh ||
+                100 + FUSE_PROTO_ROOT_INO + 1 == Request->req.release.fh);
             ASSERT(0 == Request->req.release.flags);
             ASSERT(0 == Request->req.release.release_flags);
             ASSERT(0 == Request->req.release.lock_owner);
@@ -332,7 +332,7 @@ static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Scena
             if ('BOGU' == Scenario)
                 Response->unique = Response->unique ^ rand();
 
-            if (100 + FUSE_PROTO_ROOT_ID + 1 == Request->req.release.fh)
+            if (100 + FUSE_PROTO_ROOT_INO + 1 == Request->req.release.fh)
                 Loop = FALSE;
             break;
         }

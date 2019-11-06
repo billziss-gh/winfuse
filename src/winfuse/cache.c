@@ -515,7 +515,7 @@ NTSTATUS FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
         RtlZeroMemory(NewItem, FIELD_OFFSET(FUSE_CACHE_ITEM, NameBuf));
         NewItem->NoForget =
             /* the root is not LOOKUP'ed; free without FORGET */
-            ParentIno == FUSE_PROTO_ROOT_ID && 1 == Name->Length && '/' == Name->Buffer[0];
+            ParentIno == FUSE_PROTO_ROOT_INO && 1 == Name->Length && '/' == Name->Buffer[0];
         NewItem->Hash = Hash;
         NewItem->ParentIno = ParentIno;
         NewItem->Name.Length = NewItem->Name.MaximumLength = Name->Length;
