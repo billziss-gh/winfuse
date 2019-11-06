@@ -411,13 +411,12 @@ VOID FuseProtoSendCreateChown(FUSE_CONTEXT *Context)
     /*
      * Send SETATTR message after directory/file creation.
      *
-     * Context->InternalRequest->Req.Create.CreateOptions & FILE_DIRECTORY_FILE
-     *     determines whether operation is applied to file (Context->File->Fh)
-     *     or directory (Context->Create.Ino)
+     * Context->File->IsDirectory
+     *     true if file is a directory
+     * Context->File->Ino
+     *     inode number of related file; use when file is a directory
      * Context->File->Fh
-     *     handle of related file; valid when used on file
-     * Context->Create.Ino
-     *     inode number of related directory; valid when used on directory
+     *     handle of related file; use when file is not a directory
      * Context->Create.Attr.uid
      *     uid of new file
      * Context->Create.Attr.gid
@@ -428,10 +427,10 @@ VOID FuseProtoSendCreateChown(FUSE_CONTEXT *Context)
 
     FUSE_PROTO_SEND_BEGIN
 
-        if (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DIRECTORY_FILE))
+        if (Context->File->IsDirectory)
         {
             FuseProtoInitRequest(Context,
-                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->Create.Ino);
+                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->File->Ino);
             Context->FuseRequest->req.setattr.valid =
                 FUSE_PROTO_SETATTR_UID | FUSE_PROTO_SETATTR_GID;
             Context->FuseRequest->req.setattr.uid = Context->Create.Attr.uid;
@@ -440,7 +439,7 @@ VOID FuseProtoSendCreateChown(FUSE_CONTEXT *Context)
         else
         {
             FuseProtoInitRequest(Context,
-                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, 0);
+                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->File->Ino);
             Context->FuseRequest->req.setattr.valid =
                 FUSE_PROTO_SETATTR_FH | FUSE_PROTO_SETATTR_UID | FUSE_PROTO_SETATTR_GID;
             Context->FuseRequest->req.setattr.fh = Context->File->Fh;

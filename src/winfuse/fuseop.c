@@ -735,13 +735,6 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 
         if (Context->Create.ChownOnCreate)
         {
-            if (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DIRECTORY_FILE))
-            {
-                coro_await (FuseLookupName(Context));
-                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-                    goto cleanup;
-            }
-
             Context->InternalResponse->IoStatus.Status = FspPosixMapSecurityDescriptorToPermissions(
                 (PSECURITY_DESCRIPTOR)(Context->InternalRequest->Buffer +
                     Context->InternalRequest->Req.Create.SecurityDescriptor.Offset),
