@@ -1163,7 +1163,7 @@ static BOOLEAN FuseAddDirInfo(FUSE_CONTEXT *Context,
     {
         NTSTATUS Result;
         PVOID BufferEnd = (PUINT8)Buffer + Length;
-        FSP_FSCTL_DIR_INFO *DirInfo = Buffer;
+        FSP_FSCTL_DIR_INFO *DirInfo;
         ULONG WideNameLength, DirInfoSize, AlignedSize;
         WCHAR WideName[255];
 
@@ -1187,6 +1187,7 @@ static BOOLEAN FuseAddDirInfo(FUSE_CONTEXT *Context,
             if ((PUINT8)Buffer + AlignedSize > (PUINT8)BufferEnd)
                 return FALSE;
 
+            DirInfo = Buffer;
             DirInfo->Size = (UINT16)DirInfoSize;
             FuseAttrToFileInfo(Context->DeviceObject, Attr, &DirInfo->FileInfo);
             DirInfo->NextOffset = NextOffset;
@@ -1276,7 +1277,7 @@ static VOID FuseOpQueryDirectory_ReadDirectory(FUSE_CONTEXT *Context)
     coro_block (Context->CoroState)
     {
         Context->QueryDirectory.NextOffset =
-            sizeof(UINT64) == Context->InternalRequest->Req.QueryDirectory.Marker.Size ?
+            sizeof(UINT64) + sizeof(WCHAR) == Context->InternalRequest->Req.QueryDirectory.Marker.Size ?
                 *(PUINT64)(Context->InternalRequest->Buffer +
                     Context->InternalRequest->Req.QueryDirectory.Marker.Offset) :
                 0;
