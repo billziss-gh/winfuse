@@ -90,6 +90,17 @@ VOID FuseFileDelete(PDEVICE_OBJECT DeviceObject, FUSE_FILE *File);
 typedef struct _FUSE_CONTEXT FUSE_CONTEXT;
 typedef VOID FUSE_CONTEXT_FINI(FUSE_CONTEXT *Context);
 typedef BOOLEAN FUSE_PROCESS_DISPATCH(FUSE_CONTEXT *Context);
+typedef struct _FUSE_CONTEXT_LOOKUP
+{
+    PVOID CacheGen;
+    UINT64 Ino;
+    STRING Name;
+    FUSE_PROTO_ATTR Attr;
+} FUSE_CONTEXT_LOOKUP;
+typedef struct _FUSE_CONTEXT_FORGET
+{
+    LIST_ENTRY ForgetList;
+} FUSE_CONTEXT_FORGET;
 struct _FUSE_CONTEXT
 {
     FUSE_CONTEXT *DictNext;
@@ -106,33 +117,28 @@ struct _FUSE_CONTEXT
     FUSE_FILE *File;
     union
     {
+        FUSE_CONTEXT_LOOKUP Lookup;
+        FUSE_CONTEXT_FORGET Forget;
         struct
         {
-            PVOID CacheGen;
+            FUSE_CONTEXT_LOOKUP;
             STRING OrigPath;
-            STRING Remain, Name;
-            UINT64 Ino;
-            FUSE_PROTO_ATTR Attr;
+            STRING Remain;
             UINT32 DesiredAccess, GrantedAccess;
             UINT32 UserMode:1;
             UINT32 HasTraversePrivilege:1;
             UINT32 DisableCache:1;
             UINT32 ChownOnCreate:1;
-        } Lookup;
+        } Create;
         struct
         {
-            LIST_ENTRY ForgetList;
-        } Forget;
-        struct
-        {
-            PVOID CacheGen;
+            FUSE_CONTEXT_LOOKUP;
             STRING OrigName;
             UINT64 NextOffset;
             UINT32 Length;
             ULONG BytesTransferred;
             PUINT8 Buffer, BufferEndP, BufferP;
-            STRING Name;
-        } Readdir;
+        } QueryDirectory;
     };
 };
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
@@ -216,7 +222,6 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRelease(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReaddir(FUSE_CONTEXT *Context);
-VOID FuseProtoSendReaddirLookup(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 static inline
