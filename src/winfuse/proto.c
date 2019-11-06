@@ -30,6 +30,7 @@ VOID FuseProtoFillForget(FUSE_CONTEXT *Context);
 VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
 VOID FuseProtoSendStatfs(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
+VOID FuseProtoSendFgetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);
@@ -55,6 +56,7 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoFillBatchForget)
 #pragma alloc_text(PAGE, FuseProtoSendStatfs)
 #pragma alloc_text(PAGE, FuseProtoSendGetattr)
+#pragma alloc_text(PAGE, FuseProtoSendFgetattr)
 #pragma alloc_text(PAGE, FuseProtoSendMkdir)
 #pragma alloc_text(PAGE, FuseProtoSendMknod)
 #pragma alloc_text(PAGE, FuseProtoSendRmdir)
@@ -260,6 +262,38 @@ VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context)
 
         FuseProtoInitRequest(Context,
             FUSE_PROTO_REQ_SIZE(getattr), FUSE_PROTO_OPCODE_GETATTR, Context->Lookup.Ino);
+
+    FUSE_PROTO_SEND_END
+}
+
+VOID FuseProtoSendFgetattr(FUSE_CONTEXT *Context)
+    /*
+     * Send GETATTR message given a file.
+     *
+     * Context->File->IsDirectory
+     *     true if file is a directory
+     * Context->File->Ino
+     *     inode number of related file; use when file is a directory
+     * Context->File->Fh
+     *     handle of related file; use when file is not a directory
+     */
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_SEND_BEGIN
+
+        if (Context->File->IsDirectory)
+        {
+            FuseProtoInitRequest(Context,
+                FUSE_PROTO_REQ_SIZE(getattr), FUSE_PROTO_OPCODE_GETATTR, Context->File->Ino);
+        }
+        else
+        {
+            FuseProtoInitRequest(Context,
+                FUSE_PROTO_REQ_SIZE(getattr), FUSE_PROTO_OPCODE_GETATTR, Context->File->Ino);
+            Context->FuseRequest->req.getattr.getattr_flags = FUSE_PROTO_GETATTR_FH;
+            Context->FuseRequest->req.getattr.fh = Context->File->Fh;
+        }
 
     FUSE_PROTO_SEND_END
 }

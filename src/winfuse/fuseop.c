@@ -753,6 +753,7 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
                 &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
         }
 
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
         Context->InternalResponse->IoStatus.Information = FILE_CREATED;
 
         /* ensure that ContextFini will not free the newly opened file */
@@ -829,7 +830,6 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
             Context->File->Fh = Context->FuseResponse->rsp.open.fh;
         }
 
-        Context->InternalResponse->IoStatus.Information = FILE_OPENED;
         Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
             (UINT64)(UINT_PTR)Context->File;
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
@@ -838,6 +838,9 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
             &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
         Context->InternalResponse->Rsp.Create.Opened.DisableCache =
             Context->Create.DisableCache;
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+        Context->InternalResponse->IoStatus.Information = FILE_OPENED;
 
         /* ensure that ContextFini will not free the newly opened file */
         Context->File = 0;
@@ -1097,7 +1100,21 @@ BOOLEAN FuseOpQueryInformation(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    return FALSE;
+    coro_block (Context->CoroState)
+    {
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.QueryDirectory.UserContext2;
+
+        coro_await (FuseProtoSendFgetattr(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.getattr.attr,
+            &Context->InternalResponse->Rsp.QueryInformation.FileInfo);
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+    }
+
+    return coro_active();
 }
 
 BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context)
