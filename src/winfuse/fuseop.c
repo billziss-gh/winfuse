@@ -1302,20 +1302,24 @@ static VOID FuseOpQueryDirectory_ReadDirectory(FUSE_CONTEXT *Context)
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        if (Context->FuseResponse->len > Context->QueryDirectory.Length)
+        if (Context->QueryDirectory.Length < Context->FuseResponse->len)
         {
             Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INTERNAL_ERROR;
             coro_break;
         }
 
-        Context->QueryDirectory.Buffer = FuseAlloc(Context->FuseResponse->len);
-        if (0 == Context->QueryDirectory.Buffer)
+        if (FUSE_PROTO_RSP_HEADER_SIZE < Context->FuseResponse->len)
         {
-            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INSUFFICIENT_RESOURCES;
-            coro_break;
+            Context->QueryDirectory.Buffer = FuseAlloc(Context->FuseResponse->len);
+            if (0 == Context->QueryDirectory.Buffer)
+            {
+                Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INSUFFICIENT_RESOURCES;
+                coro_break;
+            }
+
+            RtlCopyMemory(Context->QueryDirectory.Buffer, Context->FuseResponse, Context->FuseResponse->len);
         }
 
-        RtlCopyMemory(Context->QueryDirectory.Buffer, Context->FuseResponse, Context->FuseResponse->len);
         Context->QueryDirectory.BufferEndP = Context->QueryDirectory.Buffer + Context->FuseResponse->len;
         Context->QueryDirectory.BufferP = Context->QueryDirectory.Buffer + FUSE_PROTO_RSP_HEADER_SIZE;
 
