@@ -175,7 +175,7 @@ NTSTATUS FuseCacheReferenceGen(FUSE_CACHE *Cache, PVOID *PGen);
 VOID FuseCacheDereferenceGen(FUSE_CACHE *Cache, PVOID Gen);
 BOOLEAN FuseCacheGetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
     FUSE_PROTO_ENTRY *Entry);
-NTSTATUS FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
+VOID FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
     FUSE_PROTO_ENTRY *Entry);
 VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList);
 BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForgetOne);

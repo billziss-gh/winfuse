@@ -402,11 +402,9 @@ static VOID FuseLookupName(FUSE_CONTEXT *Context)
                 Entry = &Context->FuseResponse->rsp.lookup.entry;
             }
 
-            Context->InternalResponse->IoStatus.Status = FuseCacheSetEntry(
+            FuseCacheSetEntry(
                 FuseDeviceExtension(Context->DeviceObject)->Cache,
                 Context->Lookup.Ino, &Context->Lookup.Name, Entry);
-            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-                coro_break;
         }
 
         Context->Lookup.Ino = Entry->nodeid;
@@ -666,6 +664,10 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
+            FuseCacheSetEntry(
+                FuseDeviceExtension(Context->DeviceObject)->Cache,
+                Context->Create.Ino, &Context->Create.Name, &Context->FuseResponse->rsp.mkdir.entry);
+
             Context->Create.Attr = Context->FuseResponse->rsp.mkdir.entry.attr;
 
             coro_await (FuseProtoSendOpendir(Context));
@@ -684,6 +686,10 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             coro_await (FuseProtoSendCreate(Context));
             if (NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             {
+                FuseCacheSetEntry(
+                    FuseDeviceExtension(Context->DeviceObject)->Cache,
+                    Context->Create.Ino, &Context->Create.Name, &Context->FuseResponse->rsp.create.entry);
+
                 Context->Create.Attr = Context->FuseResponse->rsp.create.entry.attr;
                 Context->Create.DisableCache =
                     BooleanFlagOn(Context->FuseResponse->rsp.create.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
@@ -699,6 +705,10 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
                 coro_await (FuseProtoSendMknod(Context));
                 if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                     coro_break;
+
+                FuseCacheSetEntry(
+                    FuseDeviceExtension(Context->DeviceObject)->Cache,
+                    Context->Create.Ino, &Context->Create.Name, &Context->FuseResponse->rsp.mknod.entry);
 
                 Context->Create.Attr = Context->FuseResponse->rsp.mknod.entry.attr;
 
