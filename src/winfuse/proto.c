@@ -620,6 +620,9 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno)
 {
     PAGED_CODE();
 
+    if (0 > Errno)
+        Errno = -Errno;
+
     switch (Errno)
     {
     #undef FUSE_ERRNO
