@@ -5,6 +5,7 @@ setlocal EnableDelayedExpansion
 
 if not X%1==X set DESTDIR=%1
 
+rem ninja uses DESTDIR for installation
 if not X!DESTDIR!==X (
     if exist !DESTDIR! rmdir /s/q !DESTDIR!
     mkdir !DESTDIR!
