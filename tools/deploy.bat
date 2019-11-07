@@ -30,7 +30,7 @@ mkdir %TARGET% 2>nul
 for %%f in (winfuse-%SUFFIX%.sys winfuse-tests-%SUFFIX%.exe) do (
     copy build\VStudio\build\%CONFIG%\%%f %TARGET% >nul
 )
-for %%f in (winfsp-%SUFFIX%.sys winfsp-%SUFFIX%.dll) do (
+for %%f in (winfsp-%SUFFIX%.sys winfsp-%SUFFIX%.dll winfsp-tests-%SUFFIX%.exe) do (
     copy "!WINFSP!%%f" %TARGET% >nul
 )
 if exist tst\memfs-fuse3\build\%CONFIG% (
