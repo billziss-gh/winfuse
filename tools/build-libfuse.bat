@@ -3,16 +3,19 @@
 setlocal
 setlocal EnableDelayedExpansion
 
-if not X%1==X set InstallDir=%1
-if X!InstallDir!==X (echo usage: build-libfuse InstallDir >&2 & goto fail)
+if not X%1==X set DESTDIR=%1
 
-rem installation directory for ninja
-cd !InstallDir!
-if errorlevel 1 goto fail
-set DESTDIR=%cd%
-
-cd %~dp0..\ext\libfuse
-if errorlevel 1 goto fail
+if not X!DESTDIR!==X (
+    if exist !DESTDIR! rmdir /s/q !DESTDIR!
+    mkdir !DESTDIR!
+    pushd !DESTDIR!
+    set DESTDIR=!cd!
+    popd
+) else (
+    set DESTDIR=%~dp0..\build\VStudio\build\libfuse
+    if exist !DESTDIR! rmdir /s/q !DESTDIR!
+    mkdir !DESTDIR!
+)
 
 set vswhere="%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 for /f "usebackq tokens=*" %%i in (`%vswhere% -find VC\**\vcvarsall.bat`) do (
@@ -22,6 +25,7 @@ for /f "usebackq tokens=*" %%i in (`%vswhere% -find VC\**\vcvarsall.bat`) do (
 rem workaround getting Cygwin's meson/ninja
 set PATH=C:\Program Files\Meson;%PATH%
 
+cd %~dp0..\ext\libfuse
 if exist build rmdir /s/q build
 mkdir build && cd build
 
