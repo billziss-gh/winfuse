@@ -5,7 +5,9 @@ image: Visual Studio 2019
 environment:
   matrix:
   - CONFIGURATION: Debug
+    WINFSP: source
   - CONFIGURATION: Release
+    WINFSP: source
 
 init:
 #- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
@@ -13,7 +15,8 @@ init:
 install:
 - git submodule update --init --recursive
 - appveyor AddMessage "Install WinFsp" -Category Information
-- appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5B3/winfsp-1.5.19295.msi
+- if %WINFSP%==stable appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5B3/winfsp-1.5.19295.msi
+- if %WINFSP%==source ext\winfsp\tools\build.bat %CONFIGURATION% & copy ext\winfsp\build\VStudio\build\%CONFIGURATION%\winfsp-*.msi .
 - for %%f in ("winfsp-*.msi") do start /wait msiexec /i %%f /qn INSTALLLEVEL=1000
 - appveyor AddMessage "Change boot configuration and reboot" -Category Information
 - bcdedit /set testsigning on
