@@ -17,6 +17,8 @@ set dfl_tests=^
     winfuse-tests-x64 ^
     winfuse-tests-x86
 set opt_tests=
+    sample-memfs-fuse3-x64 ^
+    sample-memfs-fuse3-x86
 
 set tests=
 for %%f in (%dfl_tests%) do (
@@ -89,6 +91,33 @@ exit /b 0
 winfuse-tests-x86 +*
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
+
+:sample-memfs-fuse3-x64
+call :__run_sample_test memfs-fuse3 x64
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-memfs-fuse3-x86
+call :__run_sample_test memfs-fuse3 x86
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:__run_sample_test
+set TestExit=0
+call %ProjRoot%\tools\build-sample.bat %Configuration% %1 %2 "%TMP%\%1"
+if !ERRORLEVEL! neq 0 goto fail
+start "" /b "%TMP%\%1\build\%Configuration%\%1-%2.exe" L:
+waitfor 7BF47D72F6664550B03248ECFE77C7DD /t 3 2>nul
+pushd >nul
+cd L: >nul 2>nul || (echo Unable to find drive L: >&2 & goto fail)
+L:
+"%ProjRoot%\build\VStudio\build\winfsp-tests\winfsp-tests-x64.exe" ^
+    --external --resilient
+if !ERRORLEVEL! neq 0 set TestExit=1
+popd
+taskkill /f /im %1-%2.exe
+rmdir /s/q "%TMP%\%1"
+exit /b !TestExit!
 
 :leak-test
 for /F "tokens=1,2 delims=:" %%i in ('verifier /query ^| findstr ^
