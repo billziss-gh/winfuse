@@ -246,9 +246,6 @@ static void transact_open_close_dotest(PWSTR DeviceName, PWSTR Prefix, int Scena
             ASSERT(FUSE_PROTO_OPCODE_GETATTR == Request->opcode);
             ASSERT(0 != Request->unique);
             ASSERT(FUSE_PROTO_ROOT_INO == Request->nodeid || FUSE_PROTO_ROOT_INO + 1 == Request->nodeid);
-            ASSERT(0 != Request->uid);
-            ASSERT(0 != Request->gid);
-            ASSERT(0 != Request->pid);
             ASSERT(0 == Request->padding);
             ASSERT(0 == Request->req.getattr.getattr_flags);
             ASSERT(0 == Request->req.getattr.fh);
