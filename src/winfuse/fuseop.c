@@ -1267,7 +1267,7 @@ static VOID FuseOpQueryDirectory_GetDirInfoByName(FUSE_CONTEXT *Context)
                 &Context->QueryDirectory.Name,
                 0,
                 &Context->QueryDirectory.Attr,
-                (PVOID)Context->InternalRequest->Req.QueryDirectory.Address,
+                (PVOID)(UINT_PTR)Context->InternalRequest->Req.QueryDirectory.Address,
                 Context->InternalRequest->Req.QueryDirectory.Length,
                 &Context->QueryDirectory.BytesTransferred);
         else if (STATUS_OBJECT_NAME_NOT_FOUND == Context->InternalResponse->IoStatus.Status)
@@ -1279,7 +1279,7 @@ static VOID FuseOpQueryDirectory_GetDirInfoByName(FUSE_CONTEXT *Context)
                 0,
                 0,
                 0,
-                (PVOID)Context->InternalRequest->Req.QueryDirectory.Address,
+                (PVOID)(UINT_PTR)Context->InternalRequest->Req.QueryDirectory.Address,
                 Context->InternalRequest->Req.QueryDirectory.Length,
                 &Context->QueryDirectory.BytesTransferred);
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
@@ -1391,7 +1391,7 @@ static VOID FuseOpQueryDirectory_ReadDirectory(FUSE_CONTEXT *Context)
                 &Context->QueryDirectory.Name,
                 ((FUSE_PROTO_DIRENT *)Context->QueryDirectory.BufferP)->off,
                 &Context->QueryDirectory.Attr,
-                (PVOID)Context->InternalRequest->Req.QueryDirectory.Address,
+                (PVOID)(UINT_PTR)Context->InternalRequest->Req.QueryDirectory.Address,
                 Context->InternalRequest->Req.QueryDirectory.Length,
                 &Context->QueryDirectory.BytesTransferred);
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
@@ -1408,7 +1408,7 @@ static VOID FuseOpQueryDirectory_ReadDirectory(FUSE_CONTEXT *Context)
         /* empty readdir response signifies end of dir; add WinFsp end-of-dir marker */
         if (Context->QueryDirectory.BufferP == Context->QueryDirectory.Buffer + FUSE_PROTO_RSP_HEADER_SIZE)
             FuseAddDirInfo(Context, 0, 0, 0,
-                (PVOID)Context->InternalRequest->Req.QueryDirectory.Address,
+                (PVOID)(UINT_PTR)Context->InternalRequest->Req.QueryDirectory.Address,
                 Context->InternalRequest->Req.QueryDirectory.Length,
                 &Context->QueryDirectory.BytesTransferred);
 
