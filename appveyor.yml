@@ -16,7 +16,7 @@ install:
 - git submodule update --init --recursive
 - appveyor AddMessage "Install WinFsp" -Category Information
 - if %WINFSP%==stable appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5B3/winfsp-1.5.19295.msi
-- if %WINFSP%==source ext\winfsp\tools\build.bat %CONFIGURATION% & copy ext\winfsp\build\VStudio\build\%CONFIGURATION%\winfsp-*.msi .
+- if %WINFSP%==source tools\build-winfsp.bat %CONFIGURATION% & copy ext\winfsp\build\VStudio\build\%CONFIGURATION%\winfsp-*.msi .
 - for %%f in ("winfsp-*.msi") do start /wait msiexec /i %%f /qn INSTALLLEVEL=1000
 - appveyor AddMessage "Change boot configuration and reboot" -Category Information
 - bcdedit /set testsigning on

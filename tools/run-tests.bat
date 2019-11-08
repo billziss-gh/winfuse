@@ -111,7 +111,7 @@ waitfor 7BF47D72F6664550B03248ECFE77C7DD /t 3 2>nul
 pushd >nul
 cd L: >nul 2>nul || (echo Unable to find drive L: >&2 & goto fail)
 L:
-"%ProjRoot%\build\VStudio\build\winfsp-tests\winfsp-tests-x64.exe" ^
+"%ProjRoot%\ext\winfsp\build\VStudio\build\%Configuration%\winfsp-tests-x64.exe" ^
     --external --resilient
 if !ERRORLEVEL! neq 0 set TestExit=1
 popd
