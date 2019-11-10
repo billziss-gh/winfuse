@@ -78,9 +78,8 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
         FuseContextWaitRequest(Context);
 #define FUSE_PROTO_SEND_END             \
         FuseContextWaitResponse(Context);\
-        if (0 != Context->FuseResponse->error)\
-            Context->InternalResponse->IoStatus.Status =\
-                FuseNtStatusFromErrno(Context->FuseResponse->error);\
+        Context->InternalResponse->IoStatus.Status =\
+            FuseNtStatusFromErrno(Context->FuseResponse->error);\
     }
 
 static inline VOID FuseProtoInitRequest(FUSE_CONTEXT *Context,
@@ -347,7 +346,7 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
 
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(mknod) + Context->Create.Name.Length + 1),
-            FUSE_PROTO_OPCODE_MKDIR, Context->Create.Ino);
+            FUSE_PROTO_OPCODE_MKNOD, Context->Create.Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
         Context->FuseRequest->req.mknod.mode = Context->Create.Attr.mode;
         Context->FuseRequest->req.mknod.rdev = Context->Create.Attr.rdev;

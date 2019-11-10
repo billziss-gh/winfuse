@@ -668,6 +668,7 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
                 FuseDeviceExtension(Context->DeviceObject)->Cache,
                 Context->Create.Ino, &Context->Create.Name, &Context->FuseResponse->rsp.mkdir.entry);
 
+            Context->Create.Ino = Context->FuseResponse->rsp.mkdir.entry.nodeid;
             Context->Create.Attr = Context->FuseResponse->rsp.mkdir.entry.attr;
 
             coro_await (FuseProtoSendOpendir(Context));
@@ -690,6 +691,7 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
                     FuseDeviceExtension(Context->DeviceObject)->Cache,
                     Context->Create.Ino, &Context->Create.Name, &Context->FuseResponse->rsp.create.entry);
 
+                Context->Create.Ino = Context->FuseResponse->rsp.create.entry.nodeid;
                 Context->Create.Attr = Context->FuseResponse->rsp.create.entry.attr;
                 Context->Create.DisableCache =
                     BooleanFlagOn(Context->FuseResponse->rsp.create.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
@@ -710,6 +712,7 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
                     FuseDeviceExtension(Context->DeviceObject)->Cache,
                     Context->Create.Ino, &Context->Create.Name, &Context->FuseResponse->rsp.mknod.entry);
 
+                Context->Create.Ino = Context->FuseResponse->rsp.mknod.entry.nodeid;
                 Context->Create.Attr = Context->FuseResponse->rsp.mknod.entry.attr;
 
                 coro_await (FuseProtoSendOpen(Context));
