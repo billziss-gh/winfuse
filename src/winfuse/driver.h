@@ -132,6 +132,10 @@ struct _FUSE_CONTEXT
         } Create;
         struct
         {
+            FUSE_PROTO_ATTR Attr;
+        } Setattr;
+        struct
+        {
             FUSE_CONTEXT_LOOKUP;
             STRING OrigName;
             UINT64 NextOffset;
@@ -212,6 +216,7 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
 VOID FuseProtoSendStatfs(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFgetattr(FUSE_CONTEXT *Context);
+VOID FuseProtoSendFtruncate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);

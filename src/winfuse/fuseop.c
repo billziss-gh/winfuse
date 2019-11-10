@@ -1020,7 +1020,26 @@ BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    return FALSE;
+    coro_block (Context->CoroState)
+    {
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.Close.UserContext2;
+
+        //Context->Setattr.Attr.size = 0;
+        coro_await (FuseProtoSendFtruncate(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        coro_await (FuseProtoSendFgetattr(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.getattr.attr,
+            &Context->InternalResponse->Rsp.QueryInformation.FileInfo);
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+    }
+
+    return coro_active();
 }
 
 BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context)
@@ -1063,8 +1082,8 @@ BOOLEAN FuseOpClose(FUSE_CONTEXT *Context)
     {
         /* NOTE: CLOSE cannot report failure! */
 
-        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.Close.UserContext2;
         Context->Fini = FuseOpClose_ContextFini;
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.Close.UserContext2;
 
         if (Context->File->IsReparsePoint)
             /* reparse points are not opened; ignore */;

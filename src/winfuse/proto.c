@@ -31,6 +31,7 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
 VOID FuseProtoSendStatfs(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFgetattr(FUSE_CONTEXT *Context);
+VOID FuseProtoSendFtruncate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);
@@ -57,6 +58,7 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoSendStatfs)
 #pragma alloc_text(PAGE, FuseProtoSendGetattr)
 #pragma alloc_text(PAGE, FuseProtoSendFgetattr)
+#pragma alloc_text(PAGE, FuseProtoSendFtruncate)
 #pragma alloc_text(PAGE, FuseProtoSendMkdir)
 #pragma alloc_text(PAGE, FuseProtoSendMknod)
 #pragma alloc_text(PAGE, FuseProtoSendRmdir)
@@ -137,7 +139,7 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
      *
      * Context->Lookup.Ino
      *     parent directory inode number
-     * Context->Lookup.Name.Length
+     * Context->Lookup.Name
      *     name to lookup
      */
 {
@@ -272,9 +274,9 @@ VOID FuseProtoSendFgetattr(FUSE_CONTEXT *Context)
      * Context->File->IsDirectory
      *     true if file is a directory
      * Context->File->Ino
-     *     inode number of related file; use when file is a directory
+     *     inode number of related file
      * Context->File->Fh
-     *     handle of related file; use when file is not a directory
+     *     handle of related file; use only when file is not a directory
      */
 {
     PAGED_CODE();
@@ -297,13 +299,39 @@ VOID FuseProtoSendFgetattr(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_END
 }
 
+VOID FuseProtoSendFtruncate(FUSE_CONTEXT *Context)
+    /*
+     * Send SETATTR message.
+     *
+     * Context->File->Ino
+     *     inode number of related file
+     * Context->File->Fh
+     *     handle of related file
+     * Context->Setattr.Attr.size
+     *     new size of file
+     */
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_SEND_BEGIN
+
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->File->Ino);
+        Context->FuseRequest->req.setattr.valid =
+            FUSE_PROTO_SETATTR_FH | FUSE_PROTO_SETATTR_SIZE;
+        Context->FuseRequest->req.setattr.fh = Context->File->Fh;
+        Context->FuseRequest->req.setattr.size = Context->Setattr.Attr.size;
+
+    FUSE_PROTO_SEND_END
+}
+
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
     /*
      * Send MKDIR message.
      *
      * Context->Create.Ino
      *     parent directory inode number
-     * Context->Create.Name.Length
+     * Context->Create.Name
      *     name of new directory
      * Context->Create.Attr.mode
      *     mode of new directory
@@ -332,7 +360,7 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
      *
      * Context->Create.Ino
      *     parent directory inode number
-     * Context->Create.Name.Length
+     * Context->Create.Name
      *     name of new file
      * Context->Create.Attr.mode
      *     mode of new file
@@ -364,7 +392,7 @@ VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context)
      *
      * Context->Lookup.Ino
      *     parent directory inode number
-     * Context->Lookup.Name.Length
+     * Context->Lookup.Name
      *     name of directory
      */
 {
@@ -389,7 +417,7 @@ VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context)
      *
      * Context->Lookup.Ino
      *     parent directory inode number
-     * Context->Lookup.Name.Length
+     * Context->Lookup.Name
      *     name of file
      */
 {
@@ -414,7 +442,7 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
      *
      * Context->Create.Ino
      *     parent directory inode number
-     * Context->Create.Name.Length
+     * Context->Create.Name
      *     name of new file
      * Context->Create.Attr.mode
      *     mode of new file
@@ -442,7 +470,7 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
 
 VOID FuseProtoSendCreateChown(FUSE_CONTEXT *Context)
     /*
-     * Send SETATTR message after directory/file creation.
+     * Send SETATTR message for chown.
      *
      * Context->File->IsDirectory
      *     true if file is a directory

@@ -37,7 +37,7 @@ NTSTATUS DriverEntry(
 
     FuseProcessFunction[FspFsctlTransactReservedKind] = FuseOpReserved;
     FuseProcessFunction[FspFsctlTransactCreateKind] = FuseOpCreate;
-    //FuseProcessFunction[FspFsctlTransactOverwriteKind] = FuseOpOverwrite;
+    FuseProcessFunction[FspFsctlTransactOverwriteKind] = FuseOpOverwrite;
     FuseProcessFunction[FspFsctlTransactCleanupKind] = FuseOpCleanup;
     FuseProcessFunction[FspFsctlTransactCloseKind] = FuseOpClose;
     //FuseProcessFunction[FspFsctlTransactReadKind] = FuseOpRead;
