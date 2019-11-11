@@ -329,11 +329,11 @@ VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
     /*
      * Send MKDIR message.
      *
-     * Context->Create.Ino
+     * Context->Lookup.Ino
      *     parent directory inode number
-     * Context->Create.Name
+     * Context->Lookup.Name
      *     name of new directory
-     * Context->Create.Attr.mode
+     * Context->Lookup.Attr.mode
      *     mode of new directory
      */
 {
@@ -342,14 +342,14 @@ VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
-            (UINT32)(FUSE_PROTO_REQ_SIZE(mkdir) + Context->Create.Name.Length + 1),
-            FUSE_PROTO_OPCODE_MKDIR, Context->Create.Ino);
+            (UINT32)(FUSE_PROTO_REQ_SIZE(mkdir) + Context->Lookup.Name.Length + 1),
+            FUSE_PROTO_OPCODE_MKDIR, Context->Lookup.Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
-        Context->FuseRequest->req.mkdir.mode = Context->Create.Attr.mode;
+        Context->FuseRequest->req.mkdir.mode = Context->Lookup.Attr.mode;
         Context->FuseRequest->req.mkdir.umask = 0;          /* !!!: REVISIT */
-        RtlCopyMemory(Context->FuseRequest->req.mkdir.name, Context->Create.Name.Buffer,
-            Context->Create.Name.Length);
-        Context->FuseRequest->req.mkdir.name[Context->Create.Name.Length] = '\0';
+        RtlCopyMemory(Context->FuseRequest->req.mkdir.name, Context->Lookup.Name.Buffer,
+            Context->Lookup.Name.Length);
+        Context->FuseRequest->req.mkdir.name[Context->Lookup.Name.Length] = '\0';
 
     FUSE_PROTO_SEND_END
 }
@@ -358,13 +358,13 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
     /*
      * Send MKNOD message.
      *
-     * Context->Create.Ino
+     * Context->Lookup.Ino
      *     parent directory inode number
-     * Context->Create.Name
+     * Context->Lookup.Name
      *     name of new file
-     * Context->Create.Attr.mode
+     * Context->Lookup.Attr.mode
      *     mode of new file
-     * Context->Create.Attr.rdev
+     * Context->Lookup.Attr.rdev
      *     device number of new file (when file is a device)
      */
 {
@@ -373,15 +373,15 @@ VOID FuseProtoSendMknod(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
-            (UINT32)(FUSE_PROTO_REQ_SIZE(mknod) + Context->Create.Name.Length + 1),
-            FUSE_PROTO_OPCODE_MKNOD, Context->Create.Ino);
+            (UINT32)(FUSE_PROTO_REQ_SIZE(mknod) + Context->Lookup.Name.Length + 1),
+            FUSE_PROTO_OPCODE_MKNOD, Context->Lookup.Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
-        Context->FuseRequest->req.mknod.mode = Context->Create.Attr.mode;
-        Context->FuseRequest->req.mknod.rdev = Context->Create.Attr.rdev;
+        Context->FuseRequest->req.mknod.mode = Context->Lookup.Attr.mode;
+        Context->FuseRequest->req.mknod.rdev = Context->Lookup.Attr.rdev;
         Context->FuseRequest->req.mknod.umask = 0;          /* !!!: REVISIT */
-        RtlCopyMemory(Context->FuseRequest->req.mknod.name, Context->Create.Name.Buffer,
-            Context->Create.Name.Length);
-        Context->FuseRequest->req.mknod.name[Context->Create.Name.Length] = '\0';
+        RtlCopyMemory(Context->FuseRequest->req.mknod.name, Context->Lookup.Name.Buffer,
+            Context->Lookup.Name.Length);
+        Context->FuseRequest->req.mknod.name[Context->Lookup.Name.Length] = '\0';
 
     FUSE_PROTO_SEND_END
 }
@@ -440,11 +440,11 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
     /*
      * Send CREATE message.
      *
-     * Context->Create.Ino
+     * Context->Lookup.Ino
      *     parent directory inode number
-     * Context->Create.Name
+     * Context->Lookup.Name
      *     name of new file
-     * Context->Create.Attr.mode
+     * Context->Lookup.Attr.mode
      *     mode of new file
      * Context->File->OpenFlags
      *     open (O_*) flags
@@ -455,15 +455,15 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
-            (UINT32)(FUSE_PROTO_REQ_SIZE(create) + Context->Create.Name.Length + 1),
-            FUSE_PROTO_OPCODE_CREATE, Context->Create.Ino);
+            (UINT32)(FUSE_PROTO_REQ_SIZE(create) + Context->Lookup.Name.Length + 1),
+            FUSE_PROTO_OPCODE_CREATE, Context->Lookup.Ino);
         ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
         Context->FuseRequest->req.create.flags = Context->File->OpenFlags;
-        Context->FuseRequest->req.create.mode = Context->Create.Attr.mode;
+        Context->FuseRequest->req.create.mode = Context->Lookup.Attr.mode;
         Context->FuseRequest->req.create.umask = 0;         /* !!!: REVISIT */
-        RtlCopyMemory(Context->FuseRequest->req.create.name, Context->Create.Name.Buffer,
-            Context->Create.Name.Length);
-        Context->FuseRequest->req.create.name[Context->Create.Name.Length] = '\0';
+        RtlCopyMemory(Context->FuseRequest->req.create.name, Context->Lookup.Name.Buffer,
+            Context->Lookup.Name.Length);
+        Context->FuseRequest->req.create.name[Context->Lookup.Name.Length] = '\0';
 
     FUSE_PROTO_SEND_END
 }
@@ -478,9 +478,9 @@ VOID FuseProtoSendCreateChown(FUSE_CONTEXT *Context)
      *     inode number of related file; use when file is a directory
      * Context->File->Fh
      *     handle of related file; use when file is not a directory
-     * Context->Create.Attr.uid
+     * Context->Lookup.Attr.uid
      *     uid of new file
-     * Context->Create.Attr.gid
+     * Context->Lookup.Attr.gid
      *     gid of new file
      */
 {
@@ -494,8 +494,8 @@ VOID FuseProtoSendCreateChown(FUSE_CONTEXT *Context)
                 FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->File->Ino);
             Context->FuseRequest->req.setattr.valid =
                 FUSE_PROTO_SETATTR_UID | FUSE_PROTO_SETATTR_GID;
-            Context->FuseRequest->req.setattr.uid = Context->Create.Attr.uid;
-            Context->FuseRequest->req.setattr.gid = Context->Create.Attr.gid;
+            Context->FuseRequest->req.setattr.uid = Context->Lookup.Attr.uid;
+            Context->FuseRequest->req.setattr.gid = Context->Lookup.Attr.gid;
         }
         else
         {
@@ -504,8 +504,8 @@ VOID FuseProtoSendCreateChown(FUSE_CONTEXT *Context)
             Context->FuseRequest->req.setattr.valid =
                 FUSE_PROTO_SETATTR_FH | FUSE_PROTO_SETATTR_UID | FUSE_PROTO_SETATTR_GID;
             Context->FuseRequest->req.setattr.fh = Context->File->Fh;
-            Context->FuseRequest->req.setattr.uid = Context->Create.Attr.uid;
-            Context->FuseRequest->req.setattr.gid = Context->Create.Attr.gid;
+            Context->FuseRequest->req.setattr.uid = Context->Lookup.Attr.uid;
+            Context->FuseRequest->req.setattr.gid = Context->Lookup.Attr.gid;
         }
 
     FUSE_PROTO_SEND_END
@@ -515,7 +515,7 @@ VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context)
     /*
      * Send OPENDIR message.
      *
-     * Context->Create.Ino
+     * Context->Lookup.Ino
      *     inode number of directory to open
      */
 {
@@ -524,7 +524,7 @@ VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
-            FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPENDIR, Context->Create.Ino);
+            FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPENDIR, Context->Lookup.Ino);
         Context->FuseRequest->req.open.flags = Context->File->OpenFlags;
 
     FUSE_PROTO_SEND_END
@@ -534,7 +534,7 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context)
     /*
      * Send OPEN message.
      *
-     * Context->Create.Ino
+     * Context->Lookup.Ino
      *     inode number of file to open
      */
 {
@@ -543,7 +543,7 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_BEGIN
 
         FuseProtoInitRequest(Context,
-            FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPEN, Context->Create.Ino);
+            FUSE_PROTO_REQ_SIZE(open), FUSE_PROTO_OPCODE_OPEN, Context->Lookup.Ino);
         Context->FuseRequest->req.open.flags = Context->File->OpenFlags;
 
     FUSE_PROTO_SEND_END
