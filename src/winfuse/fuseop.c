@@ -509,8 +509,6 @@ static VOID FuseCreateCheck(FUSE_CONTEXT *Context)
             coro_break;
         }
 
-        FusePosixPathSuffix(&Context->Create.OrigPath, &Context->Create.Remain, 0);
-
         if (Context->InternalRequest->Req.Create.HasRestorePrivilege)
             Context->Create.DesiredAccess = 0;
         else if (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DIRECTORY_FILE))
@@ -518,6 +516,7 @@ static VOID FuseCreateCheck(FUSE_CONTEXT *Context)
         else
             Context->Create.DesiredAccess = FILE_ADD_FILE;
 
+        FusePosixPathSuffix(&Context->Create.OrigPath, &Context->Create.Remain, 0);
         coro_await (FuseLookupPath(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
@@ -547,12 +546,11 @@ static VOID FuseOpenCheck(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->Create.Remain = Context->Create.OrigPath;
-
         Context->Create.DesiredAccess = Context->InternalRequest->Req.Create.DesiredAccess |
             (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DELETE_ON_CLOSE) ?
                 DELETE : 0);
 
+        Context->Create.Remain = Context->Create.OrigPath;
         coro_await (FuseLookupPath(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
@@ -583,14 +581,13 @@ static VOID FuseOverwriteCheck(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->Create.Remain = Context->Create.OrigPath;
-
         Context->Create.DesiredAccess = Context->InternalRequest->Req.Create.DesiredAccess |
             (FILE_SUPERSEDE == ((Context->InternalRequest->Req.Create.CreateOptions >> 24) & 0xff) ?
                 DELETE : FILE_WRITE_DATA) |
             (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DELETE_ON_CLOSE) ?
                 DELETE : 0);
 
+        Context->Create.Remain = Context->Create.OrigPath;
         coro_await (FuseLookupPath(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
@@ -615,10 +612,9 @@ static VOID FuseOpenTargetDirectoryCheck(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        FusePosixPathSuffix(&Context->Create.OrigPath, &Context->Create.Remain, 0);
-
         Context->Create.DesiredAccess = Context->InternalRequest->Req.Create.DesiredAccess;
 
+        FusePosixPathSuffix(&Context->Create.OrigPath, &Context->Create.Remain, 0);
         coro_await (FuseLookupPath(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
@@ -1022,7 +1018,7 @@ BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.Close.UserContext2;
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.Overwrite.UserContext2;
 
         //Context->Setattr.Attr.size = 0;
         coro_await (FuseProtoSendFtruncate(Context));
@@ -1050,24 +1046,26 @@ BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context)
     {
         if (Context->InternalRequest->Req.Cleanup.Delete)
         {
-#if 1
-            coro_break;
-#else
             /* NOTE: CLEANUP cannot report failure! */
+
+            Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.Cleanup.UserContext2;
 
             FusePrepareLookup(Context);
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
+            FusePosixPathSuffix(&Context->Create.OrigPath, &Context->Create.Remain, 0);
             coro_await (FuseLookupPath(Context));
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
+            FusePosixPathSuffix(&Context->Create.OrigPath, 0, &Context->Create.Name);
             if (Context->File->IsDirectory)
                 coro_await (FuseProtoSendRmdir(Context));
             else
                 coro_await (FuseProtoSendUnlink(Context));
-#endif
+
+            Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
         }
     }
 
@@ -1124,7 +1122,7 @@ BOOLEAN FuseOpQueryInformation(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.QueryDirectory.UserContext2;
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.QueryInformation.UserContext2;
 
         coro_await (FuseProtoSendFgetattr(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
