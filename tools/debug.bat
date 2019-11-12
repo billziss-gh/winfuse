@@ -2,7 +2,7 @@
 
 setlocal
 
-set DebugWorkspace=winfsp
+set DebugWorkspace=winfuse
 set DebugPort=50000
 set DebugKey=1.1.1.1
 
