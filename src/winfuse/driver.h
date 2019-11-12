@@ -38,6 +38,7 @@
 /* debug */
 #if DBG
 ULONG DebugRandom(VOID);
+BOOLEAN DebugMemoryChangeTest(PVOID Memory, SIZE_T Size, BOOLEAN Test);
 #define DEBUGLOG(fmt, ...)              \
     DbgPrint("[%d] " DRIVER_NAME "!" __FUNCTION__ ": " fmt "\n", KeGetCurrentIrql(), __VA_ARGS__)
 #define DEBUGTEST(Percent)              (DebugRandom() <= (Percent) * 0x7fff / 100)
@@ -129,7 +130,7 @@ struct _FUSE_CONTEXT
             UINT32 HasTraversePrivilege:1;
             UINT32 DisableCache:1;
             UINT32 ChownOnCreate:1;
-        } Create;
+        } LookupPath;
         struct
         {
             FUSE_PROTO_ATTR Attr;

@@ -25,13 +25,13 @@ static BOOLEAN FuseOpReserved_Init(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpReserved_Destroy(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpReserved_Forget(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpReserved(FUSE_CONTEXT *Context);
+static VOID FuseLookup(FUSE_CONTEXT *Context);
 static NTSTATUS FuseAccessCheck(
     UINT32 FileUid, UINT32 FileGid, UINT32 FileMode,
     UINT32 OrigUid, UINT32 OrigGid, UINT32 DesiredAccess,
     PUINT32 PGrantedAccess);
-static VOID FusePrepareLookup(FUSE_CONTEXT *Context);
-static VOID FusePrepareLookup_ContextFini(FUSE_CONTEXT *Context);
-static VOID FuseLookupName(FUSE_CONTEXT *Context);
+static VOID FusePrepareLookupPath(FUSE_CONTEXT *Context);
+static VOID FusePrepareLookupPath_ContextFini(FUSE_CONTEXT *Context);
 static VOID FuseLookupPath(FUSE_CONTEXT *Context);
 static VOID FuseCreateCheck(FUSE_CONTEXT *Context);
 static VOID FuseOpenCheck(FUSE_CONTEXT *Context);
@@ -77,10 +77,10 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpReserved_Destroy)
 #pragma alloc_text(PAGE, FuseOpReserved_Forget)
 #pragma alloc_text(PAGE, FuseOpReserved)
+#pragma alloc_text(PAGE, FuseLookup)
 #pragma alloc_text(PAGE, FuseAccessCheck)
-#pragma alloc_text(PAGE, FusePrepareLookup)
-#pragma alloc_text(PAGE, FusePrepareLookup_ContextFini)
-#pragma alloc_text(PAGE, FuseLookupName)
+#pragma alloc_text(PAGE, FusePrepareLookupPath)
+#pragma alloc_text(PAGE, FusePrepareLookupPath_ContextFini)
 #pragma alloc_text(PAGE, FuseLookupPath)
 #pragma alloc_text(PAGE, FuseCreateCheck)
 #pragma alloc_text(PAGE, FuseOpenCheck)
@@ -199,6 +199,51 @@ BOOLEAN FuseOpReserved(FUSE_CONTEXT *Context)
     }
 }
 
+static VOID FuseLookup(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_ENTRY EntryBuf, *Entry = &EntryBuf;
+
+    coro_block (Context->CoroState)
+    {
+        if (!FuseCacheGetEntry(FuseDeviceExtension(Context->DeviceObject)->Cache,
+            Context->Lookup.Ino, &Context->Lookup.Name, Entry))
+        {
+            if (FUSE_PROTO_ROOT_INO == Context->Lookup.Ino &&
+                1 == Context->Lookup.Name.Length && '/' == Context->Lookup.Name.Buffer[0])
+            {
+                coro_await (FuseProtoSendGetattr(Context));
+                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                    coro_break;
+
+                RtlZeroMemory(Entry, sizeof *Entry);
+                Entry->nodeid = FUSE_PROTO_ROOT_INO;
+                Entry->entry_valid = Entry->attr_valid =
+                    Context->FuseResponse->rsp.getattr.attr_valid;
+                Entry->entry_valid_nsec = Entry->attr_valid_nsec =
+                    Context->FuseResponse->rsp.getattr.attr_valid_nsec;
+                Entry->attr = Context->FuseResponse->rsp.getattr.attr;
+            }
+            else
+            {
+                coro_await (FuseProtoSendLookup(Context));
+                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                    coro_break;
+
+                Entry = &Context->FuseResponse->rsp.lookup.entry;
+            }
+
+            FuseCacheSetEntry(
+                FuseDeviceExtension(Context->DeviceObject)->Cache,
+                Context->Lookup.Ino, &Context->Lookup.Name, Entry);
+        }
+
+        Context->Lookup.Ino = Entry->nodeid;
+        Context->Lookup.Attr = Entry->attr;
+    }
+}
+
 /* code borrowed from winfsp/src/ku/posix.c - see there for comments/explanations */
 #define FusePosixDefaultPerm            \
     (SYNCHRONIZE | READ_CONTROL | FILE_READ_ATTRIBUTES | FILE_READ_EA)
@@ -248,7 +293,7 @@ static NTSTATUS FuseAccessCheck(
     }
 }
 
-static VOID FusePrepareLookup(FUSE_CONTEXT *Context)
+static VOID FusePrepareLookupPath(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -334,12 +379,12 @@ static VOID FusePrepareLookup(FUSE_CONTEXT *Context)
     Context->OrigGid = Gid;
     Context->OrigPid = Pid;
 
-    RtlInitString(&Context->Create.OrigPath, PosixPath);
-    Context->Create.CacheGen = CacheGen;
-    Context->Create.UserMode = UserMode;
-    Context->Create.HasTraversePrivilege = HasTraversePrivilege;
+    RtlInitString(&Context->LookupPath.OrigPath, PosixPath);
+    Context->LookupPath.CacheGen = CacheGen;
+    Context->LookupPath.UserMode = IsUserMode;
+    Context->LookupPath.HasTraversePrivilege = HasTraversePrivilege;
 
-    Context->Fini = FusePrepareLookup_ContextFini;
+    Context->Fini = FusePrepareLookupPath_ContextFini;
 
     Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
 
@@ -353,7 +398,7 @@ exit:
     }
 }
 
-static VOID FusePrepareLookup_ContextFini(FUSE_CONTEXT *Context)
+static VOID FusePrepareLookupPath_ContextFini(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -361,72 +406,30 @@ static VOID FusePrepareLookup_ContextFini(FUSE_CONTEXT *Context)
         0 != Context->File)
         FuseFileDelete(Context->DeviceObject, Context->File);
 
-    FspPosixDeletePath(Context->Create.OrigPath.Buffer);
+    FspPosixDeletePath(Context->LookupPath.OrigPath.Buffer);
         /* handles NULL paths */
-    FuseCacheDereferenceGen(FuseDeviceExtension(Context->DeviceObject)->Cache, Context->Create.CacheGen);
+    FuseCacheDereferenceGen(FuseDeviceExtension(Context->DeviceObject)->Cache, Context->LookupPath.CacheGen);
         /* handles NULL gens */
-}
-
-static VOID FuseLookupName(FUSE_CONTEXT *Context)
-{
-    PAGED_CODE();
-
-    FUSE_PROTO_ENTRY EntryBuf, *Entry = &EntryBuf;
-
-    coro_block (Context->CoroState)
-    {
-        if (!FuseCacheGetEntry(FuseDeviceExtension(Context->DeviceObject)->Cache,
-            Context->Lookup.Ino, &Context->Lookup.Name, Entry))
-        {
-            if (FUSE_PROTO_ROOT_INO == Context->Lookup.Ino &&
-                1 == Context->Lookup.Name.Length && '/' == Context->Lookup.Name.Buffer[0])
-            {
-                coro_await (FuseProtoSendGetattr(Context));
-                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-                    coro_break;
-
-                RtlZeroMemory(Entry, sizeof *Entry);
-                Entry->nodeid = FUSE_PROTO_ROOT_INO;
-                Entry->entry_valid = Entry->attr_valid =
-                    Context->FuseResponse->rsp.getattr.attr_valid;
-                Entry->entry_valid_nsec = Entry->attr_valid_nsec =
-                    Context->FuseResponse->rsp.getattr.attr_valid_nsec;
-                Entry->attr = Context->FuseResponse->rsp.getattr.attr;
-            }
-            else
-            {
-                coro_await (FuseProtoSendLookup(Context));
-                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
-                    coro_break;
-
-                Entry = &Context->FuseResponse->rsp.lookup.entry;
-            }
-
-            FuseCacheSetEntry(
-                FuseDeviceExtension(Context->DeviceObject)->Cache,
-                Context->Lookup.Ino, &Context->Lookup.Name, Entry);
-        }
-
-        Context->Lookup.Ino = Entry->nodeid;
-        Context->Lookup.Attr = Entry->attr;
-    }
 }
 
 static VOID FuseLookupPath(FUSE_CONTEXT *Context)
 {
-#define RootName                        (1 == Context->Create.Name.Length && '/' == Context->Create.Name.Buffer[0])
-#define LastName                        (0 == Context->Create.Remain.Length)
-#define UserMode                        (Context->InternalRequest->Req.Create.UserMode)
-#define TravPriv                        (Context->InternalRequest->Req.Create.HasTraversePrivilege)
+#define RootName                        (1 == Context->LookupPath.Name.Length && '/' == Context->LookupPath.Name.Buffer[0])
+#define LastName                        (0 == Context->LookupPath.Remain.Length)
+#define UserMode                        (Context->LookupPath.UserMode)
+#define TravPriv                        (Context->LookupPath.HasTraversePrivilege)
 
     PAGED_CODE();
 
     coro_block (Context->CoroState)
     {
-        Context->Create.Ino = FUSE_PROTO_ROOT_INO;
+        Context->LookupPath.Ino = FUSE_PROTO_ROOT_INO;
+#if DBG
+        DebugMemoryChangeTest(&Context->Lookup.Attr, sizeof Context->Lookup.Attr, FALSE);
+#endif
         while (1) /* for (;;) produces "warning C4702: unreachable code" */
         {
-            FusePosixPathPrefix(&Context->Create.Remain, &Context->Create.Name, &Context->Create.Remain);
+            FusePosixPathPrefix(&Context->LookupPath.Remain, &Context->LookupPath.Name, &Context->LookupPath.Remain);
 
             /*
              * - RootName:
@@ -437,6 +440,9 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
              *         - LastName:
              *             - Lookup
              *             - AccessCheck
+             *     - !UserMode:
+             *         - LastName:
+             *             - Lookup
              * - !RootName:
              *     - Lookup
              *     - UserMode:
@@ -445,9 +451,9 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
              *         - LastName:
              *             - AccessCheck
              */
-            if (!RootName || (UserMode && (!TravPriv || LastName)))
+            if (!RootName || LastName || (UserMode && !TravPriv))
             {
-                coro_await (FuseLookupName(Context));
+                coro_await (FuseLookup(Context));
                 if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                     coro_break;
 
@@ -456,8 +462,8 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
                     if (!LastName && !TravPriv)
                     {
                         Context->InternalResponse->IoStatus.Status = FuseAccessCheck(
-                            Context->Create.Attr.uid, Context->Create.Attr.gid,
-                            Context->Create.Attr.mode,
+                            Context->LookupPath.Attr.uid, Context->LookupPath.Attr.gid,
+                            Context->LookupPath.Attr.mode,
                             Context->OrigUid, Context->OrigGid,
                             FILE_TRAVERSE, 0);
                         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
@@ -466,10 +472,10 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
                     else if (LastName)
                     {
                         Context->InternalResponse->IoStatus.Status = FuseAccessCheck(
-                            Context->Create.Attr.uid, Context->Create.Attr.gid,
-                            Context->Create.Attr.mode,
+                            Context->LookupPath.Attr.uid, Context->LookupPath.Attr.gid,
+                            Context->LookupPath.Attr.mode,
                             Context->OrigUid, Context->OrigGid,
-                            Context->Create.DesiredAccess, &Context->Create.GrantedAccess);
+                            Context->LookupPath.DesiredAccess, &Context->LookupPath.GrantedAccess);
                         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                             coro_break;
                     }
@@ -477,7 +483,12 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
             }
 
             if (LastName)
+            {
+#if DBG
+                ASSERT(DebugMemoryChangeTest(&Context->Lookup.Attr, sizeof Context->Lookup.Attr, TRUE));
+#endif
                 coro_break;
+            }
         }
     }
 
@@ -510,13 +521,13 @@ static VOID FuseCreateCheck(FUSE_CONTEXT *Context)
         }
 
         if (Context->InternalRequest->Req.Create.HasRestorePrivilege)
-            Context->Create.DesiredAccess = 0;
+            Context->LookupPath.DesiredAccess = 0;
         else if (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DIRECTORY_FILE))
-            Context->Create.DesiredAccess = FILE_ADD_SUBDIRECTORY;
+            Context->LookupPath.DesiredAccess = FILE_ADD_SUBDIRECTORY;
         else
-            Context->Create.DesiredAccess = FILE_ADD_FILE;
+            Context->LookupPath.DesiredAccess = FILE_ADD_FILE;
 
-        FusePosixPathSuffix(&Context->Create.OrigPath, &Context->Create.Remain, 0);
+        FusePosixPathSuffix(&Context->LookupPath.OrigPath, &Context->LookupPath.Remain, 0);
         coro_await (FuseLookupPath(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
@@ -546,16 +557,16 @@ static VOID FuseOpenCheck(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->Create.DesiredAccess = Context->InternalRequest->Req.Create.DesiredAccess |
+        Context->LookupPath.DesiredAccess = Context->InternalRequest->Req.Create.DesiredAccess |
             (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DELETE_ON_CLOSE) ?
                 DELETE : 0);
 
-        Context->Create.Remain = Context->Create.OrigPath;
+        Context->LookupPath.Remain = Context->LookupPath.OrigPath;
         coro_await (FuseLookupPath(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        Context->InternalResponse->Rsp.Create.Opened.GrantedAccess = Context->Create.GrantedAccess;
+        Context->InternalResponse->Rsp.Create.Opened.GrantedAccess = Context->LookupPath.GrantedAccess;
         if (!FlagOn(Context->InternalRequest->Req.Create.DesiredAccess, MAXIMUM_ALLOWED))
             Context->InternalResponse->Rsp.Create.Opened.GrantedAccess &= ~DELETE |
                 (Context->InternalRequest->Req.Create.DesiredAccess & DELETE);
@@ -581,18 +592,18 @@ static VOID FuseOverwriteCheck(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->Create.DesiredAccess = Context->InternalRequest->Req.Create.DesiredAccess |
+        Context->LookupPath.DesiredAccess = Context->InternalRequest->Req.Create.DesiredAccess |
             (FILE_SUPERSEDE == ((Context->InternalRequest->Req.Create.CreateOptions >> 24) & 0xff) ?
                 DELETE : FILE_WRITE_DATA) |
             (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DELETE_ON_CLOSE) ?
                 DELETE : 0);
 
-        Context->Create.Remain = Context->Create.OrigPath;
+        Context->LookupPath.Remain = Context->LookupPath.OrigPath;
         coro_await (FuseLookupPath(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        Context->InternalResponse->Rsp.Create.Opened.GrantedAccess = Context->Create.GrantedAccess;
+        Context->InternalResponse->Rsp.Create.Opened.GrantedAccess = Context->LookupPath.GrantedAccess;
         if (!FlagOn(Context->InternalRequest->Req.Create.DesiredAccess, MAXIMUM_ALLOWED))
             Context->InternalResponse->Rsp.Create.Opened.GrantedAccess &= ~(DELETE | FILE_WRITE_DATA) |
                 (Context->InternalRequest->Req.Create.DesiredAccess & (DELETE | FILE_WRITE_DATA));
@@ -612,14 +623,14 @@ static VOID FuseOpenTargetDirectoryCheck(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->Create.DesiredAccess = Context->InternalRequest->Req.Create.DesiredAccess;
+        Context->LookupPath.DesiredAccess = Context->InternalRequest->Req.Create.DesiredAccess;
 
-        FusePosixPathSuffix(&Context->Create.OrigPath, &Context->Create.Remain, 0);
+        FusePosixPathSuffix(&Context->LookupPath.OrigPath, &Context->LookupPath.Remain, 0);
         coro_await (FuseLookupPath(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        Context->InternalResponse->Rsp.Create.Opened.GrantedAccess = Context->Create.GrantedAccess;
+        Context->InternalResponse->Rsp.Create.Opened.GrantedAccess = Context->LookupPath.GrantedAccess;
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess |=
             Context->InternalRequest->Req.Create.GrantedAccess;
     }
@@ -639,8 +650,8 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 
         Context->File->OpenFlags = 0x0100 | 0x0400 | 2 /*O_CREAT|O_EXCL|O_RDWR*/;
 
-        Context->Create.Attr.rdev = 0;
-        Context->Create.Attr.mode = 0777;
+        Context->LookupPath.Attr.rdev = 0;
+        Context->LookupPath.Attr.mode = 0777;
         if (0 != Context->InternalRequest->Req.Create.SecurityDescriptor.Offset)
         {
             Context->InternalResponse->IoStatus.Status = FspPosixMapSecurityDescriptorToPermissions(
@@ -650,8 +661,8 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
-            Context->Create.Attr.mode = Mode;
-            Context->Create.ChownOnCreate = Uid != Context->OrigUid || Gid != Context->OrigGid;
+            Context->LookupPath.Attr.mode = Mode;
+            Context->LookupPath.ChownOnCreate = Uid != Context->OrigUid || Gid != Context->OrigGid;
         }
 
         if (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DIRECTORY_FILE))
@@ -662,19 +673,19 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 
             FuseCacheSetEntry(
                 FuseDeviceExtension(Context->DeviceObject)->Cache,
-                Context->Create.Ino, &Context->Create.Name, &Context->FuseResponse->rsp.mkdir.entry);
+                Context->LookupPath.Ino, &Context->LookupPath.Name, &Context->FuseResponse->rsp.mkdir.entry);
 
-            Context->Create.Ino = Context->FuseResponse->rsp.mkdir.entry.nodeid;
-            Context->Create.Attr = Context->FuseResponse->rsp.mkdir.entry.attr;
+            Context->LookupPath.Ino = Context->FuseResponse->rsp.mkdir.entry.nodeid;
+            Context->LookupPath.Attr = Context->FuseResponse->rsp.mkdir.entry.attr;
 
             coro_await (FuseProtoSendOpendir(Context));
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
-            Context->Create.DisableCache =
+            Context->LookupPath.DisableCache =
                 BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
 
-            Context->File->Ino = Context->Create.Ino;
+            Context->File->Ino = Context->LookupPath.Ino;
             Context->File->Fh = Context->FuseResponse->rsp.open.fh;
             Context->File->IsDirectory = TRUE;
         }
@@ -685,14 +696,14 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             {
                 FuseCacheSetEntry(
                     FuseDeviceExtension(Context->DeviceObject)->Cache,
-                    Context->Create.Ino, &Context->Create.Name, &Context->FuseResponse->rsp.create.entry);
+                    Context->LookupPath.Ino, &Context->LookupPath.Name, &Context->FuseResponse->rsp.create.entry);
 
-                Context->Create.Ino = Context->FuseResponse->rsp.create.entry.nodeid;
-                Context->Create.Attr = Context->FuseResponse->rsp.create.entry.attr;
-                Context->Create.DisableCache =
+                Context->LookupPath.Ino = Context->FuseResponse->rsp.create.entry.nodeid;
+                Context->LookupPath.Attr = Context->FuseResponse->rsp.create.entry.attr;
+                Context->LookupPath.DisableCache =
                     BooleanFlagOn(Context->FuseResponse->rsp.create.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
 
-                Context->File->Ino = Context->Create.Ino;
+                Context->File->Ino = Context->LookupPath.Ino;
                 Context->File->Fh = Context->FuseResponse->rsp.create.fh;
             }
             else
@@ -706,19 +717,19 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 
                 FuseCacheSetEntry(
                     FuseDeviceExtension(Context->DeviceObject)->Cache,
-                    Context->Create.Ino, &Context->Create.Name, &Context->FuseResponse->rsp.mknod.entry);
+                    Context->LookupPath.Ino, &Context->LookupPath.Name, &Context->FuseResponse->rsp.mknod.entry);
 
-                Context->Create.Ino = Context->FuseResponse->rsp.mknod.entry.nodeid;
-                Context->Create.Attr = Context->FuseResponse->rsp.mknod.entry.attr;
+                Context->LookupPath.Ino = Context->FuseResponse->rsp.mknod.entry.nodeid;
+                Context->LookupPath.Attr = Context->FuseResponse->rsp.mknod.entry.attr;
 
                 coro_await (FuseProtoSendOpen(Context));
                 if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                     coro_break;
 
-                Context->Create.DisableCache =
+                Context->LookupPath.DisableCache =
                     BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
 
-                Context->File->Ino = Context->Create.Ino;
+                Context->File->Ino = Context->LookupPath.Ino;
                 Context->File->Fh = Context->FuseResponse->rsp.open.fh;
             }
         }
@@ -726,13 +737,13 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
         Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
             (UINT64)(UINT_PTR)Context->File;
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
-            Context->Create.GrantedAccess;
-        FuseAttrToFileInfo(Context->DeviceObject, &Context->Create.Attr,
+            Context->LookupPath.GrantedAccess;
+        FuseAttrToFileInfo(Context->DeviceObject, &Context->LookupPath.Attr,
             &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
         Context->InternalResponse->Rsp.Create.Opened.DisableCache =
-            Context->Create.DisableCache;
+            Context->LookupPath.DisableCache;
 
-        if (Context->Create.ChownOnCreate)
+        if (Context->LookupPath.ChownOnCreate)
         {
             Context->InternalResponse->IoStatus.Status = FspPosixMapSecurityDescriptorToPermissions(
                 (PSECURITY_DESCRIPTOR)(Context->InternalRequest->Buffer +
@@ -741,8 +752,8 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 goto cleanup;
 
-            Context->Create.Attr.uid = Uid;
-            Context->Create.Attr.gid = Gid;
+            Context->LookupPath.Attr.uid = Uid;
+            Context->LookupPath.Attr.gid = Gid;
             coro_await (FuseProtoSendCreateChown(Context));
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status) &&
                 STATUS_INVALID_DEVICE_REQUEST != Context->InternalResponse->IoStatus.Status)
@@ -780,7 +791,7 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        GrantedAccess = Context->Create.GrantedAccess & (FILE_READ_DATA | FILE_WRITE_DATA);
+        GrantedAccess = Context->LookupPath.GrantedAccess & (FILE_READ_DATA | FILE_WRITE_DATA);
         if (FILE_READ_DATA == GrantedAccess)
             Context->File->OpenFlags = 0/*O_RDONLY*/;
         else
@@ -790,16 +801,16 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
         if ((FILE_READ_DATA | FILE_WRITE_DATA) == GrantedAccess)
             Context->File->OpenFlags = 2/*O_RDWR*/;
 
-        Type = Context->Create.Attr.mode & 0170000;
+        Type = Context->LookupPath.Attr.mode & 0170000;
         if (0120000/* S_IFLNK  */ == Type ||
             0010000/* S_IFIFO  */ == Type ||
             0020000/* S_IFCHR  */ == Type ||
             0060000/* S_IFBLK  */ == Type ||
             0140000/* S_IFSOCK */ == Type)
         {
-            Context->Create.DisableCache = TRUE;
+            Context->LookupPath.DisableCache = TRUE;
 
-            Context->File->Ino = Context->Create.Ino;
+            Context->File->Ino = Context->LookupPath.Ino;
             Context->File->IsReparsePoint = TRUE;
         }
         else
@@ -809,10 +820,10 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
-            Context->Create.DisableCache =
+            Context->LookupPath.DisableCache =
                 BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
 
-            Context->File->Ino = Context->Create.Ino;
+            Context->File->Ino = Context->LookupPath.Ino;
             Context->File->Fh = Context->FuseResponse->rsp.open.fh;
             Context->File->IsDirectory = TRUE;
         }
@@ -822,21 +833,21 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
-            Context->Create.DisableCache =
+            Context->LookupPath.DisableCache =
                 BooleanFlagOn(Context->FuseResponse->rsp.open.open_flags, FUSE_PROTO_OPEN_DIRECT_IO);
 
-            Context->File->Ino = Context->Create.Ino;
+            Context->File->Ino = Context->LookupPath.Ino;
             Context->File->Fh = Context->FuseResponse->rsp.open.fh;
         }
 
         Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
             (UINT64)(UINT_PTR)Context->File;
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
-            Context->Create.GrantedAccess;
-        FuseAttrToFileInfo(Context->DeviceObject, &Context->Create.Attr,
+            Context->LookupPath.GrantedAccess;
+        FuseAttrToFileInfo(Context->DeviceObject, &Context->LookupPath.Attr,
             &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
         Context->InternalResponse->Rsp.Create.Opened.DisableCache =
-            Context->Create.DisableCache;
+            Context->LookupPath.DisableCache;
 
         Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
         Context->InternalResponse->IoStatus.Information = FILE_OPENED;
@@ -856,7 +867,7 @@ static VOID FuseOpCreate_FileCreate(FUSE_CONTEXT *Context)
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        FusePosixPathSuffix(&Context->Create.OrigPath, 0, &Context->Create.Name);
+        FusePosixPathSuffix(&Context->LookupPath.OrigPath, 0, &Context->LookupPath.Name);
         coro_await (FuseCreate(Context));
     }
 }
@@ -891,7 +902,7 @@ static VOID FuseOpCreate_FileOpenIf(FUSE_CONTEXT *Context)
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
-            FusePosixPathSuffix(&Context->Create.OrigPath, 0, &Context->Create.Name);
+            FusePosixPathSuffix(&Context->LookupPath.OrigPath, 0, &Context->LookupPath.Name);
             coro_await (FuseCreate(Context));
         }
         else
@@ -933,7 +944,7 @@ static VOID FuseOpCreate_FileOverwriteIf(FUSE_CONTEXT *Context)
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
-            FusePosixPathSuffix(&Context->Create.OrigPath, 0, &Context->Create.Name);
+            FusePosixPathSuffix(&Context->LookupPath.OrigPath, 0, &Context->LookupPath.Name);
             coro_await (FuseCreate(Context));
         }
         else
@@ -961,8 +972,8 @@ static VOID FuseOpCreate_FileOpenTargetDirectory(FUSE_CONTEXT *Context)
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        FusePosixPathSuffix(&Context->Create.OrigPath, 0, &Context->Create.Name);
-        coro_await (FuseLookupName(Context));
+        FusePosixPathSuffix(&Context->LookupPath.OrigPath, 0, &Context->LookupPath.Name);
+        coro_await (FuseLookup(Context));
         Context->InternalResponse->IoStatus.Information =
             NT_SUCCESS(Context->InternalResponse->IoStatus.Status) ?
                 FILE_EXISTS : FILE_DOES_NOT_EXIST;
@@ -983,7 +994,7 @@ BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context)
             coro_break;
         }
 
-        FusePrepareLookup(Context);
+        FusePrepareLookupPath(Context);
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
@@ -1050,16 +1061,16 @@ BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context)
 
             Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.Cleanup.UserContext2;
 
-            FusePrepareLookup(Context);
+            FusePrepareLookupPath(Context);
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
-            FusePosixPathSuffix(&Context->Create.OrigPath, &Context->Create.Remain, 0);
+            FusePosixPathSuffix(&Context->LookupPath.OrigPath, &Context->LookupPath.Remain, 0);
             coro_await (FuseLookupPath(Context));
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
-            FusePosixPathSuffix(&Context->Create.OrigPath, 0, &Context->Create.Name);
+            FusePosixPathSuffix(&Context->LookupPath.OrigPath, 0, &Context->LookupPath.Name);
             if (Context->File->IsDirectory)
                 coro_await (FuseProtoSendRmdir(Context));
             else
@@ -1278,7 +1289,7 @@ static VOID FuseOpQueryDirectory_GetDirInfoByName(FUSE_CONTEXT *Context)
 
         Context->QueryDirectory.Ino = Context->File->Ino;
         Context->QueryDirectory.Name = Context->QueryDirectory.OrigName;
-        coro_await (FuseLookupName(Context));
+        coro_await (FuseLookup(Context));
 
         BOOLEAN AddDirInfoEnd = FALSE;
         if (NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
@@ -1401,7 +1412,7 @@ static VOID FuseOpQueryDirectory_ReadDirectory(FUSE_CONTEXT *Context)
             else
             {
                 Context->QueryDirectory.Ino = Context->File->Ino;
-                coro_await (FuseLookupName(Context));
+                coro_await (FuseLookup(Context));
                 if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                     coro_break;
             }

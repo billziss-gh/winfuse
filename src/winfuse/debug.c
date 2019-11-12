@@ -39,4 +39,38 @@ ULONG DebugRandom(VOID)
 
     return Result;
 }
+
+BOOLEAN DebugMemoryChangeTest(PVOID Memory, SIZE_T Size, BOOLEAN Test)
+{
+    BOOLEAN Result = TRUE;
+    if (!Test)
+    {
+        for (SIZE_T I = 0, N = Size / sizeof(UINT32); N > I; I++)
+        {
+            ((PUINT8)Memory)[0] = 0x0B;
+            ((PUINT8)Memory)[1] = 0xAD;
+            ((PUINT8)Memory)[2] = 0xF0;
+            ((PUINT8)Memory)[3] = 0x0D;
+            Memory = (PUINT8)Memory + sizeof(UINT32);
+        }
+    }
+    else
+    {
+        for (SIZE_T I = 0, N = Size / sizeof(UINT32); N > I; I++)
+        {
+            if (
+                ((PUINT8)Memory)[0] == 0x0B &&
+                ((PUINT8)Memory)[1] == 0xAD &&
+                ((PUINT8)Memory)[2] == 0xF0 &&
+                ((PUINT8)Memory)[3] == 0x0D
+                )
+            {
+                Result = FALSE;
+                break;
+            }
+            Memory = (PUINT8)Memory + sizeof(UINT32);
+        }
+    }
+    return Result;
+}
 #endif
