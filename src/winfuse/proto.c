@@ -225,7 +225,7 @@ VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context)
 
     StartP = (PVOID)((PUINT8)Context->FuseRequest + FUSE_PROTO_REQ_SIZE(batch_forget));
     EndP = (PVOID)((PUINT8)StartP + (FUSE_PROTO_REQ_SIZEMIN - FUSE_PROTO_REQ_SIZE(batch_forget)));
-    for (P = StartP; EndP > P && FuseCacheForgetOne(&Context->Forget.ForgetList, P); P++)
+    for (P = StartP; DEBUGTEST(90) && EndP > P && FuseCacheForgetOne(&Context->Forget.ForgetList, P); P++)
         ;
 
     FuseProtoInitRequest(Context,

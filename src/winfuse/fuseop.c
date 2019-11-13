@@ -165,20 +165,20 @@ static BOOLEAN FuseOpReserved_Forget(FUSE_CONTEXT *Context)
 
     FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
 
-    coro_block (Context->CoroState)
-    {
-        while (&Context->Forget.ForgetList != Context->Forget.ForgetList.Flink)
-        {
-            if (16 > DeviceExtension->VersionMinor ||
-                &Context->Forget.ForgetList == Context->Forget.ForgetList.Flink->Flink)
-                FuseProtoFillForget(Context); /* !coro */
-            else
-                FuseProtoFillBatchForget(Context); /* !coro */
-            coro_yield;
-        }
-    }
+    ASSERT(!IsListEmpty(&Context->Forget.ForgetList));
+    if (DEBUGTEST(10) ||
+        16 > DeviceExtension->VersionMinor ||
+        &Context->Forget.ForgetList == Context->Forget.ForgetList.Flink->Flink)
+        FuseProtoFillForget(Context);
+    else
+        FuseProtoFillBatchForget(Context);
 
-    return coro_active();
+    if (!IsListEmpty(&Context->Forget.ForgetList))
+        FuseIoqPostPending(DeviceExtension->Ioq, Context);
+    else
+        FuseContextDelete(Context);
+
+    return FALSE;
 }
 
 BOOLEAN FuseOpReserved(FUSE_CONTEXT *Context)
