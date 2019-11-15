@@ -140,18 +140,12 @@ static inline UINT64 FuseCacheForgetTime(FUSE_CACHE *Cache, UINT64 InterruptTime
 static inline BOOLEAN FuseCacheForgetNextItem(FUSE_CACHE *Cache,
     UINT64 ExpirationTime, PLIST_ENTRY ForgetList)
 {
-retry:
     if (!IsListEmpty(&Cache->ForgetList))
     {
         FUSE_CACHE_ITEM *Item = CONTAINING_RECORD(Cache->ForgetList.Flink, FUSE_CACHE_ITEM, ListEntry);
         if (FuseCacheForgetTime(Cache, ExpirationTime) >= Item->LastUsedTime)
         {
             RemoveEntryList(&Item->ListEntry);
-            if (Item->NoForget)
-            {
-                FuseFree(Item);
-                goto retry;
-            }
             InsertTailList(ForgetList, &Item->ListEntry);
             return TRUE;
         }
@@ -346,34 +340,46 @@ VOID FuseCacheExpirationRoutine(FUSE_CACHE *Cache,
 
     ExReleaseFastMutex(&Cache->Mutex);
 
+    for (PLIST_ENTRY Entry = ForgetList.Flink; &ForgetList != Entry;)
+    {
+        FUSE_CACHE_ITEM *Item = CONTAINING_RECORD(Entry, FUSE_CACHE_ITEM, ListEntry);
+        Entry = Entry->Flink;
+        if (Item->NoForget)
+        {
+            RemoveEntryList(&Item->ListEntry);
+            FuseFree(Item);
+        }
+    }
+
     if (!IsListEmpty(&ForgetList))
     {
-        if (0 != DeviceObject)
+        BOOLEAN Success = DEBUGTEST(90) &&
+            NT_SUCCESS(FuseProtoPostForget(DeviceObject, &ForgetList));
+        if (!Success)
         {
-            BOOLEAN Success = DEBUGTEST(90) &&
-                NT_SUCCESS(FuseProtoPostForget(DeviceObject, &ForgetList));
-            if (!Success)
-            {
-                ASSERT(!IsListEmpty(&ForgetList));
+            ASSERT(!IsListEmpty(&ForgetList));
 
-                ExAcquireFastMutex(&Cache->Mutex);
+            ExAcquireFastMutex(&Cache->Mutex);
 
-                /* reinsert forgotten items at the "forget list" head */
-                RemoveEntryList(&ForgetList);
-                    /* see AppendTailList comments */
-                PLIST_ENTRY ListHead = &Cache->ForgetList;
-                PLIST_ENTRY ListToPrepend = ForgetList.Flink;
-                PLIST_ENTRY ListBegin = ListHead->Flink;
-                ListHead->Flink->Blink = ListToPrepend->Blink;
-                ListHead->Flink = ListToPrepend;
-                ListToPrepend->Blink->Flink = ListBegin;
-                ListToPrepend->Blink = ListHead;
+            /* re-add forgotten items in the "forget list" */
+            RemoveEntryList(&ForgetList);
+                /* see AppendTailList comments */
+#if 0
+            /* append */
+            AppendTailList(&Cache->ForgetList, &ForgetList);
+#else
+            /* prepend */
+            PLIST_ENTRY ListToPrepend = ForgetList.Flink;
+            PLIST_ENTRY ListHead = &Cache->ForgetList;
+            PLIST_ENTRY ListBegin = ListHead->Flink;
+            ListBegin->Blink = ListToPrepend->Blink;
+            ListHead->Flink = ListToPrepend;
+            ListToPrepend->Blink->Flink = ListBegin;
+            ListToPrepend->Blink = ListHead;
+#endif
 
-                ExReleaseFastMutex(&Cache->Mutex);
-            }
+            ExReleaseFastMutex(&Cache->Mutex);
         }
-        else
-            FuseCacheDeleteForgotten(&ForgetList);
     }
 }
 
