@@ -27,6 +27,7 @@
 
 /* disable warnings */
 #pragma warning(disable:4100)           /* unreferenced formal parameter */
+#pragma warning(disable:4127)           /* conditional expression is constant */
 #pragma warning(disable:4200)           /* zero-sized array in struct/union */
 #pragma warning(disable:4201)           /* nameless struct/union */
 
