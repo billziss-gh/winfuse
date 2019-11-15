@@ -38,6 +38,7 @@ VOID FuseFileDeviceFini(PDEVICE_OBJECT DeviceObject)
     {
         File = CONTAINING_RECORD(Entry, FUSE_FILE, ListEntry);
         Entry = Entry->Flink;
+        FuseCacheDereferenceItem(DeviceExtension->Cache, File->CacheItem);
         FuseFree(File);
     }
 }
@@ -75,5 +76,6 @@ VOID FuseFileDelete(PDEVICE_OBJECT DeviceObject, FUSE_FILE *File)
     RemoveEntryList(&File->ListEntry);
     KeReleaseSpinLock(&DeviceExtension->FileListLock, Irql);
 
+    FuseCacheDereferenceItem(DeviceExtension->Cache, File->CacheItem);
     FuseFree(File);
 }

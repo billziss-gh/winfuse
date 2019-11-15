@@ -66,9 +66,11 @@ VOID FuseCacheExpirationRoutine(FUSE_CACHE *Cache,
 NTSTATUS FuseCacheReferenceGen(FUSE_CACHE *Cache, PVOID *PGen);
 VOID FuseCacheDereferenceGen(FUSE_CACHE *Cache, PVOID Gen);
 BOOLEAN FuseCacheGetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
-    FUSE_PROTO_ENTRY *Entry);
+    FUSE_PROTO_ENTRY *Entry, PVOID *PItem);
 VOID FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
-    FUSE_PROTO_ENTRY *Entry);
+    FUSE_PROTO_ENTRY *Entry, PVOID *PItem);
+VOID FuseCacheReferenceItem(FUSE_CACHE *Cache, PVOID Item);
+VOID FuseCacheDereferenceItem(FUSE_CACHE *Cache, PVOID Item);
 VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList);
 BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForgetOne);
 
@@ -80,6 +82,8 @@ BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForge
 #pragma alloc_text(PAGE, FuseCacheDereferenceGen)
 #pragma alloc_text(PAGE, FuseCacheGetEntry)
 #pragma alloc_text(PAGE, FuseCacheSetEntry)
+#pragma alloc_text(PAGE, FuseCacheReferenceItem)
+#pragma alloc_text(PAGE, FuseCacheDereferenceItem)
 #pragma alloc_text(PAGE, FuseCacheDeleteForgotten)
 #pragma alloc_text(PAGE, FuseCacheForgetOne)
 #endif
@@ -118,6 +122,7 @@ struct _FUSE_CACHE_ITEM
     UINT64 ExpirationTime;
     UINT64 LastUsedTime;
     FUSE_PROTO_ENTRY Entry;
+    LONG RefCount;
     CHAR NameBuf[];
 };
 
@@ -135,12 +140,18 @@ static inline UINT64 FuseCacheForgetTime(FUSE_CACHE *Cache, UINT64 InterruptTime
 static inline BOOLEAN FuseCacheForgetNextItem(FUSE_CACHE *Cache,
     UINT64 ExpirationTime, PLIST_ENTRY ForgetList)
 {
+retry:
     if (!IsListEmpty(&Cache->ForgetList))
     {
         FUSE_CACHE_ITEM *Item = CONTAINING_RECORD(Cache->ForgetList.Flink, FUSE_CACHE_ITEM, ListEntry);
         if (FuseCacheForgetTime(Cache, ExpirationTime) >= Item->LastUsedTime)
         {
             RemoveEntryList(&Item->ListEntry);
+            if (Item->NoForget)
+            {
+                FuseFree(Item);
+                goto retry;
+            }
             InsertTailList(ForgetList, &Item->ListEntry);
             return TRUE;
         }
@@ -158,10 +169,7 @@ static inline BOOLEAN FuseCacheExpireItem(FUSE_CACHE *Cache,
             *P = (*P)->DictNext;
             RemoveEntryList(&Item->ListEntry);
             Cache->ItemCount--;
-            if (Item->NoForget)
-                FuseFree(Item);
-                    /* !!!: should we attempt to free outside the mutex? */
-            else
+            if (0 == InterlockedDecrement(&Item->RefCount))
                 InsertTailList(&Cache->ForgetList, &Item->ListEntry);
             return TRUE;
         }
@@ -452,7 +460,7 @@ VOID FuseCacheDereferenceGen(FUSE_CACHE *Cache, PVOID Gen0)
 }
 
 BOOLEAN FuseCacheGetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
-    FUSE_PROTO_ENTRY *Entry)
+    FUSE_PROTO_ENTRY *Entry, PVOID *PItem)
 {
     PAGED_CODE();
 
@@ -483,11 +491,12 @@ BOOLEAN FuseCacheGetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
 
     ExReleaseFastMutex(&Cache->Mutex);
 
+    *PItem = Item;
     return 0 != Item;
 }
 
 VOID FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
-    FUSE_PROTO_ENTRY *Entry)
+    FUSE_PROTO_ENTRY *Entry, PVOID *PItem)
 {
     PAGED_CODE();
 
@@ -521,6 +530,7 @@ VOID FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
         NewItem->NLookup = 1;
         NewItem->ExpirationTime = ExpirationTime;
         NewItem->LastUsedTime = InterruptTime;
+        NewItem->RefCount = 1;
         RtlCopyMemory(&NewItem->Entry, Entry, sizeof NewItem->Entry);
         RtlCopyMemory(&NewItem->NameBuf, Name->Buffer, Name->Length);
 
@@ -535,6 +545,7 @@ VOID FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
 
             FuseCacheAddItem(Cache, NewItem);
 
+            Item = NewItem;
             NewItem = 0;
         }
 
@@ -543,6 +554,36 @@ VOID FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
 
     if (0 != NewItem)
         FuseFree(NewItem);
+
+    *PItem = Item;
+}
+
+VOID FuseCacheReferenceItem(FUSE_CACHE *Cache, PVOID Item0)
+{
+    PAGED_CODE();
+
+    FUSE_CACHE_ITEM *Item = Item0;
+
+    InterlockedIncrement(&Item->RefCount);
+}
+
+VOID FuseCacheDereferenceItem(FUSE_CACHE *Cache, PVOID Item0)
+{
+    PAGED_CODE();
+
+    FUSE_CACHE_ITEM *Item = Item0;
+    LONG RefCount;
+
+    if (0 == Item)
+        return;
+
+    RefCount = InterlockedDecrement(&Item->RefCount);
+    if (0 == RefCount)
+    {
+        ExAcquireFastMutex(&Cache->Mutex);
+        InsertTailList(&Cache->ForgetList, &Item->ListEntry);
+        ExReleaseFastMutex(&Cache->Mutex);
+    }
 }
 
 VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList)
@@ -566,6 +607,7 @@ BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForge
         return FALSE;
 
     FUSE_CACHE_ITEM *Item = CONTAINING_RECORD(Entry, FUSE_CACHE_ITEM, ListEntry);
+    ASSERT(!Item->NoForget);
     PForgetOne->nodeid = Item->Entry.nodeid;
     PForgetOne->nlookup = Item->NLookup;
     FuseFree(Item);

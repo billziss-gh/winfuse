@@ -81,6 +81,7 @@ typedef struct _FUSE_FILE
     UINT32 OpenFlags;
     UINT32 IsDirectory:1;
     UINT32 IsReparsePoint:1;
+    PVOID CacheItem;
 } FUSE_FILE;
 VOID FuseFileDeviceInit(PDEVICE_OBJECT DeviceObject);
 VOID FuseFileDeviceFini(PDEVICE_OBJECT DeviceObject);
@@ -94,6 +95,7 @@ typedef BOOLEAN FUSE_PROCESS_DISPATCH(FUSE_CONTEXT *Context);
 typedef struct _FUSE_CONTEXT_LOOKUP
 {
     PVOID CacheGen;
+    PVOID CacheItem;
     UINT64 Ino;
     STRING Name;
     FUSE_PROTO_ATTR Attr;
@@ -179,9 +181,11 @@ VOID FuseCacheExpirationRoutine(FUSE_CACHE *Cache,
 NTSTATUS FuseCacheReferenceGen(FUSE_CACHE *Cache, PVOID *PGen);
 VOID FuseCacheDereferenceGen(FUSE_CACHE *Cache, PVOID Gen);
 BOOLEAN FuseCacheGetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
-    FUSE_PROTO_ENTRY *Entry);
+    FUSE_PROTO_ENTRY *Entry, PVOID *PItem);
 VOID FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
-    FUSE_PROTO_ENTRY *Entry);
+    FUSE_PROTO_ENTRY *Entry, PVOID *PItem);
+VOID FuseCacheReferenceItem(FUSE_CACHE *Cache, PVOID Item);
+VOID FuseCacheDereferenceItem(FUSE_CACHE *Cache, PVOID Item);
 VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList);
 BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForgetOne);
 

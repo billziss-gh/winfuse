@@ -95,20 +95,23 @@ VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
     FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
 
     /*
-     * The Ioq must be deleted before the Cache, because it may contain Contexts
+     * The order of finalization is IMPORTANT:
+     *
+     * FuseIoqDelete must precede FuseFileDeviceFini, because the Ioq may contain Contexts
+     * that hold File's.
+     *
+     * FuseIoqDelete must precede FuseCacheDelete, because the Ioq may contain Contexts
      * that hold CacheGen references.
      *
-     * Likewise the Ioq must be deleted before FuseFileDeviceFini, because it may
-     * contain Contexts that hold File's.
+     * FuseFileDeviceFini must precede FuseCacheDelete, because some Files may hold
+     * CacheItem references.
      */
 
-    if (0 != DeviceExtension->Ioq)
-        FuseIoqDelete(DeviceExtension->Ioq);
-
-    if (0 != DeviceExtension->Cache)
-        FuseCacheDelete(DeviceExtension->Cache);
+    FuseIoqDelete(DeviceExtension->Ioq);
 
     FuseFileDeviceFini(DeviceObject);
+
+    FuseCacheDelete(DeviceExtension->Cache);
 }
 
 VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime)

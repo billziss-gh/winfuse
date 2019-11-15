@@ -204,11 +204,12 @@ static VOID FuseLookup(FUSE_CONTEXT *Context)
     PAGED_CODE();
 
     FUSE_PROTO_ENTRY EntryBuf, *Entry = &EntryBuf;
+    PVOID CacheItem;
 
     coro_block (Context->CoroState)
     {
         if (!FuseCacheGetEntry(FuseDeviceExtension(Context->DeviceObject)->Cache,
-            Context->Lookup.Ino, &Context->Lookup.Name, Entry))
+            Context->Lookup.Ino, &Context->Lookup.Name, Entry, &CacheItem))
         {
             if (FUSE_PROTO_ROOT_INO == Context->Lookup.Ino &&
                 1 == Context->Lookup.Name.Length && '/' == Context->Lookup.Name.Buffer[0])
@@ -236,9 +237,10 @@ static VOID FuseLookup(FUSE_CONTEXT *Context)
 
             FuseCacheSetEntry(
                 FuseDeviceExtension(Context->DeviceObject)->Cache,
-                Context->Lookup.Ino, &Context->Lookup.Name, Entry);
+                Context->Lookup.Ino, &Context->Lookup.Name, Entry, &CacheItem);
         }
 
+        Context->Lookup.CacheItem = CacheItem;
         Context->Lookup.Ino = Entry->nodeid;
         Context->Lookup.Attr = Entry->attr;
     }
@@ -673,7 +675,9 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 
             FuseCacheSetEntry(
                 FuseDeviceExtension(Context->DeviceObject)->Cache,
-                Context->LookupPath.Ino, &Context->LookupPath.Name, &Context->FuseResponse->rsp.mkdir.entry);
+                Context->LookupPath.Ino, &Context->LookupPath.Name,
+                &Context->FuseResponse->rsp.mkdir.entry,
+                &Context->LookupPath.CacheItem);
 
             Context->LookupPath.Ino = Context->FuseResponse->rsp.mkdir.entry.nodeid;
             Context->LookupPath.Attr = Context->FuseResponse->rsp.mkdir.entry.attr;
@@ -688,6 +692,9 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             Context->File->Ino = Context->LookupPath.Ino;
             Context->File->Fh = Context->FuseResponse->rsp.open.fh;
             Context->File->IsDirectory = TRUE;
+            Context->File->CacheItem = Context->LookupPath.CacheItem;
+            FuseCacheReferenceItem(FuseDeviceExtension(Context->DeviceObject)->Cache,
+                Context->File->CacheItem);
         }
         else
         {
@@ -696,7 +703,9 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
             {
                 FuseCacheSetEntry(
                     FuseDeviceExtension(Context->DeviceObject)->Cache,
-                    Context->LookupPath.Ino, &Context->LookupPath.Name, &Context->FuseResponse->rsp.create.entry);
+                    Context->LookupPath.Ino, &Context->LookupPath.Name,
+                    &Context->FuseResponse->rsp.create.entry,
+                    &Context->LookupPath.CacheItem);
 
                 Context->LookupPath.Ino = Context->FuseResponse->rsp.create.entry.nodeid;
                 Context->LookupPath.Attr = Context->FuseResponse->rsp.create.entry.attr;
@@ -705,6 +714,9 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 
                 Context->File->Ino = Context->LookupPath.Ino;
                 Context->File->Fh = Context->FuseResponse->rsp.create.fh;
+                Context->File->CacheItem = Context->LookupPath.CacheItem;
+                FuseCacheReferenceItem(FuseDeviceExtension(Context->DeviceObject)->Cache,
+                    Context->File->CacheItem);
             }
             else
             {
@@ -717,7 +729,9 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 
                 FuseCacheSetEntry(
                     FuseDeviceExtension(Context->DeviceObject)->Cache,
-                    Context->LookupPath.Ino, &Context->LookupPath.Name, &Context->FuseResponse->rsp.mknod.entry);
+                    Context->LookupPath.Ino, &Context->LookupPath.Name,
+                    &Context->FuseResponse->rsp.mknod.entry,
+                    &Context->LookupPath.CacheItem);
 
                 Context->LookupPath.Ino = Context->FuseResponse->rsp.mknod.entry.nodeid;
                 Context->LookupPath.Attr = Context->FuseResponse->rsp.mknod.entry.attr;
@@ -731,6 +745,9 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 
                 Context->File->Ino = Context->LookupPath.Ino;
                 Context->File->Fh = Context->FuseResponse->rsp.open.fh;
+                Context->File->CacheItem = Context->LookupPath.CacheItem;
+                FuseCacheReferenceItem(FuseDeviceExtension(Context->DeviceObject)->Cache,
+                    Context->File->CacheItem);
             }
         }
 
@@ -839,6 +856,10 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
             Context->File->Ino = Context->LookupPath.Ino;
             Context->File->Fh = Context->FuseResponse->rsp.open.fh;
         }
+
+        Context->File->CacheItem = Context->LookupPath.CacheItem;
+        FuseCacheReferenceItem(FuseDeviceExtension(Context->DeviceObject)->Cache,
+            Context->File->CacheItem);
 
         Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
             (UINT64)(UINT_PTR)Context->File;
