@@ -192,7 +192,7 @@ NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp)
         {
             ASSERT(FspFsctlTransactReservedKind != Context->InternalResponse->Kind);
 
-            Result = FuseSendTransactInternalIrp(
+            Result = FspFsextProviderTransact(
                 IrpSp->DeviceObject, IrpSp->FileObject, Context->InternalResponse, 0);
             FuseContextDelete(Context);
             if (!NT_SUCCESS(Result))
@@ -229,7 +229,7 @@ request:
                 goto exit;
             }
 
-            Result = FuseSendTransactInternalIrp(
+            Result = FspFsextProviderTransact(
                 IrpSp->DeviceObject, IrpSp->FileObject, 0, &InternalRequest);
             if (!NT_SUCCESS(Result))
                 goto exit;
@@ -271,7 +271,7 @@ request:
             InternalResponse.Kind = InternalRequest->Kind;
             InternalResponse.Hint = InternalRequest->Hint;
             InternalResponse.IoStatus.Status = FuseContextToStatus(Context);
-            Result = FuseSendTransactInternalIrp(
+            Result = FspFsextProviderTransact(
                 IrpSp->DeviceObject, IrpSp->FileObject, &InternalResponse, 0);
             if (!NT_SUCCESS(Result))
                 goto exit;
@@ -280,7 +280,7 @@ request:
             /* ignore */;
         else
         {
-            Result = FuseSendTransactInternalIrp(
+            Result = FspFsextProviderTransact(
                 IrpSp->DeviceObject, IrpSp->FileObject, Context->InternalResponse, 0);
             FuseContextDelete(Context);
             if (!NT_SUCCESS(Result))

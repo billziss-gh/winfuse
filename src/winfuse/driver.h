@@ -259,8 +259,6 @@ VOID FusePosixPathSuffix(PSTRING Path, PSTRING Remain, PSTRING Suffix);
 /* utility */
 PVOID FuseAllocatePoolMustSucceed(POOL_TYPE PoolType, SIZE_T Size, ULONG Tag);
 NTSTATUS FuseGetTokenUid(PACCESS_TOKEN Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid);
-NTSTATUS FuseSendTransactInternalIrp(PDEVICE_OBJECT DeviceObject, PFILE_OBJECT FileObject,
-    FSP_FSCTL_TRANSACT_RSP *Response, FSP_FSCTL_TRANSACT_REQ **PRequest);
 
 /* memory allocation */
 #define FUSE_ALLOC_TAG                  'ESUF'
