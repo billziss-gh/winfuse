@@ -114,7 +114,7 @@
     </Link>
     <PostBuildEvent>
       <Command>copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).dll $(OutDir)
-copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb $(OutDir)
+if exist ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb $(OutDir)
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -139,7 +139,7 @@ copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(Plat
     </Link>
     <PostBuildEvent>
       <Command>copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).dll $(OutDir)
-copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb $(OutDir)
+if exist ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb $(OutDir)
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -168,7 +168,7 @@ copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(Plat
     </Link>
     <PostBuildEvent>
       <Command>copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).dll $(OutDir)
-copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb $(OutDir)
+if exist ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb $(OutDir)
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -197,7 +197,7 @@ copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(Plat
     </Link>
     <PostBuildEvent>
       <Command>copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).dll $(OutDir)
-copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb $(OutDir)
+if exist ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb $(OutDir)
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
