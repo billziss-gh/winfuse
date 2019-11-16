@@ -14,10 +14,16 @@ init:
 
 install:
 - git submodule update --init --recursive
+# install Meson & Ninja
+- appveyor AddMessage "Install Meson & Ninja" -Category Information
+- appveyor DownloadFile https://github.com/mesonbuild/meson/releases/download/0.52.0/meson-0.52.0-64.msi
+- for %%f in ("meson-*.msi") do start /wait msiexec /i %%f /qn
+# install WinFsp
 - appveyor AddMessage "Install WinFsp" -Category Information
 - if %WINFSP%==stable appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5B3/winfsp-1.5.19295.msi
 - if %WINFSP%==source tools\build-winfsp.bat %CONFIGURATION% & copy ext\winfsp\build\VStudio\build\%CONFIGURATION%\winfsp-*.msi .
 - for %%f in ("winfsp-*.msi") do start /wait msiexec /i %%f /qn INSTALLLEVEL=1000
+# enable test-signing and verifier and reboot
 - appveyor AddMessage "Change boot configuration and reboot" -Category Information
 - bcdedit /set testsigning on
 - verifier /standard /driver winfuse-x64.sys || ver>nul
@@ -33,6 +39,7 @@ test_script:
 - sc create WinFuse type=kernel binPath=C:\projects\winfuse\build\VStudio\build\%CONFIGURATION%\winfuse-x64.sys
 - reg add HKLM\Software\WinFsp\Fsext /v 00093118 /d "WinFuse" /f /reg:32
 - tools\run-tests.bat %CONFIGURATION%
+- tools\run-tests.bat %CONFIGURATION% sample
 - if exist %SystemRoot%\memory.dmp exit 1
 
 on_finish:

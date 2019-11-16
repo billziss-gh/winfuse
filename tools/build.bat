@@ -23,6 +23,11 @@ if errorlevel 1 goto fail
 devenv winfuse.sln /build "%Configuration%|x86"
 if errorlevel 1 goto fail
 
+call %~dp0build-libfuse.bat %Configuration% x64
+if errorlevel 1 goto fail
+call %~dp0build-libfuse.bat %Configuration% x86
+if errorlevel 1 goto fail
+
 exit /b 0
 
 :fail
