@@ -21,8 +21,12 @@ install:
 # install WinFsp
 - appveyor AddMessage "Install WinFsp" -Category Information
 - if %WINFSP%==stable appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5B3/winfsp-1.5.19295.msi
-- if %WINFSP%==source tools\build-winfsp.bat %CONFIGURATION% & copy ext\winfsp\build\VStudio\build\%CONFIGURATION%\winfsp-*.msi .
+- if %WINFSP%==stable appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5B3/winfsp-tests-1.5.19295.zip
+- if %WINFSP%==source tools\build-winfsp.bat %CONFIGURATION%
+- if %WINFSP%==source copy ext\winfsp\build\VStudio\build\%CONFIGURATION%\winfsp-*.msi .
+- if %WINFSP%==source copy ext\winfsp\build\VStudio\build\%CONFIGURATION%\winfsp-tests-*.zip .
 - for %%f in ("winfsp-*.msi") do start /wait msiexec /i %%f /qn INSTALLLEVEL=1000
+- for %%f in ("winfsp-tests-*.zip") do powershell -command "Expand-Archive -Path %%f -DestinationPath 'C:\Program Files (x86)\WinFsp\bin'"
 # enable test-signing and verifier and reboot
 - appveyor AddMessage "Change boot configuration and reboot" -Category Information
 - bcdedit /set testsigning on
