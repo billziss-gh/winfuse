@@ -25,6 +25,9 @@ NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *Vo
 VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject);
 VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
 NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp);
+VOID FuseContextCreate(FUSE_CONTEXT **PContext,
+    PDEVICE_OBJECT DeviceObject, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
+VOID FuseContextDelete(FUSE_CONTEXT *Context);
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, FuseDeviceInit)
