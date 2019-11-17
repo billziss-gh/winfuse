@@ -5,9 +5,9 @@ image: Visual Studio 2019
 environment:
   matrix:
   - CONFIGURATION: Debug
-    WINFSP: source
+    WINFSP: stable
   - CONFIGURATION: Release
-    WINFSP: source
+    WINFSP: stable
 
 init:
 #- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
@@ -20,8 +20,8 @@ install:
 - for %%f in ("meson-*.msi") do start /wait msiexec /i %%f /qn
 # install WinFsp
 - appveyor AddMessage "Install WinFsp" -Category Information
-- if %WINFSP%==stable appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5B3/winfsp-1.5.19295.msi
-- if %WINFSP%==stable appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5B3/winfsp-tests-1.5.19295.zip
+- if %WINFSP%==stable appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5B4/winfsp-1.5.19320.msi
+- if %WINFSP%==stable appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5B4/winfsp-tests-1.5.19320.zip
 - if %WINFSP%==source tools\build-winfsp.bat %CONFIGURATION%
 - if %WINFSP%==source copy ext\winfsp\build\VStudio\build\%CONFIGURATION%\winfsp-*.msi .
 - if %WINFSP%==source copy ext\winfsp\build\VStudio\build\%CONFIGURATION%\winfsp-tests-*.zip .
