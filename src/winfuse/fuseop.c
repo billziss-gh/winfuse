@@ -54,6 +54,7 @@ BOOLEAN FuseOpRead(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpWrite(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpQueryInformation(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_SetBasicInfo(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpSetInformation_SetAllocationSize(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_SetFileSize(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_CanDelete(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_Rename(FUSE_CONTEXT *Context);
@@ -1070,7 +1071,7 @@ BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context)
             coro_break;
 
         FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.getattr.attr,
-            &Context->InternalResponse->Rsp.QueryInformation.FileInfo);
+            &Context->InternalResponse->Rsp.Overwrite.FileInfo);
 
         Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
@@ -1181,30 +1182,102 @@ BOOLEAN FuseOpSetInformation_SetBasicInfo(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_DEVICE_REQUEST;
-    return FALSE;
-#if 0
     coro_block (Context->CoroState)
     {
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.QueryInformation.UserContext2;
+
+        if (0 != Context->InternalRequest->Req.SetInformation.Info.Basic.LastAccessTime ||
+            0 != Context->InternalRequest->Req.SetInformation.Info.Basic.LastWriteTime)
+        {
+            if (0 != Context->InternalRequest->Req.SetInformation.Info.Basic.LastAccessTime)
+                FuseFileTimeToUnixTime(Context->InternalRequest->Req.SetInformation.Info.Basic.LastAccessTime,
+                    &Context->Setattr.Attr.atime, &Context->Setattr.Attr.atimensec);
+            else
+                Context->Setattr.Attr.atimensec = FUSE_PROTO_UTIME_OMIT;
+            if (0 != Context->InternalRequest->Req.SetInformation.Info.Basic.LastWriteTime)
+                FuseFileTimeToUnixTime(Context->InternalRequest->Req.SetInformation.Info.Basic.LastWriteTime,
+                    &Context->Setattr.Attr.mtime, &Context->Setattr.Attr.mtimensec);
+            else
+                Context->Setattr.Attr.mtimensec = FUSE_PROTO_UTIME_OMIT;
+
+            coro_await (FuseProtoSendFutimens(Context));
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+        }
+
+        coro_await (FuseProtoSendFgetattr(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.getattr.attr,
+            &Context->InternalResponse->Rsp.SetInformation.FileInfo);
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
 
     return coro_active();
-#endif
+}
+
+BOOLEAN FuseOpSetInformation_SetAllocationSize(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    coro_block (Context->CoroState)
+    {
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.SetInformation.UserContext2;
+
+        coro_await (FuseProtoSendFgetattr(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        if (Context->FuseResponse->rsp.getattr.attr.size >
+            Context->InternalRequest->Req.SetInformation.Info.Allocation.AllocationSize)
+        {
+            Context->Setattr.Attr.size =
+                Context->InternalRequest->Req.SetInformation.Info.Allocation.AllocationSize;
+            coro_await (FuseProtoSendFtruncate(Context));
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+
+            coro_await (FuseProtoSendFgetattr(Context));
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+        }
+
+        FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.getattr.attr,
+            &Context->InternalResponse->Rsp.SetInformation.FileInfo);
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+    }
+
+    return coro_active();
 }
 
 BOOLEAN FuseOpSetInformation_SetFileSize(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_DEVICE_REQUEST;
-    return FALSE;
-#if 0
     coro_block (Context->CoroState)
     {
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.SetInformation.UserContext2;
+
+        Context->Setattr.Attr.size =
+            Context->InternalRequest->Req.SetInformation.Info.EndOfFile.FileSize;
+        coro_await (FuseProtoSendFtruncate(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        coro_await (FuseProtoSendFgetattr(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.getattr.attr,
+            &Context->InternalResponse->Rsp.SetInformation.FileInfo);
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
 
     return coro_active();
-#endif
 }
 
 BOOLEAN FuseOpSetInformation_CanDelete(FUSE_CONTEXT *Context)
@@ -1246,15 +1319,17 @@ BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context)
     case FileBasicInformation:
         return FuseOpSetInformation_SetBasicInfo(Context);
     case FileAllocationInformation:
-        return FuseOpSetInformation_SetFileSize(Context);
+        return FuseOpSetInformation_SetAllocationSize(Context);
     case FileEndOfFileInformation:
         return FuseOpSetInformation_SetFileSize(Context);
     case FileDispositionInformation:
         if (Context->InternalRequest->Req.SetInformation.Info.Disposition.Delete)
             return FuseOpSetInformation_CanDelete(Context);
-        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
-        Context->InternalResponse->IoStatus.Information = 0;
-        return FALSE;
+        else
+        {
+            Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+            return FALSE;
+        }
     case FileRenameInformation:
         return FuseOpSetInformation_Rename(Context);
     default:
@@ -1269,31 +1344,6 @@ BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context)
     memset(&FileInfo, 0, sizeof FileInfo);
     switch (Context->InternalRequest->Req.SetInformation.FileInformationClass)
     {
-    case FileBasicInformation:
-        if (0 != FileSystem->Interface->SetBasicInfo)
-            Result = FileSystem->Interface->SetBasicInfo(FileSystem,
-                (PVOID)ValOfFileContext(Request->Req.SetInformation),
-                Request->Req.SetInformation.Info.Basic.FileAttributes,
-                Request->Req.SetInformation.Info.Basic.CreationTime,
-                Request->Req.SetInformation.Info.Basic.LastAccessTime,
-                Request->Req.SetInformation.Info.Basic.LastWriteTime,
-                Request->Req.SetInformation.Info.Basic.ChangeTime,
-                &FileInfo);
-        break;
-    case FileAllocationInformation:
-        if (0 != FileSystem->Interface->SetFileSize)
-            Result = FileSystem->Interface->SetFileSize(FileSystem,
-                (PVOID)ValOfFileContext(Request->Req.SetInformation),
-                Request->Req.SetInformation.Info.Allocation.AllocationSize, TRUE,
-                &FileInfo);
-        break;
-    case FileEndOfFileInformation:
-        if (0 != FileSystem->Interface->SetFileSize)
-            Result = FileSystem->Interface->SetFileSize(FileSystem,
-                (PVOID)ValOfFileContext(Request->Req.SetInformation),
-                Request->Req.SetInformation.Info.EndOfFile.FileSize, FALSE,
-                &FileInfo);
-        break;
     case FileDispositionInformation:
         if (0 != FileSystem->Interface->GetFileInfo)
         {

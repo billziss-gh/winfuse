@@ -223,6 +223,7 @@ VOID FuseProtoSendStatfs(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFgetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFtruncate(FUSE_CONTEXT *Context);
+VOID FuseProtoSendFutimens(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);

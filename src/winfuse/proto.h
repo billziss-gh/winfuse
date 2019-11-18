@@ -159,6 +159,12 @@ enum
     FUSE_PROTO_WRITE_LOCKOWNER          = (1 << 1),
 };
 
+enum
+{
+    FUSE_PROTO_UTIME_NOW                = ((1 << 30) - 1),
+    FUSE_PROTO_UTIME_OMIT               = ((1 << 30) - 2),
+};
+
 typedef struct
 {
     UINT64 blocks;

@@ -32,6 +32,7 @@ VOID FuseProtoSendStatfs(FUSE_CONTEXT *Context);
 VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFgetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFtruncate(FUSE_CONTEXT *Context);
+VOID FuseProtoSendFutimens(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);
@@ -59,6 +60,7 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoSendGetattr)
 #pragma alloc_text(PAGE, FuseProtoSendFgetattr)
 #pragma alloc_text(PAGE, FuseProtoSendFtruncate)
+#pragma alloc_text(PAGE, FuseProtoSendFutimens)
 #pragma alloc_text(PAGE, FuseProtoSendMkdir)
 #pragma alloc_text(PAGE, FuseProtoSendMknod)
 #pragma alloc_text(PAGE, FuseProtoSendRmdir)
@@ -301,7 +303,7 @@ VOID FuseProtoSendFgetattr(FUSE_CONTEXT *Context)
 
 VOID FuseProtoSendFtruncate(FUSE_CONTEXT *Context)
     /*
-     * Send SETATTR message.
+     * Send SETATTR message for truncate.
      *
      * Context->File->Ino
      *     inode number of related file
@@ -321,6 +323,53 @@ VOID FuseProtoSendFtruncate(FUSE_CONTEXT *Context)
             FUSE_PROTO_SETATTR_FH | FUSE_PROTO_SETATTR_SIZE;
         Context->FuseRequest->req.setattr.fh = Context->File->Fh;
         Context->FuseRequest->req.setattr.size = Context->Setattr.Attr.size;
+
+    FUSE_PROTO_SEND_END
+}
+
+VOID FuseProtoSendFutimens(FUSE_CONTEXT *Context)
+    /*
+     * Send SETATTR message for utimens.
+     *
+     * Context->File->Ino
+     *     inode number of related file
+     * Context->File->Fh
+     *     handle of related file
+     * Context->Setattr.Attr.{atime,atimensec}
+     *     new access time of file
+     * Context->Setattr.Attr.{mtime,mtimensec}
+     *     new modification time of file
+     */
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_SEND_BEGIN
+
+        if (Context->File->IsDirectory)
+        {
+            FuseProtoInitRequest(Context,
+                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->File->Ino);
+        }
+        else
+        {
+            FuseProtoInitRequest(Context,
+                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->File->Ino);
+            Context->FuseRequest->req.setattr.valid = FUSE_PROTO_SETATTR_FH;
+            Context->FuseRequest->req.setattr.fh = Context->File->Fh;
+        }
+
+        if (FUSE_PROTO_UTIME_OMIT != Context->Setattr.Attr.atimensec)
+        {
+            Context->FuseRequest->req.setattr.valid |= FUSE_PROTO_SETATTR_ATIME;
+            Context->FuseRequest->req.setattr.atime = Context->Setattr.Attr.atime;
+            Context->FuseRequest->req.setattr.atimensec = Context->Setattr.Attr.atimensec;
+        }
+        if (FUSE_PROTO_UTIME_OMIT != Context->Setattr.Attr.mtimensec)
+        {
+            Context->FuseRequest->req.setattr.valid |= FUSE_PROTO_SETATTR_MTIME;
+            Context->FuseRequest->req.setattr.mtime = Context->Setattr.Attr.mtime;
+            Context->FuseRequest->req.setattr.mtimensec = Context->Setattr.Attr.mtimensec;
+        }
 
     FUSE_PROTO_SEND_END
 }
