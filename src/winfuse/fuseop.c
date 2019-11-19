@@ -651,8 +651,6 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    UINT32 Uid, Gid, Mode;
-
     coro_block (Context->CoroState)
     {
         Context->InternalResponse->IoStatus.Status = FuseFileCreate(Context->DeviceObject, &Context->File);
@@ -665,15 +663,19 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
         Context->LookupPath.Attr.mode = 0777;
         if (0 != Context->InternalRequest->Req.Create.SecurityDescriptor.Offset)
         {
+            UINT32 Uid, Gid, Mode;
+
+            Uid = Context->OrigUid;
+            Gid = Context->OrigGid;
             Context->InternalResponse->IoStatus.Status = FspPosixMapSecurityDescriptorToPermissions(
                 (PSECURITY_DESCRIPTOR)(Context->InternalRequest->Buffer +
                     Context->InternalRequest->Req.Create.SecurityDescriptor.Offset),
-                &Uid, &Gid, &Mode);
+                (PVOID)((UINT_PTR)&Uid | 1), (PVOID)((UINT_PTR)&Gid | 1), &Mode);
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
             Context->LookupPath.Attr.mode = Mode;
-            Context->LookupPath.ChownOnCreate = Uid != Context->OrigUid || Gid != Context->OrigGid;
+            Context->LookupPath.Chown = Uid != Context->OrigUid || Gid != Context->OrigGid;
         }
 
         if (FlagOn(Context->InternalRequest->Req.Create.CreateOptions, FILE_DIRECTORY_FILE))
@@ -769,18 +771,22 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
         Context->InternalResponse->Rsp.Create.Opened.DisableCache =
             Context->LookupPath.DisableCache;
 
-        if (Context->LookupPath.ChownOnCreate)
+        if (Context->LookupPath.Chown)
         {
+            UINT32 Uid, Gid, Mode;
+
+            Uid = Context->OrigUid;
+            Gid = Context->OrigGid;
             Context->InternalResponse->IoStatus.Status = FspPosixMapSecurityDescriptorToPermissions(
                 (PSECURITY_DESCRIPTOR)(Context->InternalRequest->Buffer +
                     Context->InternalRequest->Req.Create.SecurityDescriptor.Offset),
-                &Uid, &Gid, &Mode);
+                (PVOID)((UINT_PTR)&Uid | 1), (PVOID)((UINT_PTR)&Gid | 1), &Mode);
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 goto cleanup;
 
             Context->LookupPath.Attr.uid = Uid;
             Context->LookupPath.Attr.gid = Gid;
-            coro_await (FuseProtoSendCreateChown(Context));
+            coro_await (FuseProtoSendLookupChown(Context));
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status) &&
                 STATUS_INVALID_DEVICE_REQUEST != Context->InternalResponse->IoStatus.Status)
                 goto cleanup;

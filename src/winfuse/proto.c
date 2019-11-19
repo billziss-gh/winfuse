@@ -33,12 +33,12 @@ VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFgetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFtruncate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFutimens(FUSE_CONTEXT *Context);
+VOID FuseProtoSendLookupChown(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
-VOID FuseProtoSendCreateChown(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context);
@@ -61,12 +61,12 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoSendFgetattr)
 #pragma alloc_text(PAGE, FuseProtoSendFtruncate)
 #pragma alloc_text(PAGE, FuseProtoSendFutimens)
+#pragma alloc_text(PAGE, FuseProtoSendLookupChown)
 #pragma alloc_text(PAGE, FuseProtoSendMkdir)
 #pragma alloc_text(PAGE, FuseProtoSendMknod)
 #pragma alloc_text(PAGE, FuseProtoSendRmdir)
 #pragma alloc_text(PAGE, FuseProtoSendUnlink)
 #pragma alloc_text(PAGE, FuseProtoSendCreate)
-#pragma alloc_text(PAGE, FuseProtoSendCreateChown)
 #pragma alloc_text(PAGE, FuseProtoSendOpendir)
 #pragma alloc_text(PAGE, FuseProtoSendOpen)
 #pragma alloc_text(PAGE, FuseProtoSendReleasedir)
@@ -374,6 +374,49 @@ VOID FuseProtoSendFutimens(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_END
 }
 
+VOID FuseProtoSendLookupChown(FUSE_CONTEXT *Context)
+    /*
+     * Send SETATTR message for chown.
+     *
+     * Context->File->IsDirectory
+     *     true if file is a directory
+     * Context->File->Ino
+     *     inode number of related file; use when file is a directory
+     * Context->File->Fh
+     *     handle of related file; use when file is not a directory
+     * Context->Lookup.Attr.uid
+     *     uid of new file
+     * Context->Lookup.Attr.gid
+     *     gid of new file
+     */
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_SEND_BEGIN
+
+        if (Context->File->IsDirectory)
+        {
+            FuseProtoInitRequest(Context,
+                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->File->Ino);
+            Context->FuseRequest->req.setattr.valid =
+                FUSE_PROTO_SETATTR_UID | FUSE_PROTO_SETATTR_GID;
+            Context->FuseRequest->req.setattr.uid = Context->Lookup.Attr.uid;
+            Context->FuseRequest->req.setattr.gid = Context->Lookup.Attr.gid;
+        }
+        else
+        {
+            FuseProtoInitRequest(Context,
+                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->File->Ino);
+            Context->FuseRequest->req.setattr.valid =
+                FUSE_PROTO_SETATTR_FH | FUSE_PROTO_SETATTR_UID | FUSE_PROTO_SETATTR_GID;
+            Context->FuseRequest->req.setattr.fh = Context->File->Fh;
+            Context->FuseRequest->req.setattr.uid = Context->Lookup.Attr.uid;
+            Context->FuseRequest->req.setattr.gid = Context->Lookup.Attr.gid;
+        }
+
+    FUSE_PROTO_SEND_END
+}
+
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context)
     /*
      * Send MKDIR message.
@@ -513,49 +556,6 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
         RtlCopyMemory(Context->FuseRequest->req.create.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.create.name[Context->Lookup.Name.Length] = '\0';
-
-    FUSE_PROTO_SEND_END
-}
-
-VOID FuseProtoSendCreateChown(FUSE_CONTEXT *Context)
-    /*
-     * Send SETATTR message for chown.
-     *
-     * Context->File->IsDirectory
-     *     true if file is a directory
-     * Context->File->Ino
-     *     inode number of related file; use when file is a directory
-     * Context->File->Fh
-     *     handle of related file; use when file is not a directory
-     * Context->Lookup.Attr.uid
-     *     uid of new file
-     * Context->Lookup.Attr.gid
-     *     gid of new file
-     */
-{
-    PAGED_CODE();
-
-    FUSE_PROTO_SEND_BEGIN
-
-        if (Context->File->IsDirectory)
-        {
-            FuseProtoInitRequest(Context,
-                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->File->Ino);
-            Context->FuseRequest->req.setattr.valid =
-                FUSE_PROTO_SETATTR_UID | FUSE_PROTO_SETATTR_GID;
-            Context->FuseRequest->req.setattr.uid = Context->Lookup.Attr.uid;
-            Context->FuseRequest->req.setattr.gid = Context->Lookup.Attr.gid;
-        }
-        else
-        {
-            FuseProtoInitRequest(Context,
-                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->File->Ino);
-            Context->FuseRequest->req.setattr.valid =
-                FUSE_PROTO_SETATTR_FH | FUSE_PROTO_SETATTR_UID | FUSE_PROTO_SETATTR_GID;
-            Context->FuseRequest->req.setattr.fh = Context->File->Fh;
-            Context->FuseRequest->req.setattr.uid = Context->Lookup.Attr.uid;
-            Context->FuseRequest->req.setattr.gid = Context->Lookup.Attr.gid;
-        }
 
     FUSE_PROTO_SEND_END
 }

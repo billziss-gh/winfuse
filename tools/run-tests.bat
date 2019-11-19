@@ -116,7 +116,7 @@ cd L: >nul 2>nul || (echo Unable to find drive L: >&2 & goto fail)
 L:
 "C:\Program Files (x86)\WinFsp\bin\winfsp-tests-x64.exe" ^
     --external --resilient ^
-    create_test create_related_test
+    create_test create_related_test create_sd_test
 if !ERRORLEVEL! neq 0 set TestExit=1
 popd
 taskkill /f /im %1-%2.exe

@@ -132,7 +132,7 @@ struct _FUSE_CONTEXT
             UINT32 UserMode:1;
             UINT32 HasTraversePrivilege:1;
             UINT32 DisableCache:1;
-            UINT32 ChownOnCreate:1;
+            UINT32 Chown:1;
         } LookupPath;
         struct
         {
@@ -224,12 +224,12 @@ VOID FuseProtoSendGetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFgetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFtruncate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFutimens(FUSE_CONTEXT *Context);
+VOID FuseProtoSendLookupChown(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
-VOID FuseProtoSendCreateChown(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context);
