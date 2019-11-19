@@ -855,6 +855,20 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
         }
         else
         {
+            /*
+             * Some Windows applications specify FILE_APPEND_DATA without
+             * FILE_WRITE_DATA when opening files for appending.
+             *
+             * NOTE: GrantedAccess has been initialized above and there is no coro_yield or
+             * coro_await between that initialization and this use.
+             */
+            if (GrantedAccess & FILE_APPEND_DATA)
+            {
+                if (Context->File->OpenFlags == 0)
+                    Context->File->OpenFlags = 1/* O_WRONLY */;
+                Context->File->OpenFlags |= 8/*O_APPEND*/;
+            }
+
             coro_await (FuseProtoSendOpen(Context));
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
