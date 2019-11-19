@@ -764,8 +764,6 @@ static VOID FuseCreate(FUSE_CONTEXT *Context)
 
         Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
             (UINT64)(UINT_PTR)Context->File;
-        Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
-            Context->LookupPath.GrantedAccess;
         FuseAttrToFileInfo(Context->DeviceObject, &Context->LookupPath.Attr,
             &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
         Context->InternalResponse->Rsp.Create.Opened.DisableCache =
@@ -815,25 +813,28 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    UINT32 GrantedAccess, Type;
-
     coro_block (Context->CoroState)
     {
         Context->InternalResponse->IoStatus.Status = FuseFileCreate(Context->DeviceObject, &Context->File);
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        GrantedAccess = Context->LookupPath.GrantedAccess & (FILE_READ_DATA | FILE_WRITE_DATA);
-        if (FILE_READ_DATA == GrantedAccess)
+        UINT32 GrantedAccess = Context->InternalResponse->Rsp.Create.Opened.GrantedAccess;
+        switch (GrantedAccess & (FILE_READ_DATA | FILE_WRITE_DATA))
+        {
+        default:
+        case FILE_READ_DATA:
             Context->File->OpenFlags = 0/*O_RDONLY*/;
-        else
-        if (FILE_WRITE_DATA == GrantedAccess)
+            break;
+        case FILE_WRITE_DATA:
             Context->File->OpenFlags = 1/*O_WRONLY*/;
-        else
-        if ((FILE_READ_DATA | FILE_WRITE_DATA) == GrantedAccess)
+            break;
+        case FILE_READ_DATA | FILE_WRITE_DATA:
             Context->File->OpenFlags = 2/*O_RDWR*/;
+            break;
+        }
 
-        Type = Context->LookupPath.Attr.mode & 0170000;
+        UINT32 Type = Context->LookupPath.Attr.mode & 0170000;
         if (0120000/* S_IFLNK  */ == Type ||
             0010000/* S_IFIFO  */ == Type ||
             0020000/* S_IFCHR  */ == Type ||
@@ -892,8 +893,6 @@ static VOID FuseOpen(FUSE_CONTEXT *Context)
 
         Context->InternalResponse->Rsp.Create.Opened.UserContext2 =
             (UINT64)(UINT_PTR)Context->File;
-        Context->InternalResponse->Rsp.Create.Opened.GrantedAccess =
-            Context->LookupPath.GrantedAccess;
         FuseAttrToFileInfo(Context->DeviceObject, &Context->LookupPath.Attr,
             &Context->InternalResponse->Rsp.Create.Opened.FileInfo);
         Context->InternalResponse->Rsp.Create.Opened.DisableCache =
