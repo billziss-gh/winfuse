@@ -56,7 +56,7 @@ BOOLEAN FuseOpQueryInformation(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_SetBasicInfo(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_SetAllocationSize(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_SetFileSize(FUSE_CONTEXT *Context);
-static BOOLEAN FuseOpSetInformation_CanDelete(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpSetInformation_SetDelete(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_Rename(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpQueryEa(FUSE_CONTEXT *Context);
@@ -109,7 +109,7 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpQueryInformation)
 #pragma alloc_text(PAGE, FuseOpSetInformation_SetBasicInfo)
 #pragma alloc_text(PAGE, FuseOpSetInformation_SetFileSize)
-#pragma alloc_text(PAGE, FuseOpSetInformation_CanDelete)
+#pragma alloc_text(PAGE, FuseOpSetInformation_SetDelete)
 #pragma alloc_text(PAGE, FuseOpSetInformation_Rename)
 #pragma alloc_text(PAGE, FuseOpSetInformation)
 #pragma alloc_text(PAGE, FuseOpQueryEa)
@@ -1300,19 +1300,66 @@ BOOLEAN FuseOpSetInformation_SetFileSize(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
-BOOLEAN FuseOpSetInformation_CanDelete(FUSE_CONTEXT *Context)
+BOOLEAN FuseOpSetInformation_SetDelete(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_DEVICE_REQUEST;
-    return FALSE;
-#if 0
     coro_block (Context->CoroState)
     {
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.SetInformation.UserContext2;
+
+        if (Context->InternalRequest->Req.SetInformation.Info.Disposition.Delete &&
+            Context->File->IsDirectory && !Context->File->IsReparsePoint)
+        {
+            Context->QueryDirectory.NextOffset = 0;
+            Context->QueryDirectory.Length = FUSE_PROTO_RSP_HEADER_SIZE +
+                FSP_FSCTL_ALIGN_UP(sizeof(FUSE_PROTO_DIRENT) + 1, 8) +
+                FSP_FSCTL_ALIGN_UP(sizeof(FUSE_PROTO_DIRENT) + 2, 8) +
+                FSP_FSCTL_ALIGN_UP(sizeof(FUSE_PROTO_DIRENT) + 255, 8);
+                /* enough for ".", ".." and an entry with a name up to 255 chars long */
+
+            coro_await (FuseProtoSendReaddir(Context));
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+
+            if (Context->QueryDirectory.Length < Context->FuseResponse->len)
+            {
+                Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INTERNAL_ERROR;
+                coro_break;
+            }
+
+            PUINT8 BufferEndP = (PUINT8)Context->FuseResponse + Context->FuseResponse->len;
+            PUINT8 BufferP = (PUINT8)Context->FuseResponse + FUSE_PROTO_RSP_HEADER_SIZE;
+            for (;;)
+            {
+                if (BufferEndP <
+                        BufferP + FIELD_OFFSET(FUSE_PROTO_DIRENT, name) ||
+                    BufferEndP <
+                        BufferP + FIELD_OFFSET(FUSE_PROTO_DIRENT, name) +
+                            ((FUSE_PROTO_DIRENT *)BufferP)->namelen)
+                    break;
+
+                FUSE_PROTO_DIRENT *Dirent = (FUSE_PROTO_DIRENT *)BufferP;
+                if ((1 == Dirent->namelen && '.' == Dirent->name[0]) ||
+                    (2 == Dirent->namelen && '.' == Dirent->name[0] && '.' == Dirent->name[1]))
+                    /*ignore*/;
+                else
+                {
+                    Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_DIRECTORY_NOT_EMPTY;
+                    coro_break;
+                }
+
+                BufferP += FSP_FSCTL_ALIGN_UP(
+                    FIELD_OFFSET(FUSE_PROTO_DIRENT, name) +
+                        ((FUSE_PROTO_DIRENT *)BufferP)->namelen,
+                    8);
+            }
+        }
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
 
     return coro_active();
-#endif
 }
 
 BOOLEAN FuseOpSetInformation_Rename(FUSE_CONTEXT *Context)
@@ -1343,13 +1390,7 @@ BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context)
     case FileEndOfFileInformation:
         return FuseOpSetInformation_SetFileSize(Context);
     case FileDispositionInformation:
-        if (Context->InternalRequest->Req.SetInformation.Info.Disposition.Delete)
-            return FuseOpSetInformation_CanDelete(Context);
-        else
-        {
-            Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
-            return FALSE;
-        }
+        return FuseOpSetInformation_SetDelete(Context);
     case FileRenameInformation:
         return FuseOpSetInformation_Rename(Context);
     default:
@@ -1364,34 +1405,6 @@ BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context)
     memset(&FileInfo, 0, sizeof FileInfo);
     switch (Context->InternalRequest->Req.SetInformation.FileInformationClass)
     {
-    case FileDispositionInformation:
-        if (0 != FileSystem->Interface->GetFileInfo)
-        {
-            Result = FileSystem->Interface->GetFileInfo(FileSystem,
-                (PVOID)ValOfFileContext(Request->Req.SetInformation), &FileInfo);
-            if (NT_SUCCESS(Result) && 0 != (FileInfo.FileAttributes & FILE_ATTRIBUTE_READONLY))
-            {
-                Result = STATUS_CANNOT_DELETE;
-                break;
-            }
-        }
-        if (0 != FileSystem->Interface->SetDelete)
-        {
-            Result = FileSystem->Interface->SetDelete(FileSystem,
-                (PVOID)ValOfFileContext(Request->Req.SetInformation),
-                (PWSTR)Request->Buffer,
-                Request->Req.SetInformation.Info.Disposition.Delete);
-        }
-        else if (0 != FileSystem->Interface->CanDelete)
-        {
-            if (Request->Req.SetInformation.Info.Disposition.Delete)
-                Result = FileSystem->Interface->CanDelete(FileSystem,
-                    (PVOID)ValOfFileContext(Request->Req.SetInformation),
-                    (PWSTR)Request->Buffer);
-            else
-                Result = STATUS_SUCCESS;
-        }
-        break;
     case FileRenameInformation:
         if (0 != FileSystem->Interface->Rename)
         {
