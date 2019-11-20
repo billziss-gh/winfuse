@@ -117,7 +117,8 @@ L:
 "C:\Program Files (x86)\WinFsp\bin\winfsp-tests-x64.exe" ^
     --external --resilient ^
     create_test create_related_test create_sd_test create_notraverse_test create_backup_test ^
-    create_restore_test create_share_test create_curdir_test create_namelen_test
+    create_restore_test create_share_test create_curdir_test create_namelen_test ^
+    getfileinfo_test delete_test delete_pending_test
 if !ERRORLEVEL! neq 0 set TestExit=1
 popd
 taskkill /f /im %1-%2.exe

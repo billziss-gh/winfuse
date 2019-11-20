@@ -1203,7 +1203,7 @@ BOOLEAN FuseOpSetInformation_SetBasicInfo(FUSE_CONTEXT *Context)
 
     coro_block (Context->CoroState)
     {
-        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.QueryInformation.UserContext2;
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.SetInformation.UserContext2;
 
         if (0 != Context->InternalRequest->Req.SetInformation.Info.Basic.LastAccessTime ||
             0 != Context->InternalRequest->Req.SetInformation.Info.Basic.LastWriteTime)
