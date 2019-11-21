@@ -22,10 +22,12 @@
 #include <winfuse/driver.h>
 
 PVOID FuseAllocatePoolMustSucceed(POOL_TYPE PoolType, SIZE_T Size, ULONG Tag);
+NTSTATUS FuseSafeCopyMemory(PVOID Dst, PVOID Src, ULONG Len);
 NTSTATUS FuseGetTokenUid(PACCESS_TOKEN Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid);
 
 #ifdef ALLOC_PRAGMA
 // !#pragma alloc_text(PAGE, FuseAllocatePoolMustSucceed)
+#pragma alloc_text(PAGE, FuseSafeCopyMemory)
 #pragma alloc_text(PAGE, FuseGetTokenUid)
 #endif
 
@@ -55,6 +57,22 @@ PVOID FuseAllocatePoolMustSucceed(POOL_TYPE PoolType, SIZE_T Size, ULONG Tag)
 
         Delay.QuadPart = n > i ? Delays[i] : Delays[n - 1];
         KeDelayExecutionThread(KernelMode, FALSE, &Delay);
+    }
+}
+
+NTSTATUS FuseSafeCopyMemory(PVOID Dst, PVOID Src, ULONG Len)
+{
+    PAGED_CODE();
+
+    try
+    {
+        RtlCopyMemory(Dst, Src, Len);
+        return STATUS_SUCCESS;
+    }
+    except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        NTSTATUS Result = GetExceptionCode();
+        return FsRtlIsNtstatusExpected(Result) ? STATUS_INVALID_USER_BUFFER : Result;
     }
 }
 

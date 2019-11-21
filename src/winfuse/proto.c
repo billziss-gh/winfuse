@@ -44,6 +44,8 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRelease(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReaddir(FUSE_CONTEXT *Context);
+VOID FuseProtoSendRead(FUSE_CONTEXT *Context);
+VOID FuseProtoSendWrite(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
@@ -72,6 +74,8 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoSendReleasedir)
 #pragma alloc_text(PAGE, FuseProtoSendRelease)
 #pragma alloc_text(PAGE, FuseProtoSendReaddir)
+#pragma alloc_text(PAGE, FuseProtoSendRead)
+#pragma alloc_text(PAGE, FuseProtoSendWrite)
 #pragma alloc_text(PAGE, FuseAttrToFileInfo)
 #pragma alloc_text(PAGE, FuseNtStatusFromErrno)
 #endif
@@ -674,6 +678,67 @@ VOID FuseProtoSendReaddir(FUSE_CONTEXT *Context)
         Context->FuseRequest->req.read.read_flags = 0;   /* !!!: REVISIT */
         Context->FuseRequest->req.read.lock_owner = 0;   /* !!!: REVISIT */
         Context->FuseRequest->req.read.flags = Context->File->OpenFlags;
+
+    FUSE_PROTO_SEND_END
+}
+
+VOID FuseProtoSendRead(FUSE_CONTEXT *Context)
+    /*
+     * Send READ message.
+     *
+     * Context->File->Ino
+     *     inode number of related file
+     * Context->File->Fh
+     *     handle of related file
+     * Context->Read.Offset
+     *     offset to read
+     * Context->Read.Length
+     *     read buffer length
+     */
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_SEND_BEGIN
+
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_SIZE(read), FUSE_PROTO_OPCODE_READ, Context->File->Ino);
+        Context->FuseRequest->req.read.fh = Context->File->Fh;
+        Context->FuseRequest->req.read.offset = Context->Read.StartOffset + Context->Read.Offset;
+        Context->FuseRequest->req.read.size = Context->Read.Length;
+        Context->FuseRequest->req.read.read_flags = 0;   /* !!!: REVISIT */
+        Context->FuseRequest->req.read.lock_owner = 0;   /* !!!: REVISIT */
+        Context->FuseRequest->req.read.flags = Context->File->OpenFlags;
+
+    FUSE_PROTO_SEND_END
+}
+
+VOID FuseProtoSendWrite(FUSE_CONTEXT *Context)
+    /*
+     * Send WRITE message.
+     *
+     * Context->File->Ino
+     *     inode number of related file
+     * Context->File->Fh
+     *     handle of related file
+     * Context->Write.Offset
+     *     offset to write
+     * Context->Write.Length
+     *     write buffer length
+     */
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_SEND_BEGIN
+
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_SIZE(write) + Context->Write.Length,
+            FUSE_PROTO_OPCODE_WRITE, Context->File->Ino);
+        Context->FuseRequest->req.write.fh = Context->File->Fh;
+        Context->FuseRequest->req.write.offset = Context->Write.StartOffset + Context->Write.Offset;
+        Context->FuseRequest->req.write.size = Context->Write.Length;
+        Context->FuseRequest->req.write.write_flags = 0;   /* !!!: REVISIT */
+        Context->FuseRequest->req.write.lock_owner = 0;   /* !!!: REVISIT */
+        Context->FuseRequest->req.write.flags = Context->File->OpenFlags;
 
     FUSE_PROTO_SEND_END
 }

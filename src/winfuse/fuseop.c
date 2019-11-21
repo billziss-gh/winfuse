@@ -1166,14 +1166,140 @@ BOOLEAN FuseOpRead(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    return FALSE;
+    coro_block (Context->CoroState)
+    {
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.Read.UserContext2;
+
+        Context->Read.StartOffset = Context->InternalRequest->Req.Read.Offset;
+        Context->Read.Remain = Context->InternalRequest->Req.Read.Length;
+
+        Context->Read.Offset = 0;
+        while (0 != Context->Read.Remain)
+        {
+            Context->Read.Length = Context->Read.Remain;
+#if 0
+            FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
+            if (Context->Read.Length > DeviceExtension->VolumeParams.MaxRead)
+                Context->Read.Length = DeviceExtension->VolumeParams.MaxRead;
+#endif
+
+            coro_await (FuseProtoSendRead(Context));
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+
+            UINT32 BytesTransferred = Context->FuseResponse->len - FUSE_PROTO_RSP_HEADER_SIZE;
+            if (Context->Read.Length < BytesTransferred)
+            {
+                Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INTERNAL_ERROR;
+                coro_break;
+            }
+
+            Context->InternalResponse->IoStatus.Status = FuseSafeCopyMemory(
+                (PUINT8)(UINT_PTR)Context->InternalRequest->Req.Read.Address + Context->Write.Offset,
+                (PUINT8)Context->FuseResponse + FUSE_PROTO_RSP_HEADER_SIZE,
+                BytesTransferred);
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+
+            Context->Read.Remain -= BytesTransferred;
+            Context->Read.Offset += BytesTransferred;
+
+            if (Context->Read.Length > BytesTransferred)
+                break;
+        }
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+        Context->InternalResponse->IoStatus.Information = Context->Read.Offset;
+        if (0 == Context->InternalResponse->IoStatus.Information)
+            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_END_OF_FILE;
+    }
+
+    return coro_active();
 }
 
 BOOLEAN FuseOpWrite(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    return FALSE;
+    coro_block (Context->CoroState)
+    {
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.Write.UserContext2;
+
+        coro_await (FuseProtoSendFgetattr(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        Context->Write.Attr = Context->FuseResponse->rsp.getattr.attr;
+
+        UINT64 EndOffset;
+        Context->Write.StartOffset = Context->InternalRequest->Req.Write.Offset;
+        if (Context->InternalRequest->Req.Write.ConstrainedIo)
+        {
+            if (Context->Write.StartOffset >= Context->Write.Attr.size)
+            {
+                FuseAttrToFileInfo(Context->DeviceObject, &Context->Write.Attr,
+                    &Context->InternalResponse->Rsp.Write.FileInfo);
+                Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+                Context->InternalResponse->IoStatus.Information = 0;
+                coro_break;
+            }
+            EndOffset = Context->Write.StartOffset + Context->InternalRequest->Req.Write.Length;
+            if (EndOffset > Context->Write.Attr.size)
+                EndOffset = Context->Write.Attr.size;
+        }
+        else
+        {
+            if ((UINT64)-1LL == Context->Write.StartOffset)
+                Context->Write.StartOffset = Context->Write.Attr.size;
+            EndOffset = Context->Write.StartOffset + Context->InternalRequest->Req.Write.Length;
+        }
+        Context->Write.Remain = (UINT32)(EndOffset - Context->Write.StartOffset);
+
+        Context->Write.Offset = 0;
+        while (0 != Context->Write.Remain)
+        {
+            FuseContextWaitRequest(Context);
+
+            Context->Write.Length = Context->Write.Remain;
+            if (Context->Write.Length > Context->FuseRequestLength - FUSE_PROTO_REQ_SIZE(write))
+                Context->Write.Length = Context->FuseRequestLength - FUSE_PROTO_REQ_SIZE(write);
+
+            Context->InternalResponse->IoStatus.Status = FuseSafeCopyMemory(
+                (PUINT8)Context->FuseRequest + FUSE_PROTO_REQ_SIZE(write),
+                (PUINT8)(UINT_PTR)Context->InternalRequest->Req.Write.Address + Context->Write.Offset,
+                Context->Write.Length);
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+
+            coro_await (FuseProtoSendWrite(Context));
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+
+            UINT32 BytesTransferred = Context->FuseResponse->rsp.write.size;
+            if (Context->Write.Length < BytesTransferred)
+            {
+                Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INTERNAL_ERROR;
+                coro_break;
+            }
+
+            Context->Write.Remain -= BytesTransferred;
+            Context->Write.Offset += BytesTransferred;
+
+            if (Context->Write.Length > BytesTransferred)
+                break;
+        }
+
+        if (Context->Write.Attr.size < Context->Write.StartOffset + Context->Write.Offset)
+            Context->Write.Attr.size = Context->Write.StartOffset + Context->Write.Offset;
+
+        FuseAttrToFileInfo(Context->DeviceObject, &Context->Write.Attr,
+            &Context->InternalResponse->Rsp.Write.FileInfo);
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+        Context->InternalResponse->IoStatus.Information = Context->Write.Offset;
+    }
+
+    return coro_active();
 }
 
 BOOLEAN FuseOpQueryInformation(FUSE_CONTEXT *Context)
@@ -1311,7 +1437,7 @@ BOOLEAN FuseOpSetInformation_SetDelete(FUSE_CONTEXT *Context)
             Context->File->IsDirectory && !Context->File->IsReparsePoint)
         {
             Context->QueryDirectory.NextOffset = 0;
-            Context->QueryDirectory.Length = FUSE_PROTO_RSP_HEADER_SIZE +
+            Context->QueryDirectory.Length =
                 FSP_FSCTL_ALIGN_UP(sizeof(FUSE_PROTO_DIRENT) + 1, 8) +
                 FSP_FSCTL_ALIGN_UP(sizeof(FUSE_PROTO_DIRENT) + 2, 8) +
                 FSP_FSCTL_ALIGN_UP(sizeof(FUSE_PROTO_DIRENT) + 255, 8);
@@ -1321,7 +1447,7 @@ BOOLEAN FuseOpSetInformation_SetDelete(FUSE_CONTEXT *Context)
             if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
                 coro_break;
 
-            if (Context->QueryDirectory.Length < Context->FuseResponse->len)
+            if (FUSE_PROTO_RSP_HEADER_SIZE + Context->QueryDirectory.Length < Context->FuseResponse->len)
             {
                 Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INTERNAL_ERROR;
                 coro_break;
@@ -1623,14 +1749,13 @@ static VOID FuseOpQueryDirectory_ReadDirectory(FUSE_CONTEXT *Context)
          */
         UINT32 N = Context->InternalRequest->Req.QueryDirectory.Length /
             (sizeof(FSP_FSCTL_DIR_INFO) + (24 * sizeof(WCHAR)));
-        Context->QueryDirectory.Length = FUSE_PROTO_RSP_HEADER_SIZE +
-            N * (sizeof(FUSE_PROTO_DIRENT) + 24);
+        Context->QueryDirectory.Length = N * (sizeof(FUSE_PROTO_DIRENT) + 24);
 
         coro_await (FuseProtoSendReaddir(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        if (Context->QueryDirectory.Length < Context->FuseResponse->len)
+        if (FUSE_PROTO_RSP_HEADER_SIZE + Context->QueryDirectory.Length < Context->FuseResponse->len)
         {
             Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INTERNAL_ERROR;
             coro_break;

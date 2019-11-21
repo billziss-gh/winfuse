@@ -129,7 +129,7 @@ VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationT
 FUSE_PROCESS_DISPATCH *FuseProcessFunction[FspFsctlTransactKindCount];
 
 static inline BOOLEAN FuseContextProcess(FUSE_CONTEXT *Context,
-    FUSE_PROTO_RSP *FuseResponse, FUSE_PROTO_REQ *FuseRequest)
+    FUSE_PROTO_RSP *FuseResponse, FUSE_PROTO_REQ *FuseRequest, ULONG FuseRequestLength)
 {
     ASSERT(0 == FuseRequest || 0 == FuseResponse);
     ASSERT(0 != FuseRequest || 0 != FuseResponse);
@@ -139,6 +139,7 @@ static inline BOOLEAN FuseContextProcess(FUSE_CONTEXT *Context,
 
     Context->FuseRequest = FuseRequest;
     Context->FuseResponse = FuseResponse;
+    Context->FuseRequestLength = FuseRequestLength;
 
     return FuseProcessFunction[Kind](Context);
 }
@@ -185,7 +186,7 @@ NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp)
         if (0 == Context)
             goto request;
 
-        Continue = FuseContextProcess(Context, FuseResponse, 0);
+        Continue = FuseContextProcess(Context, FuseResponse, 0, 0);
 
         if (Continue)
             FuseIoqPostPending(DeviceExtension->Ioq, Context);
@@ -252,13 +253,13 @@ request:
             if (!FuseContextIsStatus(Context))
             {
                 InternalRequest = 0;
-                Continue = FuseContextProcess(Context, 0, FuseRequest);
+                Continue = FuseContextProcess(Context, 0, FuseRequest, OutputBufferLength);
             }
         }
         else
         {
             ASSERT(!FuseContextIsStatus(Context));
-            Continue = FuseContextProcess(Context, 0, FuseRequest);
+            Continue = FuseContextProcess(Context, 0, FuseRequest, OutputBufferLength);
         }
 
         if (Continue)

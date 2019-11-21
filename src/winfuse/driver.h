@@ -116,6 +116,7 @@ struct _FUSE_CONTEXT
     FSP_FSCTL_DECLSPEC_ALIGN UINT8 InternalResponseBuf[sizeof(FSP_FSCTL_TRANSACT_RSP)];
     FUSE_PROTO_REQ *FuseRequest;
     FUSE_PROTO_RSP *FuseResponse;
+    ULONG FuseRequestLength;
     SHORT CoroState[16];
     UINT32 OrigUid, OrigGid, OrigPid;
     FUSE_FILE *File;
@@ -147,6 +148,14 @@ struct _FUSE_CONTEXT
             ULONG BytesTransferred;
             PUINT8 Buffer, BufferEndP, BufferP;
         } QueryDirectory;
+        struct
+        {
+            FUSE_PROTO_ATTR Attr;
+            UINT64 StartOffset;
+            UINT32 Remain;
+            UINT32 Offset;
+            UINT32 Length;
+        } Read, Write;
     };
 };
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
@@ -235,6 +244,8 @@ VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReleasedir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRelease(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReaddir(FUSE_CONTEXT *Context);
+VOID FuseProtoSendRead(FUSE_CONTEXT *Context);
+VOID FuseProtoSendWrite(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 static inline
@@ -259,6 +270,7 @@ VOID FusePosixPathSuffix(PSTRING Path, PSTRING Remain, PSTRING Suffix);
 
 /* utility */
 PVOID FuseAllocatePoolMustSucceed(POOL_TYPE PoolType, SIZE_T Size, ULONG Tag);
+NTSTATUS FuseSafeCopyMemory(PVOID Dst, PVOID Src, ULONG Len);
 NTSTATUS FuseGetTokenUid(PACCESS_TOKEN Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid);
 
 /* memory allocation */
