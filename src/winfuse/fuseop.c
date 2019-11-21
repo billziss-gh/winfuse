@@ -1177,6 +1177,10 @@ BOOLEAN FuseOpRead(FUSE_CONTEXT *Context)
         while (0 != Context->Read.Remain)
         {
             Context->Read.Length = Context->Read.Remain;
+#if DBG
+            if (DEBUGTEST(10) && Context->Read.Length > 512)
+                Context->Read.Length = 512;
+#endif
 #if 0
             FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
             if (Context->Read.Length > DeviceExtension->VolumeParams.MaxRead)
@@ -1261,6 +1265,10 @@ BOOLEAN FuseOpWrite(FUSE_CONTEXT *Context)
             FuseContextWaitRequest(Context);
 
             Context->Write.Length = Context->Write.Remain;
+#if DBG
+            if (DEBUGTEST(10) && Context->Write.Length > 512)
+                Context->Write.Length = 512;
+#endif
             if (Context->Write.Length > Context->FuseRequestLength - FUSE_PROTO_REQ_SIZE(write))
                 Context->Write.Length = Context->FuseRequestLength - FUSE_PROTO_REQ_SIZE(write);
 
