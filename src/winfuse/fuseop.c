@@ -133,16 +133,13 @@ static BOOLEAN FuseOpReserved_Init(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    FUSE_DEVICE_EXTENSION *DeviceExtension;
-
     coro_block (Context->CoroState)
     {
         coro_await (FuseProtoSendInit(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
-
+        FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
         if (FUSE_PROTO_VERSION != Context->FuseResponse->rsp.init.major)
         {
             DeviceExtension->VersionMajor = (UINT32)-1;
@@ -156,6 +153,8 @@ static BOOLEAN FuseOpReserved_Init(FUSE_CONTEXT *Context)
         DeviceExtension->VersionMinor = Context->FuseResponse->rsp.init.minor;
         // !!!: REVISIT
         KeSetEvent(&DeviceExtension->InitEvent, 1, FALSE);
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
 
     return coro_active();
@@ -252,6 +251,8 @@ static VOID FuseLookup(FUSE_CONTEXT *Context)
         Context->Lookup.CacheItem = CacheItem;
         Context->Lookup.Ino = Entry->nodeid;
         Context->Lookup.Attr = Entry->attr;
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
 }
 
@@ -498,9 +499,11 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
 #if DBG
                 ASSERT(DebugMemoryChangeTest(&Context->Lookup.Attr, sizeof Context->Lookup.Attr, TRUE));
 #endif
-                coro_break;
+                break;
             }
         }
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
 
 #undef TravPriv
@@ -549,6 +552,8 @@ static VOID FuseCreateCheck(FUSE_CONTEXT *Context)
                 Context->InternalRequest->Req.Create.DesiredAccess;
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess |=
             Context->InternalRequest->Req.Create.GrantedAccess;
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
 }
 
@@ -583,6 +588,8 @@ static VOID FuseOpenCheck(FUSE_CONTEXT *Context)
                 (Context->InternalRequest->Req.Create.DesiredAccess & DELETE);
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess |=
             Context->InternalRequest->Req.Create.GrantedAccess;
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
 }
 
@@ -620,6 +627,8 @@ static VOID FuseOverwriteCheck(FUSE_CONTEXT *Context)
                 (Context->InternalRequest->Req.Create.DesiredAccess & (DELETE | FILE_WRITE_DATA));
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess |=
             Context->InternalRequest->Req.Create.GrantedAccess;
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
 }
 
@@ -644,6 +653,8 @@ static VOID FuseOpenTargetDirectoryCheck(FUSE_CONTEXT *Context)
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess = Context->LookupPath.GrantedAccess;
         Context->InternalResponse->Rsp.Create.Opened.GrantedAccess |=
             Context->InternalRequest->Req.Create.GrantedAccess;
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
 }
 
@@ -1033,8 +1044,6 @@ BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    UINT32 Disposition;
-
     coro_block (Context->CoroState)
     {
         if (Context->InternalRequest->Req.Create.NamedStream)
@@ -1047,7 +1056,7 @@ BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context)
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        Disposition = (Context->InternalRequest->Req.Create.CreateOptions >> 24) & 0xff;
+        UINT32 Disposition = (Context->InternalRequest->Req.Create.CreateOptions >> 24) & 0xff;
         if (Context->InternalRequest->Req.Create.OpenTargetDirectory)
             coro_await (FuseOpCreate_FileOpenTargetDirectory(Context));
         else
@@ -1603,6 +1612,8 @@ BOOLEAN FuseOpQueryVolumeInformation(FUSE_CONTEXT *Context)
         Context->InternalResponse->Rsp.QueryVolumeInformation.VolumeInfo.FreeSize =
             (UINT64)Context->FuseResponse->rsp.statfs.st.bfree *
             (UINT64)Context->FuseResponse->rsp.statfs.st.frsize;
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
 
     return coro_active();
