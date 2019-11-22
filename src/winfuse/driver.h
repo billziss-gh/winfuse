@@ -63,10 +63,6 @@ typedef struct _FUSE_DEVICE_EXTENSION
     KSPIN_LOCK FileListLock;
     LIST_ENTRY FileList;
 } FUSE_DEVICE_EXTENSION;
-NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *VolumeParams);
-VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject);
-VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
-NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp);
 extern FSP_FSEXT_PROVIDER FuseProvider;
 static inline
 FUSE_DEVICE_EXTENSION *FuseDeviceExtension(PDEVICE_OBJECT DeviceObject)

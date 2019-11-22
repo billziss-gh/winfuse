@@ -35,14 +35,5 @@ NTSTATUS DriverEntry(
         DbgBreakPoint();
 #endif
 
-    FuseProvider.Version = sizeof FuseProvider;
-    FuseProvider.DeviceTransactCode = FUSE_FSCTL_TRANSACT;
-    FuseProvider.DeviceExtensionSize = sizeof(FUSE_DEVICE_EXTENSION);
-    FuseProvider.DeviceInit = FuseDeviceInit;
-    FuseProvider.DeviceFini = FuseDeviceFini;
-    FuseProvider.DeviceExpirationRoutine = FuseDeviceExpirationRoutine;
-    FuseProvider.DeviceTransact = FuseDeviceTransact;
     return FspFsextProviderRegister(&FuseProvider);
 }
-
-FSP_FSEXT_PROVIDER FuseProvider;

@@ -21,10 +21,10 @@
 
 #include <winfuse/driver.h>
 
-NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *VolumeParams);
-VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject);
-VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
-NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp);
+static NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *VolumeParams);
+static VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject);
+static VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
+static NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp);
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
     PDEVICE_OBJECT DeviceObject, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
 VOID FuseContextDelete(FUSE_CONTEXT *Context);
@@ -38,7 +38,7 @@ VOID FuseContextDelete(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseContextDelete)
 #endif
 
-NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *VolumeParams)
+static NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *VolumeParams)
 {
     PAGED_CODE();
 
@@ -98,7 +98,7 @@ fail:
     return Result;
 }
 
-VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
+static VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
 {
     PAGED_CODE();
 
@@ -130,7 +130,7 @@ VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
     KeLeaveCriticalRegion();
 }
 
-VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime)
+static VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime)
 {
     PAGED_CODE();
 
@@ -174,7 +174,7 @@ static inline BOOLEAN FuseContextProcess(FUSE_CONTEXT *Context,
     return Result;
 }
 
-NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+static NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
     PAGED_CODE();
 
@@ -334,6 +334,30 @@ exit:
 
     return Result;
 }
+
+FSP_FSEXT_PROVIDER FuseProvider =
+{
+    /* Version */
+    sizeof FuseProvider,
+
+    /* DeviceTransactCode */
+    FUSE_FSCTL_TRANSACT,
+
+    /* DeviceExtensionSize */
+    sizeof(FUSE_DEVICE_EXTENSION),
+
+    /* DeviceInit */
+    FuseDeviceInit,
+
+    /* DeviceFini */
+    FuseDeviceFini,
+
+    /* DeviceExpirationRoutine */
+    FuseDeviceExpirationRoutine,
+
+    /* DeviceTransact */
+    FuseDeviceTransact,
+};
 
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
     PDEVICE_OBJECT DeviceObject, FSP_FSCTL_TRANSACT_REQ *InternalRequest)
