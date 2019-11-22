@@ -35,31 +35,6 @@ NTSTATUS DriverEntry(
         DbgBreakPoint();
 #endif
 
-    FuseOperations[FspFsctlTransactReservedKind].Proc = FuseOpReserved;
-    FuseOperations[FspFsctlTransactCreateKind].Proc = FuseOpCreate;
-    FuseOperations[FspFsctlTransactCreateKind].Guard = FuseOgCreate;
-    FuseOperations[FspFsctlTransactOverwriteKind].Proc = FuseOpOverwrite;
-    FuseOperations[FspFsctlTransactCleanupKind].Proc = FuseOpCleanup;
-    FuseOperations[FspFsctlTransactCleanupKind].Guard = FuseOgCleanup;
-    FuseOperations[FspFsctlTransactCloseKind].Proc = FuseOpClose;
-    FuseOperations[FspFsctlTransactReadKind].Proc = FuseOpRead;
-    FuseOperations[FspFsctlTransactWriteKind].Proc = FuseOpWrite;
-    FuseOperations[FspFsctlTransactQueryInformationKind].Proc = FuseOpQueryInformation;
-    FuseOperations[FspFsctlTransactSetInformationKind].Proc = FuseOpSetInformation;
-    FuseOperations[FspFsctlTransactSetInformationKind].Guard = FuseOgSetInformation;
-    //FuseOperations[FspFsctlTransactQueryEaKind].Proc = FuseOpQueryEa;
-    //FuseOperations[FspFsctlTransactSetEaKind].Proc = FuseOpSetEa;
-    //FuseOperations[FspFsctlTransactFlushBuffersKind].Proc = FuseOpFlushBuffers;
-    FuseOperations[FspFsctlTransactQueryVolumeInformationKind].Proc = FuseOpQueryVolumeInformation;
-    //FuseOperations[FspFsctlTransactSetVolumeInformationKind].Proc = FuseOpSetVolumeInformation;
-    FuseOperations[FspFsctlTransactQueryDirectoryKind].Proc = FuseOpQueryDirectory;
-    FuseOperations[FspFsctlTransactQueryDirectoryKind].Guard = FuseOgQueryDirectory;
-    //FuseOperations[FspFsctlTransactFileSystemControlKind].Proc = FuseOpFileSystemControl;
-    //FuseOperations[FspFsctlTransactDeviceControlKind].Proc = FuseOpDeviceControl;
-    //FuseOperations[FspFsctlTransactQuerySecurityKind].Proc = FuseOpQuerySecurity;
-    //FuseOperations[FspFsctlTransactSetSecurityKind].Proc = FuseOpSetSecurity;
-    //FuseOperations[FspFsctlTransactQueryStreamInformationKind].Proc = FuseOpQueryStreamInformation;
-
     FuseProvider.Version = sizeof FuseProvider;
     FuseProvider.DeviceTransactCode = FUSE_FSCTL_TRANSACT;
     FuseProvider.DeviceExtensionSize = sizeof(FUSE_DEVICE_EXTENSION);

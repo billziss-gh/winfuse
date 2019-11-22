@@ -143,8 +143,6 @@ VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationT
     KeLeaveCriticalRegion();
 }
 
-FUSE_OPERATION FuseOperations[FspFsctlTransactKindCount];
-
 static inline BOOLEAN FuseContextProcess(FUSE_CONTEXT *Context,
     FUSE_PROTO_RSP *FuseResponse, FUSE_PROTO_REQ *FuseRequest, ULONG FuseRequestLength)
 {

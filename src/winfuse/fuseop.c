@@ -24,7 +24,7 @@
 static BOOLEAN FuseOpReserved_Init(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpReserved_Destroy(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpReserved_Forget(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpReserved(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpReserved(FUSE_CONTEXT *Context);
 static VOID FuseLookup(FUSE_CONTEXT *Context);
 static NTSTATUS FuseAccessCheck(
     UINT32 FileUid, UINT32 FileGid, UINT32 FileMode,
@@ -45,41 +45,39 @@ static VOID FuseOpCreate_FileOpenIf(FUSE_CONTEXT *Context);
 static VOID FuseOpCreate_FileOverwrite(FUSE_CONTEXT *Context);
 static VOID FuseOpCreate_FileOverwriteIf(FUSE_CONTEXT *Context);
 static VOID FuseOpCreate_FileOpenTargetDirectory(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context);
-BOOLEAN FuseOgCreate(FUSE_CONTEXT *Context, BOOLEAN Acquire);
-BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context);
-BOOLEAN FuseOgCleanup(FUSE_CONTEXT *Context, BOOLEAN Acquire);
-BOOLEAN FuseOpClose(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOgCreate(FUSE_CONTEXT *Context, BOOLEAN Acquire);
+static BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOgCleanup(FUSE_CONTEXT *Context, BOOLEAN Acquire);
+static BOOLEAN FuseOpClose(FUSE_CONTEXT *Context);
 static VOID FuseOpClose_ContextFini(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpRead(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpWrite(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpQueryInformation(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpRead(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpWrite(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpQueryInformation(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_SetBasicInfo(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_SetAllocationSize(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_SetFileSize(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_SetDelete(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_Rename(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context);
-BOOLEAN FuseOgSetInformation(FUSE_CONTEXT *Context, BOOLEAN Acquire);
-BOOLEAN FuseOpQueryEa(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpSetEa(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpFlushBuffers(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpQueryVolumeInformation(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpSetVolumeInformation(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOgSetInformation(FUSE_CONTEXT *Context, BOOLEAN Acquire);
+static BOOLEAN FuseOpQueryEa(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpSetEa(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpFlushBuffers(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpQueryVolumeInformation(FUSE_CONTEXT *Context);
 static BOOLEAN FuseAddDirInfo(FUSE_CONTEXT *Context,
     PSTRING Name, UINT64 NextOffset, FUSE_PROTO_ATTR *Attr,
     PVOID Buffer, ULONG Length, PULONG PBytesTransferred);
 static VOID FuseOpQueryDirectory_GetDirInfoByName(FUSE_CONTEXT *Context);
 static VOID FuseOpQueryDirectory_ReadDirectory(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpQueryDirectory(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpQueryDirectory(FUSE_CONTEXT *Context);
 static VOID FuseOpQueryDirectory_ContextFini(FUSE_CONTEXT *Context);
-BOOLEAN FuseOgQueryDirectory(FUSE_CONTEXT *Context, BOOLEAN Acquire);
-BOOLEAN FuseOpFileSystemControl(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpDeviceControl(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpQuerySecurity(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpSetSecurity(FUSE_CONTEXT *Context);
-BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOgQueryDirectory(FUSE_CONTEXT *Context, BOOLEAN Acquire);
+static BOOLEAN FuseOpFileSystemControl(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpDeviceControl(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpQuerySecurity(FUSE_CONTEXT *Context);
+static BOOLEAN FuseOpSetSecurity(FUSE_CONTEXT *Context);
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, FuseOpReserved_Init)
@@ -123,7 +121,6 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpSetEa)
 #pragma alloc_text(PAGE, FuseOpFlushBuffers)
 #pragma alloc_text(PAGE, FuseOpQueryVolumeInformation)
-#pragma alloc_text(PAGE, FuseOpSetVolumeInformation)
 #pragma alloc_text(PAGE, FuseAddDirInfo)
 #pragma alloc_text(PAGE, FuseOpQueryDirectory_GetDirInfoByName)
 #pragma alloc_text(PAGE, FuseOpQueryDirectory_ReadDirectory)
@@ -134,7 +131,6 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpDeviceControl)
 #pragma alloc_text(PAGE, FuseOpQuerySecurity)
 #pragma alloc_text(PAGE, FuseOpSetSecurity)
-#pragma alloc_text(PAGE, FuseOpQueryStreamInformation)
 #endif
 
 static BOOLEAN FuseOpReserved_Init(FUSE_CONTEXT *Context)
@@ -197,7 +193,7 @@ static BOOLEAN FuseOpReserved_Forget(FUSE_CONTEXT *Context)
     return FALSE;
 }
 
-BOOLEAN FuseOpReserved(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpReserved(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1048,7 +1044,7 @@ static VOID FuseOpCreate_FileOpenTargetDirectory(FUSE_CONTEXT *Context)
     }
 }
 
-BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1089,7 +1085,7 @@ BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
-BOOLEAN FuseOgCreate(FUSE_CONTEXT *Context, BOOLEAN Acquire)
+static BOOLEAN FuseOgCreate(FUSE_CONTEXT *Context, BOOLEAN Acquire)
 {
     PAGED_CODE();
 
@@ -1106,7 +1102,7 @@ BOOLEAN FuseOgCreate(FUSE_CONTEXT *Context, BOOLEAN Acquire)
     return Acquire;
 }
 
-BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1132,7 +1128,7 @@ BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
-BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1166,7 +1162,7 @@ BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
-BOOLEAN FuseOgCleanup(FUSE_CONTEXT *Context, BOOLEAN Acquire)
+static BOOLEAN FuseOgCleanup(FUSE_CONTEXT *Context, BOOLEAN Acquire)
 {
     PAGED_CODE();
 
@@ -1183,7 +1179,7 @@ BOOLEAN FuseOgCleanup(FUSE_CONTEXT *Context, BOOLEAN Acquire)
     return Acquire;
 }
 
-BOOLEAN FuseOpClose(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpClose(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1213,7 +1209,7 @@ static VOID FuseOpClose_ContextFini(FUSE_CONTEXT *Context)
         FuseFileDelete(Context->DeviceObject, Context->File);
 }
 
-BOOLEAN FuseOpRead(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpRead(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1272,7 +1268,7 @@ BOOLEAN FuseOpRead(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
-BOOLEAN FuseOpWrite(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpWrite(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1361,7 +1357,7 @@ BOOLEAN FuseOpWrite(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
-BOOLEAN FuseOpQueryInformation(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpQueryInformation(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1382,7 +1378,7 @@ BOOLEAN FuseOpQueryInformation(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
-BOOLEAN FuseOpSetInformation_SetBasicInfo(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpSetInformation_SetBasicInfo(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1422,7 +1418,7 @@ BOOLEAN FuseOpSetInformation_SetBasicInfo(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
-BOOLEAN FuseOpSetInformation_SetAllocationSize(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpSetInformation_SetAllocationSize(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1457,7 +1453,7 @@ BOOLEAN FuseOpSetInformation_SetAllocationSize(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
-BOOLEAN FuseOpSetInformation_SetFileSize(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpSetInformation_SetFileSize(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1484,7 +1480,7 @@ BOOLEAN FuseOpSetInformation_SetFileSize(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
-BOOLEAN FuseOpSetInformation_SetDelete(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpSetInformation_SetDelete(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1546,7 +1542,7 @@ BOOLEAN FuseOpSetInformation_SetDelete(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
-BOOLEAN FuseOpSetInformation_Rename(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpSetInformation_Rename(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1561,7 +1557,7 @@ BOOLEAN FuseOpSetInformation_Rename(FUSE_CONTEXT *Context)
 #endif
 }
 
-BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1617,7 +1613,7 @@ BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context)
 #endif
 }
 
-BOOLEAN FuseOgSetInformation(FUSE_CONTEXT *Context, BOOLEAN Acquire)
+static BOOLEAN FuseOgSetInformation(FUSE_CONTEXT *Context, BOOLEAN Acquire)
 {
     PAGED_CODE();
 
@@ -1637,28 +1633,28 @@ BOOLEAN FuseOgSetInformation(FUSE_CONTEXT *Context, BOOLEAN Acquire)
     return Acquire;
 }
 
-BOOLEAN FuseOpQueryEa(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpQueryEa(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
     return FALSE;
 }
 
-BOOLEAN FuseOpSetEa(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpSetEa(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
     return FALSE;
 }
 
-BOOLEAN FuseOpFlushBuffers(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpFlushBuffers(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
     return FALSE;
 }
 
-BOOLEAN FuseOpQueryVolumeInformation(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpQueryVolumeInformation(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1679,13 +1675,6 @@ BOOLEAN FuseOpQueryVolumeInformation(FUSE_CONTEXT *Context)
     }
 
     return coro_active();
-}
-
-BOOLEAN FuseOpSetVolumeInformation(FUSE_CONTEXT *Context)
-{
-    PAGED_CODE();
-
-    return FALSE;
 }
 
 static BOOLEAN FuseAddDirInfo(FUSE_CONTEXT *Context,
@@ -1931,7 +1920,7 @@ static VOID FuseOpQueryDirectory_ReadDirectory(FUSE_CONTEXT *Context)
     }
 }
 
-BOOLEAN FuseOpQueryDirectory(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpQueryDirectory(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
@@ -1968,7 +1957,7 @@ static VOID FuseOpQueryDirectory_ContextFini(FUSE_CONTEXT *Context)
         /* handles NULL gens */
 }
 
-BOOLEAN FuseOgQueryDirectory(FUSE_CONTEXT *Context, BOOLEAN Acquire)
+static BOOLEAN FuseOgQueryDirectory(FUSE_CONTEXT *Context, BOOLEAN Acquire)
 {
     PAGED_CODE();
 
@@ -1980,37 +1969,99 @@ BOOLEAN FuseOgQueryDirectory(FUSE_CONTEXT *Context, BOOLEAN Acquire)
     return Acquire;
 }
 
-BOOLEAN FuseOpFileSystemControl(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpFileSystemControl(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
     return FALSE;
 }
 
-BOOLEAN FuseOpDeviceControl(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpDeviceControl(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
     return FALSE;
 }
 
-BOOLEAN FuseOpQuerySecurity(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpQuerySecurity(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
     return FALSE;
 }
 
-BOOLEAN FuseOpSetSecurity(FUSE_CONTEXT *Context)
+static BOOLEAN FuseOpSetSecurity(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
     return FALSE;
 }
 
-BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context)
+FUSE_OPERATION FuseOperations[FspFsctlTransactKindCount] =
 {
-    PAGED_CODE();
+    /* FspFsctlTransactReservedKind */
+    { FuseOpReserved },
 
-    return FALSE;
-}
+    /* FspFsctlTransactCreateKind */
+    { FuseOpCreate, FuseOgCreate },
+
+    /* FspFsctlTransactOverwriteKind */
+    { FuseOpOverwrite },
+
+    /* FspFsctlTransactCleanupKind */
+    { FuseOpCleanup, FuseOgCleanup },
+
+    /* FspFsctlTransactCloseKind */
+    { FuseOpClose },
+
+    /* FspFsctlTransactReadKind */
+    { FuseOpRead },
+
+    /* FspFsctlTransactWriteKind */
+    { FuseOpWrite },
+
+    /* FspFsctlTransactQueryInformationKind */
+    { FuseOpQueryInformation },
+
+    /* FspFsctlTransactSetInformationKind */
+    { FuseOpSetInformation, FuseOgSetInformation },
+
+    /* FspFsctlTransactQueryEaKind */
+    { 0 },
+
+    /* FspFsctlTransactSetEaKind */
+    { 0 },
+
+    /* FspFsctlTransactFlushBuffersKind */
+    { 0 },
+
+    /* FspFsctlTransactQueryVolumeInformationKind */
+    { FuseOpQueryVolumeInformation },
+
+    /* FspFsctlTransactSetVolumeInformationKind */
+    { 0 },
+
+    /* FspFsctlTransactQueryDirectoryKind */
+    { FuseOpQueryDirectory, FuseOgQueryDirectory },
+
+    /* FspFsctlTransactFileSystemControlKind */
+    { 0 },
+
+    /* FspFsctlTransactDeviceControlKind */
+    { 0 },
+
+    /* FspFsctlTransactShutdownKind */
+    { 0 },
+
+    /* FspFsctlTransactLockControlKind */
+    { 0 },
+
+    /* FspFsctlTransactQuerySecurityKind */
+    { 0 },
+
+    /* FspFsctlTransactSetSecurityKind */
+    { 0 },
+
+    /* FspFsctlTransactQueryStreamInformationKind */
+    { 0 },
+};

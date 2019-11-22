@@ -228,32 +228,6 @@ VOID FuseCacheDereferenceItem(FUSE_CACHE *Cache, PVOID Item);
 VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList);
 BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForgetOne);
 
-/* FUSE processing functions */
-FUSE_OPERATION_PROC FuseOpReserved;
-FUSE_OPERATION_PROC FuseOpCreate;
-FUSE_OPERATION_GUARD FuseOgCreate;
-FUSE_OPERATION_PROC FuseOpOverwrite;
-FUSE_OPERATION_PROC FuseOpCleanup;
-FUSE_OPERATION_GUARD FuseOgCleanup;
-FUSE_OPERATION_PROC FuseOpClose;
-FUSE_OPERATION_PROC FuseOpRead;
-FUSE_OPERATION_PROC FuseOpWrite;
-FUSE_OPERATION_PROC FuseOpQueryInformation;
-FUSE_OPERATION_PROC FuseOpSetInformation;
-FUSE_OPERATION_GUARD FuseOgSetInformation;
-FUSE_OPERATION_PROC FuseOpQueryEa;
-FUSE_OPERATION_PROC FuseOpSetEa;
-FUSE_OPERATION_PROC FuseOpFlushBuffers;
-FUSE_OPERATION_PROC FuseOpQueryVolumeInformation;
-FUSE_OPERATION_PROC FuseOpSetVolumeInformation;
-FUSE_OPERATION_PROC FuseOpQueryDirectory;
-FUSE_OPERATION_GUARD FuseOgQueryDirectory;
-FUSE_OPERATION_PROC FuseOpFileSystemControl;
-FUSE_OPERATION_PROC FuseOpDeviceControl;
-FUSE_OPERATION_PROC FuseOpQuerySecurity;
-FUSE_OPERATION_PROC FuseOpSetSecurity;
-FUSE_OPERATION_PROC FuseOpQueryStreamInformation;
-
 /* protocol implementation */
 NTSTATUS FuseProtoPostInit(PDEVICE_OBJECT DeviceObject);
 VOID FuseProtoSendInit(FUSE_CONTEXT *Context);
