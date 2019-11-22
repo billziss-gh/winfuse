@@ -46,8 +46,10 @@ static VOID FuseOpCreate_FileOverwrite(FUSE_CONTEXT *Context);
 static VOID FuseOpCreate_FileOverwriteIf(FUSE_CONTEXT *Context);
 static VOID FuseOpCreate_FileOpenTargetDirectory(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context);
+BOOLEAN FuseOgCreate(FUSE_CONTEXT *Context, BOOLEAN Acquire);
 BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context);
+BOOLEAN FuseOgCleanup(FUSE_CONTEXT *Context, BOOLEAN Acquire);
 BOOLEAN FuseOpClose(FUSE_CONTEXT *Context);
 static VOID FuseOpClose_ContextFini(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpRead(FUSE_CONTEXT *Context);
@@ -59,6 +61,7 @@ static BOOLEAN FuseOpSetInformation_SetFileSize(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_SetDelete(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_Rename(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context);
+BOOLEAN FuseOgSetInformation(FUSE_CONTEXT *Context, BOOLEAN Acquire);
 BOOLEAN FuseOpQueryEa(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpSetEa(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpFlushBuffers(FUSE_CONTEXT *Context);
@@ -71,6 +74,7 @@ static VOID FuseOpQueryDirectory_GetDirInfoByName(FUSE_CONTEXT *Context);
 static VOID FuseOpQueryDirectory_ReadDirectory(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpQueryDirectory(FUSE_CONTEXT *Context);
 static VOID FuseOpQueryDirectory_ContextFini(FUSE_CONTEXT *Context);
+BOOLEAN FuseOgQueryDirectory(FUSE_CONTEXT *Context, BOOLEAN Acquire);
 BOOLEAN FuseOpFileSystemControl(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpDeviceControl(FUSE_CONTEXT *Context);
 BOOLEAN FuseOpQuerySecurity(FUSE_CONTEXT *Context);
@@ -100,8 +104,10 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpCreate_FileOverwriteIf)
 #pragma alloc_text(PAGE, FuseOpCreate_FileOpenTargetDirectory)
 #pragma alloc_text(PAGE, FuseOpCreate)
+#pragma alloc_text(PAGE, FuseOgCreate)
 #pragma alloc_text(PAGE, FuseOpOverwrite)
 #pragma alloc_text(PAGE, FuseOpCleanup)
+#pragma alloc_text(PAGE, FuseOgCleanup)
 #pragma alloc_text(PAGE, FuseOpClose)
 #pragma alloc_text(PAGE, FuseOpClose_ContextFini)
 #pragma alloc_text(PAGE, FuseOpRead)
@@ -112,6 +118,7 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpSetInformation_SetDelete)
 #pragma alloc_text(PAGE, FuseOpSetInformation_Rename)
 #pragma alloc_text(PAGE, FuseOpSetInformation)
+#pragma alloc_text(PAGE, FuseOgSetInformation)
 #pragma alloc_text(PAGE, FuseOpQueryEa)
 #pragma alloc_text(PAGE, FuseOpSetEa)
 #pragma alloc_text(PAGE, FuseOpFlushBuffers)
@@ -122,6 +129,7 @@ BOOLEAN FuseOpQueryStreamInformation(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpQueryDirectory_ReadDirectory)
 #pragma alloc_text(PAGE, FuseOpQueryDirectory)
 #pragma alloc_text(PAGE, FuseOpQueryDirectory_ContextFini)
+#pragma alloc_text(PAGE, FuseOgQueryDirectory)
 #pragma alloc_text(PAGE, FuseOpFileSystemControl)
 #pragma alloc_text(PAGE, FuseOpDeviceControl)
 #pragma alloc_text(PAGE, FuseOpQuerySecurity)
@@ -1081,6 +1089,23 @@ BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
+BOOLEAN FuseOgCreate(FUSE_CONTEXT *Context, BOOLEAN Acquire)
+{
+    PAGED_CODE();
+
+    if (Acquire)
+    {
+        if (FILE_OPEN != ((Context->InternalRequest->Req.Create.CreateOptions >> 24) & 0xff))
+            FuseOpGuardAcquireExclusive(Context);
+        else
+            FuseOpGuardAcquireShared(Context);
+    }
+    else
+        FuseOpGuardRelease(Context);
+
+    return Acquire;
+}
+
 BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
@@ -1139,6 +1164,23 @@ BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context)
     }
 
     return coro_active();
+}
+
+BOOLEAN FuseOgCleanup(FUSE_CONTEXT *Context, BOOLEAN Acquire)
+{
+    PAGED_CODE();
+
+    if (Acquire)
+    {
+        if (Context->InternalRequest->Req.Cleanup.Delete)
+            FuseOpGuardAcquireExclusive(Context);
+        else
+            Acquire = FALSE;
+    }
+    else
+        FuseOpGuardRelease(Context);
+
+    return Acquire;
 }
 
 BOOLEAN FuseOpClose(FUSE_CONTEXT *Context)
@@ -1575,6 +1617,26 @@ BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context)
 #endif
 }
 
+BOOLEAN FuseOgSetInformation(FUSE_CONTEXT *Context, BOOLEAN Acquire)
+{
+    PAGED_CODE();
+
+    if (Acquire)
+    {
+        if (FileRenameInformation == Context->InternalRequest->Req.SetInformation.FileInformationClass)
+            FuseOpGuardAcquireExclusive(Context);
+        else
+        if (FileDispositionInformation == Context->InternalRequest->Req.SetInformation.FileInformationClass)
+            FuseOpGuardAcquireShared(Context);
+        else
+            Acquire = FALSE;
+    }
+    else
+        FuseOpGuardRelease(Context);
+
+    return Acquire;
+}
+
 BOOLEAN FuseOpQueryEa(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
@@ -1904,6 +1966,18 @@ static VOID FuseOpQueryDirectory_ContextFini(FUSE_CONTEXT *Context)
         /* handles NULL paths */
     FuseCacheDereferenceGen(FuseDeviceExtension(Context->DeviceObject)->Cache, Context->QueryDirectory.CacheGen);
         /* handles NULL gens */
+}
+
+BOOLEAN FuseOgQueryDirectory(FUSE_CONTEXT *Context, BOOLEAN Acquire)
+{
+    PAGED_CODE();
+
+    if (Acquire)
+        FuseOpGuardAcquireShared(Context);
+    else
+        FuseOpGuardRelease(Context);
+
+    return Acquire;
 }
 
 BOOLEAN FuseOpFileSystemControl(FUSE_CONTEXT *Context)

@@ -42,6 +42,8 @@ NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *Vo
 {
     PAGED_CODE();
 
+    KeEnterCriticalRegion();
+
     FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
     FUSE_IOQ *Ioq = 0;
     FUSE_CACHE *Cache = 0;
@@ -69,6 +71,7 @@ NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *Vo
         goto fail;
 
     DeviceExtension->VolumeParams = VolumeParams;
+    ExInitializeResourceLite(&DeviceExtension->OpGuardLock);
     DeviceExtension->Ioq = Ioq;
     DeviceExtension->Cache = Cache;
     KeInitializeEvent(&DeviceExtension->InitEvent, NotificationEvent, FALSE);
@@ -79,6 +82,8 @@ NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *Vo
     if (!NT_SUCCESS(Result))
         goto fail;
 
+    KeLeaveCriticalRegion();
+
     return STATUS_SUCCESS;
 
 fail:
@@ -88,12 +93,16 @@ fail:
     if (0 != Ioq)
         FuseIoqDelete(Ioq);
 
+    KeLeaveCriticalRegion();
+
     return Result;
 }
 
 VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
 {
     PAGED_CODE();
+
+    KeEnterCriticalRegion();
 
     FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
 
@@ -115,18 +124,26 @@ VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
     FuseFileDeviceFini(DeviceObject);
 
     FuseCacheDelete(DeviceExtension->Cache);
+
+    ExDeleteResourceLite(&DeviceExtension->OpGuardLock);
+
+    KeLeaveCriticalRegion();
 }
 
 VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime)
 {
     PAGED_CODE();
 
+    KeEnterCriticalRegion();
+
     FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
 
     FuseCacheExpirationRoutine(DeviceExtension->Cache, DeviceObject, ExpirationTime);
+
+    KeLeaveCriticalRegion();
 }
 
-FUSE_PROCESS_DISPATCH *FuseProcessFunction[FspFsctlTransactKindCount];
+FUSE_OPERATION FuseOperations[FspFsctlTransactKindCount];
 
 static inline BOOLEAN FuseContextProcess(FUSE_CONTEXT *Context,
     FUSE_PROTO_RSP *FuseResponse, FUSE_PROTO_REQ *FuseRequest, ULONG FuseRequestLength)
@@ -137,16 +154,33 @@ static inline BOOLEAN FuseContextProcess(FUSE_CONTEXT *Context,
     UINT32 Kind = 0 == Context->InternalRequest ?
         FspFsctlTransactReservedKind : Context->InternalRequest->Kind;
 
+    if (0 == Context->FuseRequest && 0 == Context->FuseResponse &&
+        0 != FuseOperations[Kind].Guard)
+    {
+        ASSERT(!Context->Acquired);
+        Context->Acquired = FuseOperations[Kind].Guard(Context, TRUE);
+    }
+
     Context->FuseRequest = FuseRequest;
     Context->FuseResponse = FuseResponse;
     Context->FuseRequestLength = FuseRequestLength;
 
-    return FuseProcessFunction[Kind](Context);
+    BOOLEAN Result = FuseOperations[Kind].Proc(Context);
+
+    if (!Result && Context->Acquired)
+    {
+        FuseOperations[Kind].Guard(Context, FALSE);
+        Context->Acquired = FALSE;
+    }
+
+    return Result;
 }
 
 NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
     PAGED_CODE();
+
+    ASSERT(KeAreApcsDisabled());
 
     PIO_STACK_LOCATION IrpSp = IoGetCurrentIrpStackLocation(Irp);
     ASSERT(IRP_MJ_FILE_SYSTEM_CONTROL == IrpSp->MajorFunction);
@@ -313,7 +347,7 @@ VOID FuseContextCreate(FUSE_CONTEXT **PContext,
         FspFsctlTransactReservedKind : InternalRequest->Kind;
 
     ASSERT(FspFsctlTransactKindCount > Kind);
-    if (0 == FuseProcessFunction[Kind])
+    if (0 == FuseOperations[Kind].Proc)
     {
         *PContext = FuseContextStatus(STATUS_INVALID_DEVICE_REQUEST);
         return;
@@ -339,6 +373,13 @@ VOID FuseContextCreate(FUSE_CONTEXT **PContext,
 VOID FuseContextDelete(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
+
+    if (Context->Acquired)
+    {
+        UINT32 Kind = 0 == Context->InternalRequest ?
+            FspFsctlTransactReservedKind : Context->InternalRequest->Kind;
+        FuseOperations[Kind].Guard(Context, FALSE);
+    }
 
     if (0 != Context->Fini)
         Context->Fini(Context);

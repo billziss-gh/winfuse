@@ -55,6 +55,7 @@ BOOLEAN DebugMemoryChangeTest(PVOID Memory, SIZE_T Size, BOOLEAN Test);
 typedef struct _FUSE_DEVICE_EXTENSION
 {
     FSP_FSCTL_VOLUME_PARAMS *VolumeParams;
+    ERESOURCE OpGuardLock;
     PVOID Ioq;
     PVOID Cache;
     KEVENT InitEvent;
@@ -92,7 +93,13 @@ VOID FuseFileDelete(PDEVICE_OBJECT DeviceObject, FUSE_FILE *File);
 /* FUSE processing context */
 typedef struct _FUSE_CONTEXT FUSE_CONTEXT;
 typedef VOID FUSE_CONTEXT_FINI(FUSE_CONTEXT *Context);
-typedef BOOLEAN FUSE_PROCESS_DISPATCH(FUSE_CONTEXT *Context);
+typedef BOOLEAN FUSE_OPERATION_PROC(FUSE_CONTEXT *Context);
+typedef BOOLEAN FUSE_OPERATION_GUARD(FUSE_CONTEXT *Context, BOOLEAN Acquire);
+typedef struct _FUSE_OPERATION
+{
+    FUSE_OPERATION_PROC *Proc;
+    FUSE_OPERATION_GUARD *Guard;
+} FUSE_OPERATION;
 typedef struct _FUSE_CONTEXT_LOOKUP
 {
     PVOID CacheGen;
@@ -117,6 +124,7 @@ struct _FUSE_CONTEXT
     FUSE_PROTO_REQ *FuseRequest;
     FUSE_PROTO_RSP *FuseResponse;
     ULONG FuseRequestLength;
+    BOOLEAN Acquired;
     SHORT CoroState[16];
     UINT32 OrigUid, OrigGid, OrigPid;
     FUSE_FILE *File;
@@ -161,6 +169,27 @@ struct _FUSE_CONTEXT
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
     PDEVICE_OBJECT DeviceObject, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
 VOID FuseContextDelete(FUSE_CONTEXT *Context);
+static inline
+VOID FuseOpGuardAcquireExclusive(FUSE_CONTEXT *Context)
+{
+    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
+    ExAcquireResourceExclusiveLite(&DeviceExtension->OpGuardLock, TRUE);
+    ExSetResourceOwnerPointer(&DeviceExtension->OpGuardLock, (PVOID)((UINT_PTR)Context | 3));
+}
+static inline
+VOID FuseOpGuardAcquireShared(FUSE_CONTEXT *Context)
+{
+    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
+    ExAcquireResourceSharedLite(&DeviceExtension->OpGuardLock, TRUE);
+    ExSetResourceOwnerPointer(&DeviceExtension->OpGuardLock, (PVOID)((UINT_PTR)Context | 3));
+}
+static inline
+VOID FuseOpGuardRelease(FUSE_CONTEXT *Context)
+{
+    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
+    ExReleaseResourceForThreadLite(&DeviceExtension->OpGuardLock,
+        (ERESOURCE_THREAD)((UINT_PTR)Context | 3));
+}
 #define FuseContextStatus(S)            \
     (                                   \
         ASSERT(0xC0000000 == ((UINT32)(S) & 0xFFFF0000)),\
@@ -170,7 +199,7 @@ VOID FuseContextDelete(FUSE_CONTEXT *Context);
 #define FuseContextToStatus(C)          ((NTSTATUS)(0xC0000000 | (UINT32)(UINT_PTR)(C)))
 #define FuseContextWaitRequest(C)       do { while (0 == (C)->FuseRequest) coro_yield; } while (0,0)
 #define FuseContextWaitResponse(C)      do { coro_yield; } while (0 == (C)->FuseResponse)
-extern FUSE_PROCESS_DISPATCH *FuseProcessFunction[];
+extern FUSE_OPERATION FuseOperations[];
 
 /* FUSE I/O queue */
 typedef struct _FUSE_IOQ FUSE_IOQ;
@@ -200,26 +229,30 @@ VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList);
 BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForgetOne);
 
 /* FUSE processing functions */
-FUSE_PROCESS_DISPATCH FuseOpReserved;
-FUSE_PROCESS_DISPATCH FuseOpCreate;
-FUSE_PROCESS_DISPATCH FuseOpOverwrite;
-FUSE_PROCESS_DISPATCH FuseOpCleanup;
-FUSE_PROCESS_DISPATCH FuseOpClose;
-FUSE_PROCESS_DISPATCH FuseOpRead;
-FUSE_PROCESS_DISPATCH FuseOpWrite;
-FUSE_PROCESS_DISPATCH FuseOpQueryInformation;
-FUSE_PROCESS_DISPATCH FuseOpSetInformation;
-FUSE_PROCESS_DISPATCH FuseOpQueryEa;
-FUSE_PROCESS_DISPATCH FuseOpSetEa;
-FUSE_PROCESS_DISPATCH FuseOpFlushBuffers;
-FUSE_PROCESS_DISPATCH FuseOpQueryVolumeInformation;
-FUSE_PROCESS_DISPATCH FuseOpSetVolumeInformation;
-FUSE_PROCESS_DISPATCH FuseOpQueryDirectory;
-FUSE_PROCESS_DISPATCH FuseOpFileSystemControl;
-FUSE_PROCESS_DISPATCH FuseOpDeviceControl;
-FUSE_PROCESS_DISPATCH FuseOpQuerySecurity;
-FUSE_PROCESS_DISPATCH FuseOpSetSecurity;
-FUSE_PROCESS_DISPATCH FuseOpQueryStreamInformation;
+FUSE_OPERATION_PROC FuseOpReserved;
+FUSE_OPERATION_PROC FuseOpCreate;
+FUSE_OPERATION_GUARD FuseOgCreate;
+FUSE_OPERATION_PROC FuseOpOverwrite;
+FUSE_OPERATION_PROC FuseOpCleanup;
+FUSE_OPERATION_GUARD FuseOgCleanup;
+FUSE_OPERATION_PROC FuseOpClose;
+FUSE_OPERATION_PROC FuseOpRead;
+FUSE_OPERATION_PROC FuseOpWrite;
+FUSE_OPERATION_PROC FuseOpQueryInformation;
+FUSE_OPERATION_PROC FuseOpSetInformation;
+FUSE_OPERATION_GUARD FuseOgSetInformation;
+FUSE_OPERATION_PROC FuseOpQueryEa;
+FUSE_OPERATION_PROC FuseOpSetEa;
+FUSE_OPERATION_PROC FuseOpFlushBuffers;
+FUSE_OPERATION_PROC FuseOpQueryVolumeInformation;
+FUSE_OPERATION_PROC FuseOpSetVolumeInformation;
+FUSE_OPERATION_PROC FuseOpQueryDirectory;
+FUSE_OPERATION_GUARD FuseOgQueryDirectory;
+FUSE_OPERATION_PROC FuseOpFileSystemControl;
+FUSE_OPERATION_PROC FuseOpDeviceControl;
+FUSE_OPERATION_PROC FuseOpQuerySecurity;
+FUSE_OPERATION_PROC FuseOpSetSecurity;
+FUSE_OPERATION_PROC FuseOpQueryStreamInformation;
 
 /* protocol implementation */
 NTSTATUS FuseProtoPostInit(PDEVICE_OBJECT DeviceObject);
