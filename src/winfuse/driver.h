@@ -219,6 +219,7 @@ BOOLEAN FuseCacheGetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
     FUSE_PROTO_ENTRY *Entry, PVOID *PItem);
 VOID FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
     FUSE_PROTO_ENTRY *Entry, PVOID *PItem);
+VOID FuseCacheRemoveEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name);
 VOID FuseCacheReferenceItem(FUSE_CACHE *Cache, PVOID Item);
 VOID FuseCacheDereferenceItem(FUSE_CACHE *Cache, PVOID Item);
 VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList);

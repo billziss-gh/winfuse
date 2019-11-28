@@ -1155,6 +1155,10 @@ static BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context)
             else
                 coro_await (FuseProtoSendUnlink(Context));
 
+            FuseCacheRemoveEntry(
+                FuseDeviceExtension(Context->DeviceObject)->Cache,
+                Context->Lookup.Ino, &Context->Lookup.Name);
+
             Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
         }
     }

@@ -119,7 +119,7 @@ L:
     create_test create_related_test create_sd_test create_notraverse_test create_backup_test ^
     create_restore_test create_share_test create_curdir_test create_namelen_test ^
     getfileinfo_test delete_test delete_pending_test ^
-    rdwr_noncached_* rdwr_cached_* rdwr_writethru_*
+    rdwr_*
 if !ERRORLEVEL! neq 0 set TestExit=1
 popd
 taskkill /f /im %1-%2.exe

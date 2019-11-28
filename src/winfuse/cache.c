@@ -69,6 +69,7 @@ BOOLEAN FuseCacheGetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
     FUSE_PROTO_ENTRY *Entry, PVOID *PItem);
 VOID FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
     FUSE_PROTO_ENTRY *Entry, PVOID *PItem);
+VOID FuseCacheRemoveEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name);
 VOID FuseCacheReferenceItem(FUSE_CACHE *Cache, PVOID Item);
 VOID FuseCacheDereferenceItem(FUSE_CACHE *Cache, PVOID Item);
 VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList);
@@ -82,6 +83,7 @@ BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForge
 #pragma alloc_text(PAGE, FuseCacheDereferenceGen)
 #pragma alloc_text(PAGE, FuseCacheGetEntry)
 #pragma alloc_text(PAGE, FuseCacheSetEntry)
+#pragma alloc_text(PAGE, FuseCacheRemoveEntry)
 #pragma alloc_text(PAGE, FuseCacheReferenceItem)
 #pragma alloc_text(PAGE, FuseCacheDereferenceItem)
 #pragma alloc_text(PAGE, FuseCacheDeleteForgotten)
@@ -562,6 +564,22 @@ VOID FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
         FuseFree(NewItem);
 
     *PItem = Item;
+}
+
+VOID FuseCacheRemoveEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name)
+{
+    PAGED_CODE();
+
+    FUSE_CACHE_ITEM *Item;
+    ULONG Hash = FuseCacheHash(ParentIno, Name, Cache->CaseInsensitive);
+
+    ExAcquireFastMutex(&Cache->Mutex);
+
+    Item = FuseCacheLookupHashedItem(Cache, Hash, ParentIno, Name);
+    if (0 != Item)
+        FuseCacheExpireItem(Cache, Item);
+
+    ExReleaseFastMutex(&Cache->Mutex);
 }
 
 VOID FuseCacheReferenceItem(FUSE_CACHE *Cache, PVOID Item0)
