@@ -33,6 +33,9 @@ for %%f in (winfuse-%SUFFIX%.sys winfuse-tests-%SUFFIX%.exe) do (
 for %%f in (winfsp-%SUFFIX%.sys winfsp-%SUFFIX%.dll winfsp-tests-%SUFFIX%.exe) do (
     copy "!WINFSP!%%f" %TARGET% >nul
 )
+if exist tst\lockdly\lockdly.exe (
+    copy tst\lockdly\lockdly.exe %TARGET% >nul
+)
 if exist tst\memfs-fuse3\build\%CONFIG% (
     for %%f in (memfs-fuse3-%SUFFIX%.exe fuse3-%SUFFIX%.dll) do (
         copy tst\memfs-fuse3\build\%CONFIG%\%%f %TARGET% >nul

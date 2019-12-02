@@ -71,7 +71,7 @@ static NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PAR
         goto fail;
 
     DeviceExtension->VolumeParams = VolumeParams;
-    ExInitializeResourceLite(&DeviceExtension->OpGuardLock);
+    FuseRwlockInitialize(&DeviceExtension->OpGuardLock);
     DeviceExtension->Ioq = Ioq;
     DeviceExtension->Cache = Cache;
     KeInitializeEvent(&DeviceExtension->InitEvent, NotificationEvent, FALSE);
@@ -125,7 +125,7 @@ static VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
 
     FuseCacheDelete(DeviceExtension->Cache);
 
-    ExDeleteResourceLite(&DeviceExtension->OpGuardLock);
+    FuseRwlockFinalize(&DeviceExtension->OpGuardLock);
 
     KeLeaveCriticalRegion();
 }
@@ -155,8 +155,13 @@ static inline BOOLEAN FuseContextProcess(FUSE_CONTEXT *Context,
     if (0 == Context->FuseRequest && 0 == Context->FuseResponse &&
         0 != FuseOperations[Kind].Guard)
     {
-        ASSERT(!Context->Acquired);
-        Context->Acquired = FuseOperations[Kind].Guard(Context, TRUE);
+        ASSERT(FuseOpGuardFalse == Context->OpGuardResult);
+        Context->OpGuardResult = FuseOperations[Kind].Guard(Context, TRUE);
+        if (FuseOpGuardCancel == Context->OpGuardResult)
+        {
+            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_CANCELLED;
+            return FALSE;
+        }
     }
 
     Context->FuseRequest = FuseRequest;
@@ -165,10 +170,10 @@ static inline BOOLEAN FuseContextProcess(FUSE_CONTEXT *Context,
 
     BOOLEAN Result = FuseOperations[Kind].Proc(Context);
 
-    if (!Result && Context->Acquired)
+    if (!Result && FuseOpGuardTrue == Context->OpGuardResult)
     {
         FuseOperations[Kind].Guard(Context, FALSE);
-        Context->Acquired = FALSE;
+        Context->OpGuardResult = FuseOpGuardFalse;
     }
 
     return Result;
@@ -396,7 +401,7 @@ VOID FuseContextDelete(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    if (Context->Acquired)
+    if (FuseOpGuardTrue == Context->OpGuardResult)
     {
         UINT32 Kind = 0 == Context->InternalRequest ?
             FspFsctlTransactReservedKind : Context->InternalRequest->Kind;

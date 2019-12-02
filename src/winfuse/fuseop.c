@@ -46,10 +46,10 @@ static VOID FuseOpCreate_FileOverwrite(FUSE_CONTEXT *Context);
 static VOID FuseOpCreate_FileOverwriteIf(FUSE_CONTEXT *Context);
 static VOID FuseOpCreate_FileOpenTargetDirectory(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context);
-static BOOLEAN FuseOgCreate(FUSE_CONTEXT *Context, BOOLEAN Acquire);
+static INT FuseOgCreate(FUSE_CONTEXT *Context, BOOLEAN Acquire);
 static BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context);
-static BOOLEAN FuseOgCleanup(FUSE_CONTEXT *Context, BOOLEAN Acquire);
+static INT FuseOgCleanup(FUSE_CONTEXT *Context, BOOLEAN Acquire);
 static BOOLEAN FuseOpClose(FUSE_CONTEXT *Context);
 static VOID FuseOpClose_ContextFini(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpRead(FUSE_CONTEXT *Context);
@@ -61,7 +61,7 @@ static BOOLEAN FuseOpSetInformation_SetFileSize(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_SetDelete(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation_Rename(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context);
-static BOOLEAN FuseOgSetInformation(FUSE_CONTEXT *Context, BOOLEAN Acquire);
+static INT FuseOgSetInformation(FUSE_CONTEXT *Context, BOOLEAN Acquire);
 static BOOLEAN FuseOpQueryEa(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetEa(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpFlushBuffers(FUSE_CONTEXT *Context);
@@ -73,7 +73,7 @@ static VOID FuseOpQueryDirectory_GetDirInfoByName(FUSE_CONTEXT *Context);
 static VOID FuseOpQueryDirectory_ReadDirectory(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpQueryDirectory(FUSE_CONTEXT *Context);
 static VOID FuseOpQueryDirectory_ContextFini(FUSE_CONTEXT *Context);
-static BOOLEAN FuseOgQueryDirectory(FUSE_CONTEXT *Context, BOOLEAN Acquire);
+static INT FuseOgQueryDirectory(FUSE_CONTEXT *Context, BOOLEAN Acquire);
 static BOOLEAN FuseOpFileSystemControl(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpDeviceControl(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpQuerySecurity(FUSE_CONTEXT *Context);
@@ -1085,21 +1085,46 @@ static BOOLEAN FuseOpCreate(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
-static BOOLEAN FuseOgCreate(FUSE_CONTEXT *Context, BOOLEAN Acquire)
+static INT FuseOgCreate(FUSE_CONTEXT *Context, BOOLEAN Acquire)
 {
     PAGED_CODE();
 
     if (Acquire)
     {
+        INT Result;
         if (FILE_OPEN != ((Context->InternalRequest->Req.Create.CreateOptions >> 24) & 0xff))
-            FuseOpGuardAcquireExclusive(Context);
+            Result = FuseOpGuardAcquireExclusive(Context);
         else
-            FuseOpGuardAcquireShared(Context);
+            Result = FuseOpGuardAcquireShared(Context);
+#if DBG
+        /*
+         * In debug builds we add an artificial delay to our opens to test alertable locks.
+         */
+        if (Result)
+        {
+            UNICODE_STRING LockDly, FileName;
+            RtlInitUnicodeString(&LockDly, L"\\$LOCKDLY");
+            FileName.Length = FileName.MaximumLength =
+                Context->InternalRequest->FileName.Size - sizeof(WCHAR);
+            FileName.Buffer = (PVOID)(
+                Context->InternalRequest->Buffer + Context->InternalRequest->FileName.Offset);
+            if (RtlEqualUnicodeString(&LockDly, &FileName, FALSE))
+            {
+                LARGE_INTEGER Delay;
+                Delay.QuadPart = 5000/*ms*/ * -10000LL;
+                KeDelayExecutionThread(KernelMode, FALSE, &Delay);
+            }
+        }
+#endif
+        return Result;
     }
     else
-        FuseOpGuardRelease(Context);
-
-    return Acquire;
+    {
+        if (FILE_OPEN != ((Context->InternalRequest->Req.Create.CreateOptions >> 24) & 0xff))
+            return FuseOpGuardReleaseExclusive(Context);
+        else
+            return FuseOpGuardReleaseShared(Context);
+    }
 }
 
 static BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context)
@@ -1166,21 +1191,24 @@ static BOOLEAN FuseOpCleanup(FUSE_CONTEXT *Context)
     return coro_active();
 }
 
-static BOOLEAN FuseOgCleanup(FUSE_CONTEXT *Context, BOOLEAN Acquire)
+static INT FuseOgCleanup(FUSE_CONTEXT *Context, BOOLEAN Acquire)
 {
     PAGED_CODE();
 
     if (Acquire)
     {
         if (Context->InternalRequest->Req.Cleanup.Delete)
-            FuseOpGuardAcquireExclusive(Context);
+            return FuseOpGuardAcquireExclusive(Context);
         else
-            Acquire = FALSE;
+            return FuseOpGuardFalse;
     }
     else
-        FuseOpGuardRelease(Context);
-
-    return Acquire;
+    {
+        if (Context->InternalRequest->Req.Cleanup.Delete)
+            return FuseOpGuardReleaseExclusive(Context);
+        else
+            return FuseOpGuardFalse;
+    }
 }
 
 static BOOLEAN FuseOpClose(FUSE_CONTEXT *Context)
@@ -1617,24 +1645,30 @@ static BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context)
 #endif
 }
 
-static BOOLEAN FuseOgSetInformation(FUSE_CONTEXT *Context, BOOLEAN Acquire)
+static INT FuseOgSetInformation(FUSE_CONTEXT *Context, BOOLEAN Acquire)
 {
     PAGED_CODE();
 
     if (Acquire)
     {
         if (FileRenameInformation == Context->InternalRequest->Req.SetInformation.FileInformationClass)
-            FuseOpGuardAcquireExclusive(Context);
+            return FuseOpGuardAcquireExclusive(Context);
         else
         if (FileDispositionInformation == Context->InternalRequest->Req.SetInformation.FileInformationClass)
-            FuseOpGuardAcquireShared(Context);
+            return FuseOpGuardAcquireShared(Context);
         else
-            Acquire = FALSE;
+            return FuseOpGuardFalse;
     }
     else
-        FuseOpGuardRelease(Context);
-
-    return Acquire;
+    {
+        if (FileRenameInformation == Context->InternalRequest->Req.SetInformation.FileInformationClass)
+            return FuseOpGuardReleaseExclusive(Context);
+        else
+        if (FileDispositionInformation == Context->InternalRequest->Req.SetInformation.FileInformationClass)
+            return FuseOpGuardReleaseShared(Context);
+        else
+            return FuseOpGuardFalse;
+    }
 }
 
 static BOOLEAN FuseOpQueryEa(FUSE_CONTEXT *Context)
@@ -1961,16 +1995,14 @@ static VOID FuseOpQueryDirectory_ContextFini(FUSE_CONTEXT *Context)
         /* handles NULL gens */
 }
 
-static BOOLEAN FuseOgQueryDirectory(FUSE_CONTEXT *Context, BOOLEAN Acquire)
+static INT FuseOgQueryDirectory(FUSE_CONTEXT *Context, BOOLEAN Acquire)
 {
     PAGED_CODE();
 
     if (Acquire)
-        FuseOpGuardAcquireShared(Context);
+        return FuseOpGuardAcquireShared(Context);
     else
-        FuseOpGuardRelease(Context);
-
-    return Acquire;
+        return FuseOpGuardReleaseShared(Context);
 }
 
 static BOOLEAN FuseOpFileSystemControl(FUSE_CONTEXT *Context)

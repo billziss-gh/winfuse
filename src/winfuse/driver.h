@@ -51,11 +51,106 @@ BOOLEAN DebugMemoryChangeTest(PVOID Memory, SIZE_T Size, BOOLEAN Test);
 #define FUSE_FSCTL_TRANSACT             \
     CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0xC00 + 'F', METHOD_BUFFERED, FILE_ANY_ACCESS)
 
+/* read/write locks */
+#define FUSE_RWLOCK_USE_SEMAPHORE
+//#define FUSE_RWLOCK_USE_ERESOURCE
+typedef struct _FUSE_RWLOCK
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+    KSEMAPHORE OrderSem;
+    KSEMAPHORE WriteSem;
+    LONG Readers;
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ERESOURCE Resource;
+#else
+#error One of FUSE_RWLOCK_USE_SEMAPHORE or FUSE_RWLOCK_USE_ERESOURCE must be defined.
+#endif
+} FUSE_RWLOCK;
+static inline
+VOID FuseRwlockInitialize(FUSE_RWLOCK *Lock)
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+    KeInitializeSemaphore(&Lock->OrderSem, 1, 1);
+    KeInitializeSemaphore(&Lock->WriteSem, 1, 1);
+    Lock->Readers = 0;
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ExInitializeResourceLite(&Lock->Resource);
+#endif
+}
+static inline
+VOID FuseRwlockFinalize(FUSE_RWLOCK *Lock)
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ExDeleteResourceLite(&Lock->Resource);
+#endif
+}
+static inline
+BOOLEAN FuseRwlockEnterWriter(FUSE_RWLOCK *Lock, PVOID Owner)
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+    NTSTATUS Result;
+    Result = FsRtlCancellableWaitForSingleObject(&Lock->OrderSem, 0, 0);
+    if (STATUS_SUCCESS == Result)
+    {
+        Result = FsRtlCancellableWaitForSingleObject(&Lock->WriteSem, 0, 0);
+        KeReleaseSemaphore(&Lock->OrderSem, 1, 1, FALSE);
+    }
+    return STATUS_SUCCESS == Result;
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ExAcquireResourceExclusiveLite(&Lock->Resource, TRUE);
+    ExSetResourceOwnerPointer(&Lock->Resource, (PVOID)((UINT_PTR)Owner | 3));
+    return TRUE;
+#endif
+}
+static inline
+BOOLEAN FuseRwlockEnterReader(FUSE_RWLOCK *Lock, PVOID Owner)
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+    NTSTATUS Result;
+    Result = FsRtlCancellableWaitForSingleObject(&Lock->OrderSem, 0, 0);
+    if (STATUS_SUCCESS == Result)
+    {
+        if (1 == InterlockedIncrement(&Lock->Readers))
+        {
+            Result = FsRtlCancellableWaitForSingleObject(&Lock->WriteSem, 0, 0);
+            if (STATUS_SUCCESS != Result)
+                InterlockedDecrement(&Lock->Readers);
+        }
+        KeReleaseSemaphore(&Lock->OrderSem, 1, 1, FALSE);
+    }
+    return STATUS_SUCCESS == Result;
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ExAcquireResourceSharedLite(&Lock->Resource, TRUE);
+    ExSetResourceOwnerPointer(&Lock->Resource, (PVOID)((UINT_PTR)Owner | 3));
+    return TRUE;
+#endif
+}
+static inline
+VOID FuseRwlockLeaveWriter(FUSE_RWLOCK *Lock, PVOID Owner)
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+    KeReleaseSemaphore(&Lock->WriteSem, 1, 1, FALSE);
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ExReleaseResourceForThreadLite(&Lock->Resource, (ERESOURCE_THREAD)((UINT_PTR)Owner | 3));
+#endif
+}
+static inline
+VOID FuseRwlockLeaveReader(FUSE_RWLOCK *Lock, PVOID Owner)
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+    if (0 == InterlockedDecrement(&Lock->Readers))
+        KeReleaseSemaphore(&Lock->WriteSem, 1, 1, FALSE);
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ExReleaseResourceForThreadLite(&Lock->Resource, (ERESOURCE_THREAD)((UINT_PTR)Owner | 3));
+#endif
+}
+
 /* device management */
 typedef struct _FUSE_DEVICE_EXTENSION
 {
     FSP_FSCTL_VOLUME_PARAMS *VolumeParams;
-    ERESOURCE OpGuardLock;
+    FUSE_RWLOCK OpGuardLock;
     PVOID Ioq;
     PVOID Cache;
     KEVENT InitEvent;
@@ -90,7 +185,13 @@ VOID FuseFileDelete(PDEVICE_OBJECT DeviceObject, FUSE_FILE *File);
 typedef struct _FUSE_CONTEXT FUSE_CONTEXT;
 typedef VOID FUSE_CONTEXT_FINI(FUSE_CONTEXT *Context);
 typedef BOOLEAN FUSE_OPERATION_PROC(FUSE_CONTEXT *Context);
-typedef BOOLEAN FUSE_OPERATION_GUARD(FUSE_CONTEXT *Context, BOOLEAN Acquire);
+typedef INT FUSE_OPERATION_GUARD(FUSE_CONTEXT *Context, BOOLEAN Acquire);
+enum
+{
+    FuseOpGuardCancel = -1,
+    FuseOpGuardFalse = 0,
+    FuseOpGuardTrue = 1,
+};
 typedef struct _FUSE_OPERATION
 {
     FUSE_OPERATION_PROC *Proc;
@@ -120,7 +221,7 @@ struct _FUSE_CONTEXT
     FUSE_PROTO_REQ *FuseRequest;
     FUSE_PROTO_RSP *FuseResponse;
     ULONG FuseRequestLength;
-    BOOLEAN Acquired;
+    INT OpGuardResult;
     SHORT CoroState[16];
     UINT32 OrigUid, OrigGid, OrigPid;
     FUSE_FILE *File;
@@ -166,25 +267,38 @@ VOID FuseContextCreate(FUSE_CONTEXT **PContext,
     PDEVICE_OBJECT DeviceObject, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
 VOID FuseContextDelete(FUSE_CONTEXT *Context);
 static inline
-VOID FuseOpGuardAcquireExclusive(FUSE_CONTEXT *Context)
+INT FuseOpGuardResult_(BOOLEAN RwlockResult)
 {
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
-    ExAcquireResourceExclusiveLite(&DeviceExtension->OpGuardLock, TRUE);
-    ExSetResourceOwnerPointer(&DeviceExtension->OpGuardLock, (PVOID)((UINT_PTR)Context | 3));
+    ASSERT(
+        ( RwlockResult && FuseOpGuardTrue   == (((INT)RwlockResult - 1) | 1)) ||
+        (!RwlockResult && FuseOpGuardCancel == (((INT)RwlockResult - 1) | 1)));
+    return ((INT)RwlockResult - 1) | 1;
 }
 static inline
-VOID FuseOpGuardAcquireShared(FUSE_CONTEXT *Context)
+INT FuseOpGuardAcquireExclusive(FUSE_CONTEXT *Context)
 {
     FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
-    ExAcquireResourceSharedLite(&DeviceExtension->OpGuardLock, TRUE);
-    ExSetResourceOwnerPointer(&DeviceExtension->OpGuardLock, (PVOID)((UINT_PTR)Context | 3));
+    return FuseOpGuardResult_(FuseRwlockEnterWriter(&DeviceExtension->OpGuardLock, Context));
 }
 static inline
-VOID FuseOpGuardRelease(FUSE_CONTEXT *Context)
+INT FuseOpGuardAcquireShared(FUSE_CONTEXT *Context)
 {
     FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
-    ExReleaseResourceForThreadLite(&DeviceExtension->OpGuardLock,
-        (ERESOURCE_THREAD)((UINT_PTR)Context | 3));
+    return FuseOpGuardResult_(FuseRwlockEnterReader(&DeviceExtension->OpGuardLock, Context));
+}
+static inline
+INT FuseOpGuardReleaseExclusive(FUSE_CONTEXT *Context)
+{
+    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
+    FuseRwlockLeaveWriter(&DeviceExtension->OpGuardLock, Context);
+    return FuseOpGuardFalse;
+}
+static inline
+INT FuseOpGuardReleaseShared(FUSE_CONTEXT *Context)
+{
+    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
+    FuseRwlockLeaveReader(&DeviceExtension->OpGuardLock, Context);
+    return FuseOpGuardFalse;
 }
 #define FuseContextStatus(S)            \
     (                                   \
