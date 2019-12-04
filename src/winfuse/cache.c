@@ -405,7 +405,7 @@ NTSTATUS FuseCacheReferenceGen(FUSE_CACHE *Cache, PVOID *PGen)
     {
         Gen = CONTAINING_RECORD(Cache->GenList.Blink, FUSE_CACHE_GEN, ListEntry);
         if (InterruptTime <= Gen->InterruptTime)
-            InterlockedIncrement(&Gen->RefCount);
+            Gen->RefCount++;
         else
             Gen = 0;
     }
@@ -428,7 +428,7 @@ NTSTATUS FuseCacheReferenceGen(FUSE_CACHE *Cache, PVOID *PGen)
         {
             Gen = CONTAINING_RECORD(Cache->GenList.Blink, FUSE_CACHE_GEN, ListEntry);
             if (InterruptTime <= Gen->InterruptTime)
-                InterlockedIncrement(&Gen->RefCount);
+                Gen->RefCount++;
             else
                 Gen = 0;
         }
@@ -461,15 +461,14 @@ VOID FuseCacheDereferenceGen(FUSE_CACHE *Cache, PVOID Gen0)
     if (0 == Gen)
         return;
 
-    RefCount = InterlockedDecrement(&Gen->RefCount);
+    ExAcquireFastMutex(&Cache->Mutex);
+    RefCount = --Gen->RefCount;
     if (0 == RefCount)
-    {
-        ExAcquireFastMutex(&Cache->Mutex);
         RemoveEntryList(&Gen->ListEntry);
-        ExReleaseFastMutex(&Cache->Mutex);
+    ExReleaseFastMutex(&Cache->Mutex);
 
+    if (0 == RefCount)
         FuseFree(Gen);
-    }
 }
 
 BOOLEAN FuseCacheGetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
