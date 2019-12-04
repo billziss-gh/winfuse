@@ -123,7 +123,8 @@ L:
     rdwr_* ^
     lock_* ^
     querydir_* ^
-    dirnotify_test
+    dirnotify_test ^
+    exec_test exec_delete_test
 if !ERRORLEVEL! neq 0 set TestExit=1
 popd
 taskkill /f /im %1-%2.exe

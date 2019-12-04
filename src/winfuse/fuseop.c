@@ -1144,6 +1144,9 @@ static BOOLEAN FuseOpOverwrite(FUSE_CONTEXT *Context)
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
+        FuseCacheQuickExpireItem(FuseDeviceExtension(Context->DeviceObject)->Cache,
+            Context->File->CacheItem);
+
         FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.getattr.attr,
             &Context->InternalResponse->Rsp.Overwrite.FileInfo);
 
@@ -1379,6 +1382,9 @@ static BOOLEAN FuseOpWrite(FUSE_CONTEXT *Context)
         if (Context->Write.Attr.size < Context->Write.StartOffset + Context->Write.Offset)
             Context->Write.Attr.size = Context->Write.StartOffset + Context->Write.Offset;
 
+        FuseCacheQuickExpireItem(FuseDeviceExtension(Context->DeviceObject)->Cache,
+            Context->File->CacheItem);
+
         FuseAttrToFileInfo(Context->DeviceObject, &Context->Write.Attr,
             &Context->InternalResponse->Rsp.Write.FileInfo);
 
@@ -1441,6 +1447,9 @@ static BOOLEAN FuseOpSetInformation_SetBasicInfo(FUSE_CONTEXT *Context)
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
+        FuseCacheQuickExpireItem(FuseDeviceExtension(Context->DeviceObject)->Cache,
+            Context->File->CacheItem);
+
         FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.getattr.attr,
             &Context->InternalResponse->Rsp.SetInformation.FileInfo);
 
@@ -1476,6 +1485,9 @@ static BOOLEAN FuseOpSetInformation_SetAllocationSize(FUSE_CONTEXT *Context)
                 coro_break;
         }
 
+        FuseCacheQuickExpireItem(FuseDeviceExtension(Context->DeviceObject)->Cache,
+            Context->File->CacheItem);
+
         FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.getattr.attr,
             &Context->InternalResponse->Rsp.SetInformation.FileInfo);
 
@@ -1502,6 +1514,9 @@ static BOOLEAN FuseOpSetInformation_SetFileSize(FUSE_CONTEXT *Context)
         coro_await (FuseProtoSendFgetattr(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
+
+        FuseCacheQuickExpireItem(FuseDeviceExtension(Context->DeviceObject)->Cache,
+            Context->File->CacheItem);
 
         FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.getattr.attr,
             &Context->InternalResponse->Rsp.SetInformation.FileInfo);

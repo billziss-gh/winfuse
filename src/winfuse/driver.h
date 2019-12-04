@@ -336,6 +336,7 @@ VOID FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
 VOID FuseCacheRemoveEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name);
 VOID FuseCacheReferenceItem(FUSE_CACHE *Cache, PVOID Item);
 VOID FuseCacheDereferenceItem(FUSE_CACHE *Cache, PVOID Item);
+VOID FuseCacheQuickExpireItem(FUSE_CACHE *Cache, PVOID Item);
 VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList);
 BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForgetOne);
 
