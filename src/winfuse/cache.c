@@ -72,6 +72,7 @@ VOID FuseCacheSetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
 VOID FuseCacheRemoveEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name);
 VOID FuseCacheReferenceItem(FUSE_CACHE *Cache, PVOID Item);
 VOID FuseCacheDereferenceItem(FUSE_CACHE *Cache, PVOID Item);
+VOID FuseCacheQuickExpireItem(FUSE_CACHE *Cache, PVOID Item);
 VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList);
 BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForgetOne);
 
@@ -86,6 +87,7 @@ BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForge
 #pragma alloc_text(PAGE, FuseCacheRemoveEntry)
 #pragma alloc_text(PAGE, FuseCacheReferenceItem)
 #pragma alloc_text(PAGE, FuseCacheDereferenceItem)
+#pragma alloc_text(PAGE, FuseCacheQuickExpireItem)
 #pragma alloc_text(PAGE, FuseCacheDeleteForgotten)
 #pragma alloc_text(PAGE, FuseCacheForgetOne)
 #endif
@@ -124,6 +126,7 @@ struct _FUSE_CACHE_ITEM
     UINT64 ExpirationTime;
     UINT64 LastUsedTime;
     FUSE_PROTO_ENTRY Entry;
+    LONG QuickExpiry;
     LONG RefCount;
     CHAR NameBuf[];
 };
@@ -178,7 +181,8 @@ static inline BOOLEAN FuseCacheExpireNextItem(FUSE_CACHE *Cache,
     if (!IsListEmpty(&Cache->ItemList))
     {
         FUSE_CACHE_ITEM *Item = CONTAINING_RECORD(Cache->ItemList.Flink, FUSE_CACHE_ITEM, ListEntry);
-        if (ExpirationTime >= Item->ExpirationTime)
+        if (ExpirationTime >= Item->ExpirationTime ||
+            InterlockedCompareExchange(&Item->QuickExpiry, 1, 1))
             return FuseCacheExpireItem(Cache, Item);
     }
     return FALSE;
@@ -252,7 +256,8 @@ static inline FUSE_CACHE_ITEM *FuseCacheUpdateHashedItem(FUSE_CACHE *Cache,
     FUSE_CACHE_ITEM *Item = FuseCacheLookupHashedItem(Cache, Hash, ParentIno, Name);
     if (0 != Item)
     {
-        if (Entry->nodeid == Item->Entry.nodeid)
+        if (Entry->nodeid == Item->Entry.nodeid &&
+            !InterlockedCompareExchange(&Item->QuickExpiry, 1, 1))
         {
             Item->NLookup++;
             Item->ExpirationTime = ExpirationTime;
@@ -481,7 +486,8 @@ BOOLEAN FuseCacheGetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
     Item = FuseCacheLookupHashedItem(Cache, Hash, ParentIno, Name);
     if (0 != Item)
     {
-        if (InterruptTime < Item->ExpirationTime)
+        if (InterruptTime < Item->ExpirationTime &&
+            !InterlockedCompareExchange(&Item->QuickExpiry, 1, 1))
         {
             Item->LastUsedTime = InterruptTime;
             RtlCopyMemory(Entry, &Item->Entry, sizeof Item->Entry);
@@ -608,6 +614,15 @@ VOID FuseCacheDereferenceItem(FUSE_CACHE *Cache, PVOID Item0)
         InsertTailList(&Cache->ForgetList, &Item->ListEntry);
         ExReleaseFastMutex(&Cache->Mutex);
     }
+}
+
+VOID FuseCacheQuickExpireItem(FUSE_CACHE *Cache, PVOID Item0)
+{
+    PAGED_CODE();
+
+    FUSE_CACHE_ITEM *Item = Item0;
+
+    InterlockedExchange(&Item->QuickExpiry, 1);
 }
 
 VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList)
