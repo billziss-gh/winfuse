@@ -42,6 +42,7 @@ build_script:
 test_script:
 - sc create WinFuse type=kernel binPath=C:\projects\winfuse\build\VStudio\build\%CONFIGURATION%\winfuse-x64.sys
 - reg add HKLM\Software\WinFsp\Fsext /v 00093118 /d "WinFuse" /f /reg:32
+- tools\nmake-ext-test.bat
 - tools\run-tests.bat %CONFIGURATION%
 - tools\run-tests.bat %CONFIGURATION% sample
 - if exist %SystemRoot%\memory.dmp exit 1

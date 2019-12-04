@@ -18,7 +18,9 @@ set dfl_tests=^
     winfuse-tests-x86
 set opt_tests=^
     sample-memfs-fuse3-x64 ^
-    sample-memfs-fuse3-x86
+    sample-fsx-memfs-fuse3-x64 ^
+    sample-memfs-fuse3-x86 ^
+    sample-fsx-memfs-fuse3-x86
 
 set tests=
 for %%f in (%dfl_tests%) do (
@@ -125,6 +127,36 @@ L:
     querydir_* ^
     dirnotify_test ^
     exec_test exec_delete_test
+if !ERRORLEVEL! neq 0 set TestExit=1
+popd
+taskkill /f /im %1-%2.exe
+rem rmdir /s/q "%TMP%\%1"
+rmdir /s/q "%ProjRoot%\tst\%1\build"
+exit /b !TestExit!
+
+:sample-fsx-memfs-fuse3-x64
+call :__run_sample_fsx_test memfs-fuse3 x64
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-fsx-memfs-fuse3-x86
+call :__run_sample_fsx_test memfs-fuse3 x86
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:__run_sample_fsx_test
+rem REVISIT when sample is included in installer
+set TestExit=0
+rem call %ProjRoot%\tools\build-sample.bat %Configuration% %2 %1 "%TMP%\%1"
+call %ProjRoot%\tools\build-sample.bat %Configuration% %2 %1
+if !ERRORLEVEL! neq 0 goto fail
+rem start "" /b "%TMP%\%1\build\%Configuration%\%1-%2.exe" L:
+start "" /b "%ProjRoot%\tst\%1\build\%Configuration%\%1-%2.exe" L:
+waitfor 7BF47D72F6664550B03248ECFE77C7DD /t 3 2>nul
+pushd >nul
+cd L: >nul 2>nul || (echo Unable to find drive L: >&2 & goto fail)
+L:
+"%ProjRoot%\ext\winfsp\ext\test\fstools\src\fsx\fsx.exe" -N 5000 test xxxxxx
 if !ERRORLEVEL! neq 0 set TestExit=1
 popd
 taskkill /f /im %1-%2.exe
