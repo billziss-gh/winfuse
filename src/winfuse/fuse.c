@@ -318,7 +318,18 @@ request:
                 goto exit;
         }
         else if (0 == Context->InternalRequest)
-            /* ignore */;
+        {
+            switch (Context->InternalResponse->Hint)
+            {
+            case FUSE_PROTO_OPCODE_FORGET:
+            case FUSE_PROTO_OPCODE_BATCH_FORGET:
+                if (!IsListEmpty(&Context->Forget.ForgetList))
+                    FuseIoqPostPending(DeviceExtension->Ioq, Context);
+                else
+                    FuseContextDelete(Context);
+                break;
+            }
+        }
         else
         {
             Result = FspFsextProviderTransact(
@@ -414,5 +425,10 @@ VOID FuseContextDelete(FUSE_CONTEXT *Context)
         FuseFree(Context->InternalRequest);
     if ((PVOID)&Context->InternalResponseBuf != Context->InternalResponse)
         FuseFree(Context->InternalResponse);
+
+#if DBG
+    DebugMemoryChangeTest(Context, sizeof *Context, FALSE);
+#endif
+
     FuseFree(Context);
 }

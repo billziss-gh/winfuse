@@ -185,11 +185,6 @@ static BOOLEAN FuseOpReserved_Forget(FUSE_CONTEXT *Context)
     else
         FuseProtoFillBatchForget(Context);
 
-    if (!IsListEmpty(&Context->Forget.ForgetList))
-        FuseIoqPostPending(DeviceExtension->Ioq, Context);
-    else
-        FuseContextDelete(Context);
-
     return FALSE;
 }
 
