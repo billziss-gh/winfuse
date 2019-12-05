@@ -178,9 +178,9 @@ static BOOLEAN FuseOpReserved_Forget(FUSE_CONTEXT *Context)
     FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
 
     ASSERT(!IsListEmpty(&Context->Forget.ForgetList));
-    if (DEBUGTEST(10) ||
-        16 > DeviceExtension->VersionMinor ||
-        &Context->Forget.ForgetList == Context->Forget.ForgetList.Flink->Flink)
+    if (16 > DeviceExtension->VersionMinor ||
+        &Context->Forget.ForgetList == Context->Forget.ForgetList.Flink->Flink ||
+        DEBUGTEST(10))
         FuseProtoFillForget(Context);
     else
         FuseProtoFillBatchForget(Context);
