@@ -435,9 +435,7 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
     coro_block (Context->CoroState)
     {
         Context->LookupPath.Ino = FUSE_PROTO_ROOT_INO;
-#if DBG
-        DebugMemoryChangeTest(&Context->Lookup.Attr, sizeof Context->Lookup.Attr, FALSE);
-#endif
+        DEBUGFILL(&Context->Lookup.Attr, sizeof Context->Lookup.Attr);
         while (1) /* for (;;) produces "warning C4702: unreachable code" */
         {
             FusePosixPathPrefix(&Context->LookupPath.Remain, &Context->LookupPath.Name, &Context->LookupPath.Remain);
@@ -495,9 +493,7 @@ static VOID FuseLookupPath(FUSE_CONTEXT *Context)
 
             if (LastName)
             {
-#if DBG
-                ASSERT(DebugMemoryChangeTest(&Context->Lookup.Attr, sizeof Context->Lookup.Attr, TRUE));
-#endif
+                ASSERT(DEBUGGOOD(&Context->Lookup.Attr, sizeof Context->Lookup.Attr));
                 break;
             }
         }

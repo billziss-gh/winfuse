@@ -426,9 +426,6 @@ VOID FuseContextDelete(FUSE_CONTEXT *Context)
     if ((PVOID)&Context->InternalResponseBuf != Context->InternalResponse)
         FuseFree(Context->InternalResponse);
 
-#if DBG
-    DebugMemoryChangeTest(Context, sizeof *Context, FALSE);
-#endif
-
+    DEBUGFILL(Context, sizeof *Context);
     FuseFree(Context);
 }

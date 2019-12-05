@@ -77,5 +77,7 @@ VOID FuseFileDelete(PDEVICE_OBJECT DeviceObject, FUSE_FILE *File)
     KeReleaseSpinLock(&DeviceExtension->FileListLock, Irql);
 
     FuseCacheDereferenceItem(DeviceExtension->Cache, File->CacheItem);
+
+    DEBUGFILL(File, sizeof *File);
     FuseFree(File);
 }

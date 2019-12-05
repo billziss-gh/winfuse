@@ -39,13 +39,17 @@
 /* debug */
 #if DBG
 ULONG DebugRandom(VOID);
-BOOLEAN DebugMemoryChangeTest(PVOID Memory, SIZE_T Size, BOOLEAN Test);
+BOOLEAN DebugMemory(PVOID Memory, SIZE_T Size, BOOLEAN Test);
 #define DEBUGLOG(fmt, ...)              \
     DbgPrint("[%d] " DRIVER_NAME "!" __FUNCTION__ ": " fmt "\n", KeGetCurrentIrql(), __VA_ARGS__)
 #define DEBUGTEST(Percent)              (DebugRandom() <= (Percent) * 0x7fff / 100)
+#define DEBUGFILL(M, S)                 DebugMemory(M, S, FALSE)
+#define DEBUGGOOD(M, S)                 DebugMemory(M, S, TRUE)
 #else
 #define DEBUGLOG(fmt, ...)              ((void)0)
 #define DEBUGTEST(Percent)              (TRUE)
+#define DEBUGFILL(M, S)                 (TRUE)
+#define DEBUGGOOD(M, S)                 (TRUE)
 #endif
 
 #define FUSE_FSCTL_TRANSACT             \

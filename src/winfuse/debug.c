@@ -40,7 +40,7 @@ ULONG DebugRandom(VOID)
     return Result;
 }
 
-BOOLEAN DebugMemoryChangeTest(PVOID Memory, SIZE_T Size, BOOLEAN Test)
+BOOLEAN DebugMemory(PVOID Memory, SIZE_T Size, BOOLEAN Test)
 {
     BOOLEAN Result = TRUE;
     if (!Test)
