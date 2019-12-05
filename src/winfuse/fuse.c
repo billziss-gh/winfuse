@@ -155,6 +155,7 @@ static inline BOOLEAN FuseContextProcess(FUSE_CONTEXT *Context,
     if (0 == Context->FuseRequest && 0 == Context->FuseResponse &&
         0 != FuseOperations[Kind].Guard)
     {
+        ASSERT(0 != Kind); /* no opguard support for Kind==0 */
         ASSERT(FuseOpGuardFalse == Context->OpGuardResult);
         Context->OpGuardResult = FuseOperations[Kind].Guard(Context, TRUE);
         if (FuseOpGuardCancel == Context->OpGuardResult)
@@ -170,7 +171,11 @@ static inline BOOLEAN FuseContextProcess(FUSE_CONTEXT *Context,
 
     BOOLEAN Result = FuseOperations[Kind].Proc(Context);
 
-    if (!Result && FuseOpGuardTrue == Context->OpGuardResult)
+    /*
+     * DO NOT ACCESS CONTEXT WHEN Kind==0. IT MAY HAVE BEEN FREED!
+     */
+
+    if (!Result && 0 != Kind && FuseOpGuardTrue == Context->OpGuardResult)
     {
         FuseOperations[Kind].Guard(Context, FALSE);
         Context->OpGuardResult = FuseOpGuardFalse;
