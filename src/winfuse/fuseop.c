@@ -31,12 +31,14 @@ static NTSTATUS FuseAccessCheck(
     UINT32 OrigUid, UINT32 OrigGid, UINT32 DesiredAccess,
     PUINT32 PGrantedAccess);
 static VOID FusePrepareLookupPath(FUSE_CONTEXT *Context);
+static VOID FusePrepareLookupPath2(FUSE_CONTEXT *Context);
 static VOID FusePrepareLookupPath_ContextFini(FUSE_CONTEXT *Context);
 static VOID FuseLookupPath(FUSE_CONTEXT *Context);
 static VOID FuseCreateCheck(FUSE_CONTEXT *Context);
 static VOID FuseOpenCheck(FUSE_CONTEXT *Context);
 static VOID FuseOverwriteCheck(FUSE_CONTEXT *Context);
 static VOID FuseOpenTargetDirectoryCheck(FUSE_CONTEXT *Context);
+static VOID FuseRenameCheck(FUSE_CONTEXT *Context);
 static VOID FuseCreate(FUSE_CONTEXT *Context);
 static VOID FuseOpen(FUSE_CONTEXT *Context);
 static VOID FuseOpCreate_FileCreate(FUSE_CONTEXT *Context);
@@ -87,12 +89,14 @@ static BOOLEAN FuseOpSetSecurity(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseLookup)
 #pragma alloc_text(PAGE, FuseAccessCheck)
 #pragma alloc_text(PAGE, FusePrepareLookupPath)
+#pragma alloc_text(PAGE, FusePrepareLookupPath2)
 #pragma alloc_text(PAGE, FusePrepareLookupPath_ContextFini)
 #pragma alloc_text(PAGE, FuseLookupPath)
 #pragma alloc_text(PAGE, FuseCreateCheck)
 #pragma alloc_text(PAGE, FuseOpenCheck)
 #pragma alloc_text(PAGE, FuseOverwriteCheck)
 #pragma alloc_text(PAGE, FuseOpenTargetDirectoryCheck)
+#pragma alloc_text(PAGE, FuseRenameCheck)
 #pragma alloc_text(PAGE, FuseCreate)
 #pragma alloc_text(PAGE, FuseOpen)
 #pragma alloc_text(PAGE, FuseOpCreate_FileCreate)
@@ -390,6 +394,7 @@ static VOID FusePrepareLookupPath(FUSE_CONTEXT *Context)
     Context->OrigGid = Gid;
     Context->OrigPid = Pid;
 
+    ASSERT(0 == Context->LookupPath.OrigPath.Buffer);
     RtlInitString(&Context->LookupPath.OrigPath, PosixPath);
     Context->LookupPath.CacheGen = CacheGen;
     Context->LookupPath.UserMode = IsUserMode;
@@ -409,6 +414,48 @@ exit:
     }
 }
 
+static VOID FusePrepareLookupPath2(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    PSTR PosixPath = 0;
+    PWSTR FileName = 0;
+
+    switch (Context->InternalRequest->Kind)
+    {
+    case FspFsctlTransactSetInformationKind:
+        ASSERT(FileRenameInformation ==
+            Context->InternalRequest->Req.SetInformation.FileInformationClass);
+        FileName = (PWSTR)Context->InternalRequest->Buffer;
+        break;
+    default:
+        ASSERT(FALSE);
+        Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_PARAMETER;
+        goto exit;
+    }
+
+    if (0 != FileName)
+    {
+        Context->InternalResponse->IoStatus.Status = FspPosixMapWindowsToPosixPathEx(
+            FileName, &PosixPath, TRUE);
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            goto exit;
+    }
+
+    ASSERT(0 == Context->LookupPath.OrigPath.Buffer);
+    ASSERT(0 != Context->LookupPath.OrigPath2.Buffer);
+    RtlInitString(&Context->LookupPath.OrigPath, PosixPath);
+
+    Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+
+exit:
+    if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+    {
+        FspPosixDeletePath(PosixPath);
+            /* handles NULL paths */
+    }
+}
+
 static VOID FusePrepareLookupPath_ContextFini(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
@@ -417,6 +464,8 @@ static VOID FusePrepareLookupPath_ContextFini(FUSE_CONTEXT *Context)
         0 != Context->File)
         FuseFileDelete(Context->DeviceObject, Context->File);
 
+    FspPosixDeletePath(Context->LookupPath.OrigPath2.Buffer);
+        /* handles NULL paths */
     FspPosixDeletePath(Context->LookupPath.OrigPath.Buffer);
         /* handles NULL paths */
     FuseCacheDereferenceGen(FuseDeviceExtension(Context->DeviceObject)->Cache, Context->LookupPath.CacheGen);
@@ -650,6 +699,64 @@ static VOID FuseOpenTargetDirectoryCheck(FUSE_CONTEXT *Context)
             Context->InternalRequest->Req.Create.GrantedAccess;
 
         Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+    }
+}
+
+static VOID FuseRenameCheck(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    /*
+     * RenameCheck consists of checking the new file name for DELETE access.
+     *
+     * The following assumptions are being made here for a file that is going
+     * to be replaced:
+     * -   The new file is in the same directory as the old one. In that case
+     *     there is no need for traverse access checks as they have been already
+     *     performed (if necessary) when opening the file under the existing file
+     *     name.
+     * -   The new file is in a different directory than the old one. In that case
+     *     NTOS called us with SL_OPEN_TARGET_DIRECTORY and we performed any
+     *     necessary traverse access checks at that time.
+     */
+
+    coro_block (Context->CoroState)
+    {
+        Context->LookupPath.DesiredAccess = 0;
+
+        FusePosixPathSuffix(&Context->LookupPath.OrigPath, &Context->LookupPath.Remain, 0);
+        coro_await (FuseLookupPath(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        Context->LookupPath.Ino2 = Context->LookupPath.Ino;
+
+        FusePosixPathSuffix(&Context->LookupPath.OrigPath, 0, &Context->LookupPath.Name);
+        coro_await (FuseLookup(Context));
+        if (NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+        {
+            if (0 != Context->InternalRequest->Req.SetInformation.Info.Rename.AccessToken)
+            {
+                Context->InternalResponse->IoStatus.Status = FuseAccessCheck(
+                    Context->LookupPath.Attr.uid, Context->LookupPath.Attr.gid,
+                    Context->LookupPath.Attr.mode,
+                    Context->OrigUid, Context->OrigGid,
+                    DELETE, &Context->LookupPath.GrantedAccess);
+                if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                    coro_break;
+            }
+
+            Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+        }
+
+        Context->LookupPath.OrigPath2 = Context->LookupPath.OrigPath;
+        Context->LookupPath.Name2 = Context->LookupPath.Name;
+
+        Context->LookupPath.Ino = 0;
+        Context->LookupPath.OrigPath.Length = Context->LookupPath.OrigPath.MaximumLength = 0;
+        Context->LookupPath.OrigPath.Buffer = 0;
+        Context->LookupPath.Name.Length = Context->LookupPath.Name.MaximumLength = 0;
+        Context->LookupPath.Name.Buffer = 0;
     }
 }
 
@@ -1032,6 +1139,7 @@ static VOID FuseOpCreate_FileOpenTargetDirectory(FUSE_CONTEXT *Context)
         Context->InternalResponse->IoStatus.Information =
             NT_SUCCESS(Context->InternalResponse->IoStatus.Status) ?
                 FILE_EXISTS : FILE_DOES_NOT_EXIST;
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
 }
 
@@ -1582,17 +1690,69 @@ static BOOLEAN FuseOpSetInformation_SetDelete(FUSE_CONTEXT *Context)
 
 static BOOLEAN FuseOpSetInformation_Rename(FUSE_CONTEXT *Context)
 {
-    PAGED_CODE();
-
-    Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_DEVICE_REQUEST;
-    return FALSE;
-#if 0
     coro_block (Context->CoroState)
     {
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.SetInformation.UserContext2;
+
+        FusePrepareLookupPath(Context);
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        coro_await (FuseRenameCheck(Context));
+        if (NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            Context->LookupPath.RenameIsDirectory = 0040000 == (Context->LookupPath.Attr.mode & 0170000);
+        else
+        if (STATUS_OBJECT_PATH_NOT_FOUND == Context->InternalResponse->IoStatus.Status ||
+            STATUS_OBJECT_NAME_NOT_FOUND == Context->InternalResponse->IoStatus.Status)
+            Context->LookupPath.RenameIsNonExistent = 1;
+        else
+            coro_break;
+
+        FusePrepareLookupPath2(Context);
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        FusePosixPathSuffix(&Context->LookupPath.OrigPath, &Context->LookupPath.Remain, 0);
+        coro_await (FuseLookupPath(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        FusePosixPathSuffix(&Context->LookupPath.OrigPath, 0, &Context->LookupPath.Name);
+
+        if (!Context->LookupPath.RenameIsNonExistent &&
+            (FuseDeviceExtension(Context->DeviceObject)->VolumeParams->CaseSensitiveSearch ||
+                Context->LookupPath.Ino != Context->LookupPath.Ino2 ||
+                !RtlEqualString(&Context->LookupPath.Name, &Context->LookupPath.Name2, TRUE)))
+        {
+            if (0 == Context->InternalRequest->Req.SetInformation.Info.Rename.AccessToken)
+            {
+                Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_OBJECT_NAME_COLLISION;
+                coro_break;
+            }
+
+            if (Context->LookupPath.RenameIsDirectory)
+            {
+                Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_ACCESS_DENIED;
+                coro_break;
+            }
+        }
+
+        coro_await (FuseProtoSendRename(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        FuseCacheRemoveEntry(
+            FuseDeviceExtension(Context->DeviceObject)->Cache,
+            Context->LookupPath.Ino, &Context->LookupPath.Name);
+
+        FuseCacheRemoveEntry(
+            FuseDeviceExtension(Context->DeviceObject)->Cache,
+            Context->LookupPath.Ino2, &Context->LookupPath.Name2);
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
     }
 
     return coro_active();
-#endif
 }
 
 static BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context)
@@ -1615,40 +1775,6 @@ static BOOLEAN FuseOpSetInformation(FUSE_CONTEXT *Context)
         Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_DEVICE_REQUEST;
         return FALSE;
     }
-#if 0
-    NTSTATUS Result;
-    FSP_FSCTL_FILE_INFO FileInfo;
-
-    Result = STATUS_INVALID_DEVICE_REQUEST;
-    memset(&FileInfo, 0, sizeof FileInfo);
-    switch (Context->InternalRequest->Req.SetInformation.FileInformationClass)
-    {
-    case FileRenameInformation:
-        if (0 != FileSystem->Interface->Rename)
-        {
-            if (0 != Request->Req.SetInformation.Info.Rename.AccessToken)
-            {
-                Result = FspFileSystemRenameCheck(FileSystem, Request);
-                if (!NT_SUCCESS(Result) &&
-                    STATUS_OBJECT_PATH_NOT_FOUND != Result &&
-                    STATUS_OBJECT_NAME_NOT_FOUND != Result)
-                    break;
-            }
-            Result = FileSystem->Interface->Rename(FileSystem,
-                (PVOID)ValOfFileContext(Request->Req.SetInformation),
-                (PWSTR)Request->Buffer,
-                (PWSTR)(Request->Buffer + Request->Req.SetInformation.Info.Rename.NewFileName.Offset),
-                0 != Request->Req.SetInformation.Info.Rename.AccessToken);
-        }
-        break;
-    }
-
-    if (!NT_SUCCESS(Result))
-        return Result;
-
-    memcpy(&Response->Rsp.SetInformation.FileInfo, &FileInfo, sizeof FileInfo);
-    return STATUS_SUCCESS;
-#endif
 }
 
 static INT FuseOgSetInformation(FUSE_CONTEXT *Context, BOOLEAN Acquire)

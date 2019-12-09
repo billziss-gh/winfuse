@@ -243,6 +243,12 @@ struct _FUSE_CONTEXT
             UINT32 HasTraversePrivilege:1;
             UINT32 DisableCache:1;
             UINT32 Chown:1;
+            UINT32 RenameIsNonExistent:1;
+            UINT32 RenameIsDirectory:1;
+            /* 2 path operations (rename) */
+            STRING OrigPath2;
+            STRING Name2;
+            UINT64 Ino2;
         } LookupPath;
         struct
         {
@@ -361,6 +367,7 @@ VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context);
+VOID FuseProtoSendRename(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);

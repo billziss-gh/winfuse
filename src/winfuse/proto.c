@@ -38,6 +38,7 @@ VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context);
+VOID FuseProtoSendRename(FUSE_CONTEXT *Context);
 VOID FuseProtoSendCreate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendOpen(FUSE_CONTEXT *Context);
@@ -68,6 +69,7 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoSendMknod)
 #pragma alloc_text(PAGE, FuseProtoSendRmdir)
 #pragma alloc_text(PAGE, FuseProtoSendUnlink)
+#pragma alloc_text(PAGE, FuseProtoSendRename)
 #pragma alloc_text(PAGE, FuseProtoSendCreate)
 #pragma alloc_text(PAGE, FuseProtoSendOpendir)
 #pragma alloc_text(PAGE, FuseProtoSendOpen)
@@ -528,6 +530,42 @@ VOID FuseProtoSendUnlink(FUSE_CONTEXT *Context)
         RtlCopyMemory(Context->FuseRequest->req.unlink.name, Context->Lookup.Name.Buffer,
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.unlink.name[Context->Lookup.Name.Length] = '\0';
+
+    FUSE_PROTO_SEND_END
+}
+
+VOID FuseProtoSendRename(FUSE_CONTEXT *Context)
+    /*
+     * Send RENAME message.
+     *
+     * Context->LookupPath.Ino
+     *     old parent directory inode number
+     * Context->LookupPath.Name
+     *     old name of file
+     * Context->LookupPath.Ino2
+     *     new parent directory inode number
+     * Context->LookupPath.Name2
+     *     new name of file
+     */
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_SEND_BEGIN
+
+        FuseProtoInitRequest(Context, (UINT32)(FUSE_PROTO_REQ_SIZE(rename) +
+            Context->LookupPath.Name.Length + 1 + Context->LookupPath.Name2.Length + 1),
+            FUSE_PROTO_OPCODE_RENAME, Context->LookupPath.Ino);
+        ASSERT(FUSE_PROTO_REQ_SIZEMIN >= Context->FuseRequest->len);
+        Context->FuseRequest->req.rename.newdir = Context->LookupPath.Ino2;
+        RtlCopyMemory(Context->FuseRequest->req.rename.name,
+            Context->LookupPath.Name.Buffer,
+            Context->LookupPath.Name.Length);
+        Context->FuseRequest->req.rename.name[Context->LookupPath.Name.Length] = '\0';
+        RtlCopyMemory(Context->FuseRequest->req.rename.name + Context->LookupPath.Name.Length + 1,
+            Context->LookupPath.Name2.Buffer,
+            Context->LookupPath.Name2.Length);
+        (Context->FuseRequest->req.rename.name + Context->LookupPath.Name.Length + 1)
+            [Context->LookupPath.Name2.Length] = '\0';
 
     FUSE_PROTO_SEND_END
 }
