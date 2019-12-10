@@ -80,6 +80,7 @@ static BOOLEAN FuseOpFileSystemControl(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpDeviceControl(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpQuerySecurity(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpSetSecurity(FUSE_CONTEXT *Context);
+static VOID FuseSecurity_ContextFini(FUSE_CONTEXT *Context);
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, FuseOpReserved_Init)
@@ -135,6 +136,7 @@ static BOOLEAN FuseOpSetSecurity(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpDeviceControl)
 #pragma alloc_text(PAGE, FuseOpQuerySecurity)
 #pragma alloc_text(PAGE, FuseOpSetSecurity)
+#pragma alloc_text(PAGE, FuseSecurity_ContextFini)
 #endif
 
 static BOOLEAN FuseOpReserved_Init(FUSE_CONTEXT *Context)
@@ -2155,14 +2157,142 @@ static BOOLEAN FuseOpQuerySecurity(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    return FALSE;
+    coro_block (Context->CoroState)
+    {
+        Context->Fini = FuseSecurity_ContextFini;
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.QuerySecurity.UserContext2;
+
+        coro_await (FuseProtoSendFgetattr(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        Context->InternalResponse->IoStatus.Status = FspPosixMapPermissionsToSecurityDescriptor(
+            Context->FuseResponse->rsp.getattr.attr.uid,
+            Context->FuseResponse->rsp.getattr.attr.gid,
+            Context->FuseResponse->rsp.getattr.attr.mode,
+            &Context->Security.SecurityDescriptor);
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        ULONG Length = RtlLengthSecurityDescriptor(Context->Security.SecurityDescriptor);
+        if (FSP_FSCTL_TRANSACT_RSP_BUFFER_SIZEMAX < Length)
+        {
+            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_SECURITY_DESCR;
+            coro_break;
+        }
+
+        PVOID InternalResponse = FuseAlloc(sizeof *Context->InternalResponse + Length);
+        if (0 == InternalResponse)
+        {
+            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INSUFFICIENT_RESOURCES;
+            coro_break;
+        }
+        RtlZeroMemory(InternalResponse, sizeof *Context->InternalResponse);
+
+        Context->InternalResponse = InternalResponse;
+        Context->InternalResponse->Size = (UINT16)(sizeof *Context->InternalResponse + Length);
+        Context->InternalResponse->Kind = Context->InternalRequest->Kind;
+        Context->InternalResponse->Hint = Context->InternalRequest->Hint;
+        Context->InternalResponse->Rsp.QuerySecurity.SecurityDescriptor.Offset = 0;
+        Context->InternalResponse->Rsp.QuerySecurity.SecurityDescriptor.Size = (UINT16)Length;
+
+        /* RtlCopyMemory is safe here, because all buffers are in-kernel */
+        RtlCopyMemory(
+            Context->InternalResponse->Buffer, Context->Security.SecurityDescriptor, Length);
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+    }
+
+    return coro_active();
 }
 
 static BOOLEAN FuseOpSetSecurity(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    return FALSE;
+    coro_block (Context->CoroState)
+    {
+        Context->Fini = FuseSecurity_ContextFini;
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.SetSecurity.UserContext2;
+
+        coro_await (FuseProtoSendFgetattr(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        Context->InternalResponse->IoStatus.Status = FspPosixMapPermissionsToSecurityDescriptor(
+            Context->FuseResponse->rsp.getattr.attr.uid,
+            Context->FuseResponse->rsp.getattr.attr.gid,
+            Context->FuseResponse->rsp.getattr.attr.mode,
+            &Context->Security.SecurityDescriptor);
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        /*
+         * BEGIN:
+         * No coro_yield or coro_await allowed, because Context->FuseResponse->rsp.getattr.attr
+         * must remain valid.
+         */
+
+        PSECURITY_DESCRIPTOR NewSecurityDescriptor = Context->Security.SecurityDescriptor;
+        Context->InternalResponse->IoStatus.Status = SeSetSecurityDescriptorInfo(
+            0,
+            (PSECURITY_INFORMATION)&Context->InternalRequest->Req.SetSecurity.SecurityInformation,
+            (PSECURITY_DESCRIPTOR)Context->InternalRequest->Buffer,
+            &NewSecurityDescriptor,
+            PagedPool,
+            IoGetFileObjectGenericMapping());
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+        FuseFreeExternal(Context->Security.SecurityDescriptor);
+        Context->Security.SecurityDescriptor = NewSecurityDescriptor;
+
+        Context->InternalResponse->IoStatus.Status = FspPosixMapSecurityDescriptorToPermissions(
+            Context->Security.SecurityDescriptor,
+            &Context->Security.Attr.uid,
+            &Context->Security.Attr.gid,
+            &Context->Security.Attr.mode);
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        Context->Security.Attr.mode &= 07777;
+        Context->Security.Attr.mode |= (Context->FuseResponse->rsp.getattr.attr.mode & 0170000);
+
+        Context->Security.AttrValid = 0;
+        Context->Security.AttrValid |=
+            Context->Security.Attr.uid != Context->FuseResponse->rsp.getattr.attr.uid ?
+                FUSE_PROTO_SETATTR_UID : 0;
+        Context->Security.AttrValid |=
+            Context->Security.Attr.gid != Context->FuseResponse->rsp.getattr.attr.gid ?
+                FUSE_PROTO_SETATTR_GID : 0;
+        Context->Security.AttrValid |=
+            Context->Security.Attr.mode != Context->FuseResponse->rsp.getattr.attr.mode ?
+                FUSE_PROTO_SETATTR_MODE : 0;
+
+        /*
+         * END:
+         * No coro_yield or coro_await allowed, because Context->FuseResponse->rsp.getattr.attr
+         * must remain valid.
+         */
+
+        if (0 != Context->Security.AttrValid)
+        {
+            coro_await (FuseProtoSendSetattr(Context));
+            if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+                coro_break;
+        }
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+    }
+
+    return coro_active();
+}
+
+static VOID FuseSecurity_ContextFini(FUSE_CONTEXT *Context)
+{
+    PAGED_CODE();
+
+    if (0 != Context->Security.SecurityDescriptor)
+        FuseFreeExternal(Context->Security.SecurityDescriptor);
 }
 
 FUSE_OPERATION FuseOperations[FspFsctlTransactKindCount] =
@@ -2225,10 +2355,10 @@ FUSE_OPERATION FuseOperations[FspFsctlTransactKindCount] =
     { 0 },
 
     /* FspFsctlTransactQuerySecurityKind */
-    { 0 },
+    { FuseOpQuerySecurity },
 
     /* FspFsctlTransactSetSecurityKind */
-    { 0 },
+    { FuseOpSetSecurity },
 
     /* FspFsctlTransactQueryStreamInformationKind */
     { 0 },

@@ -123,6 +123,7 @@ L:
     getfileinfo_test delete_test delete_pending_test delete_mmap_test delete_standby_test ^
     rename_* ^
     getvolinfo_test ^
+    getsecurity_test ^
     rdwr_* ^
     lock_* ^
     querydir_* ^

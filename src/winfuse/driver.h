@@ -213,6 +213,11 @@ typedef struct _FUSE_CONTEXT_FORGET
 {
     LIST_ENTRY ForgetList;
 } FUSE_CONTEXT_FORGET;
+typedef struct _FUSE_CONTEXT_SETATTR
+{
+    FUSE_PROTO_ATTR Attr;
+    UINT32 AttrValid;
+} FUSE_CONTEXT_SETATTR;
 struct _FUSE_CONTEXT
 {
     FUSE_CONTEXT *DictNext;
@@ -250,10 +255,15 @@ struct _FUSE_CONTEXT
             STRING Name2;
             UINT64 Ino2;
         } LookupPath;
+        FUSE_CONTEXT_SETATTR Setattr;
         struct
         {
             FUSE_PROTO_ATTR Attr;
-        } Setattr;
+            UINT64 StartOffset;
+            UINT32 Remain;
+            UINT32 Offset;
+            UINT32 Length;
+        } Read, Write;
         struct
         {
             FUSE_CONTEXT_LOOKUP;
@@ -265,12 +275,9 @@ struct _FUSE_CONTEXT
         } QueryDirectory;
         struct
         {
-            FUSE_PROTO_ATTR Attr;
-            UINT64 StartOffset;
-            UINT32 Remain;
-            UINT32 Offset;
-            UINT32 Length;
-        } Read, Write;
+            FUSE_CONTEXT_SETATTR;
+            PSECURITY_DESCRIPTOR SecurityDescriptor;
+        } Security;
     };
 };
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
@@ -363,6 +370,7 @@ VOID FuseProtoSendFgetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFtruncate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFutimens(FUSE_CONTEXT *Context);
 VOID FuseProtoSendLookupChown(FUSE_CONTEXT *Context);
+VOID FuseProtoSendSetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);

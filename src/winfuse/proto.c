@@ -34,6 +34,7 @@ VOID FuseProtoSendFgetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFtruncate(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFutimens(FUSE_CONTEXT *Context);
 VOID FuseProtoSendLookupChown(FUSE_CONTEXT *Context);
+VOID FuseProtoSendSetattr(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMkdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendMknod(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRmdir(FUSE_CONTEXT *Context);
@@ -65,6 +66,7 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoSendFtruncate)
 #pragma alloc_text(PAGE, FuseProtoSendFutimens)
 #pragma alloc_text(PAGE, FuseProtoSendLookupChown)
+#pragma alloc_text(PAGE, FuseProtoSendSetattr)
 #pragma alloc_text(PAGE, FuseProtoSendMkdir)
 #pragma alloc_text(PAGE, FuseProtoSendMknod)
 #pragma alloc_text(PAGE, FuseProtoSendRmdir)
@@ -418,6 +420,63 @@ VOID FuseProtoSendLookupChown(FUSE_CONTEXT *Context)
             Context->FuseRequest->req.setattr.fh = Context->File->Fh;
             Context->FuseRequest->req.setattr.uid = Context->Lookup.Attr.uid;
             Context->FuseRequest->req.setattr.gid = Context->Lookup.Attr.gid;
+        }
+
+    FUSE_PROTO_SEND_END
+}
+
+VOID FuseProtoSendSetattr(FUSE_CONTEXT *Context)
+    /*
+     * Send SETATTR message.
+     *
+     * Context->File->IsDirectory
+     *     true if file is a directory
+     * Context->File->Ino
+     *     inode number of related file; use when file is a directory
+     * Context->File->Fh
+     *     handle of related file; use when file is not a directory
+     * Context->Setattr.AttrValid
+     *     valid attr fields
+     * Context->Setattr.Attr
+     *     new attr of file
+     */
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_SEND_BEGIN
+
+        if (Context->File->IsDirectory)
+        {
+            FuseProtoInitRequest(Context,
+                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->File->Ino);
+            Context->FuseRequest->req.setattr.size = Context->Setattr.Attr.size;
+            Context->FuseRequest->req.setattr.atime = Context->Setattr.Attr.atime;
+            Context->FuseRequest->req.setattr.mtime = Context->Setattr.Attr.mtime;
+            Context->FuseRequest->req.setattr.ctime = Context->Setattr.Attr.ctime;
+            Context->FuseRequest->req.setattr.atimensec = Context->Setattr.Attr.atimensec;
+            Context->FuseRequest->req.setattr.mtimensec = Context->Setattr.Attr.mtimensec;
+            Context->FuseRequest->req.setattr.ctimensec = Context->Setattr.Attr.ctimensec;
+            Context->FuseRequest->req.setattr.mode = Context->Setattr.Attr.mode;
+            Context->FuseRequest->req.setattr.uid = Context->Setattr.Attr.uid;
+            Context->FuseRequest->req.setattr.gid = Context->Setattr.Attr.gid;
+            Context->FuseRequest->req.setattr.valid = Context->Setattr.AttrValid;
+        }
+        else
+        {
+            FuseProtoInitRequest(Context,
+                FUSE_PROTO_REQ_SIZE(setattr), FUSE_PROTO_OPCODE_SETATTR, Context->File->Ino);
+            Context->FuseRequest->req.setattr.size = Context->Setattr.Attr.size;
+            Context->FuseRequest->req.setattr.atime = Context->Setattr.Attr.atime;
+            Context->FuseRequest->req.setattr.mtime = Context->Setattr.Attr.mtime;
+            Context->FuseRequest->req.setattr.ctime = Context->Setattr.Attr.ctime;
+            Context->FuseRequest->req.setattr.atimensec = Context->Setattr.Attr.atimensec;
+            Context->FuseRequest->req.setattr.mtimensec = Context->Setattr.Attr.mtimensec;
+            Context->FuseRequest->req.setattr.ctimensec = Context->Setattr.Attr.ctimensec;
+            Context->FuseRequest->req.setattr.mode = Context->Setattr.Attr.mode;
+            Context->FuseRequest->req.setattr.uid = Context->Setattr.Attr.uid;
+            Context->FuseRequest->req.setattr.gid = Context->Setattr.Attr.gid;
+            Context->FuseRequest->req.setattr.fh = Context->File->Fh;
+            Context->FuseRequest->req.setattr.valid = Context->Setattr.AttrValid | FUSE_PROTO_SETATTR_FH;
         }
 
     FUSE_PROTO_SEND_END
