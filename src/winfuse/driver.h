@@ -161,12 +161,40 @@ typedef struct _FUSE_DEVICE_EXTENSION
     UINT32 VersionMajor, VersionMinor;
     KSPIN_LOCK FileListLock;
     LIST_ENTRY FileList;
+    /*
+     * The following bitmap is used to remember which opcodes have returned ENOSYS.
+     *
+     * It is assumed that an opcode that returned ENOSYS once, will continue returning
+     * ENOSYS in the future. Thus an expensive message to user space can be eliminated.
+     *
+     * This bitmap may be accessed from multiple threads without locking. This is
+     * because the bitmap is used for optimization purposes ONLY, and it is ok for
+     * extraneous requests (that will result in ENOSYS) to be sent to the user mode
+     * file system.
+     */
+    UINT32 OpcodeENOSYS[2];
 } FUSE_DEVICE_EXTENSION;
 extern FSP_FSEXT_PROVIDER FuseProvider;
 static inline
 FUSE_DEVICE_EXTENSION *FuseDeviceExtension(PDEVICE_OBJECT DeviceObject)
 {
     return (PVOID)((PUINT8)DeviceObject->DeviceExtension + FuseProvider.DeviceExtensionOffset);
+}
+static inline
+BOOLEAN FuseOpcodeENOSYS(PDEVICE_OBJECT DeviceObject, UINT32 Opcode)
+{
+    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
+    ASSERT(sizeof DeviceExtension->OpcodeENOSYS / sizeof DeviceExtension->OpcodeENOSYS[0] > (Opcode >> 5));
+    ASSERT(8 * sizeof DeviceExtension->OpcodeENOSYS[0] > (Opcode & 0x1f));
+    return !!(DeviceExtension->OpcodeENOSYS[Opcode >> 5] & (1 << (Opcode & 0x1f)));
+}
+static inline
+VOID FuseOpcodeSetENOSYS(PDEVICE_OBJECT DeviceObject, UINT32 Opcode)
+{
+    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
+    ASSERT(sizeof DeviceExtension->OpcodeENOSYS / sizeof DeviceExtension->OpcodeENOSYS[0] > (Opcode >> 5));
+    ASSERT(8 * sizeof DeviceExtension->OpcodeENOSYS[0] > (Opcode & 0x1f));
+    DeviceExtension->OpcodeENOSYS[Opcode >> 5] |= (1 << (Opcode & 0x1f));
 }
 
 /* FUSE files */
@@ -384,6 +412,7 @@ VOID FuseProtoSendRelease(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReaddir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRead(FUSE_CONTEXT *Context);
 VOID FuseProtoSendWrite(FUSE_CONTEXT *Context);
+VOID FuseProtoSendFsyncdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFsync(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);

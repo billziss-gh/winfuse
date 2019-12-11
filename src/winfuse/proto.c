@@ -48,6 +48,7 @@ VOID FuseProtoSendRelease(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReaddir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRead(FUSE_CONTEXT *Context);
 VOID FuseProtoSendWrite(FUSE_CONTEXT *Context);
+VOID FuseProtoSendFsyncdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFsync(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
@@ -81,6 +82,7 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoSendReaddir)
 #pragma alloc_text(PAGE, FuseProtoSendRead)
 #pragma alloc_text(PAGE, FuseProtoSendWrite)
+#pragma alloc_text(PAGE, FuseProtoSendFsyncdir)
 #pragma alloc_text(PAGE, FuseProtoSendFsync)
 #pragma alloc_text(PAGE, FuseAttrToFileInfo)
 #pragma alloc_text(PAGE, FuseNtStatusFromErrno)
@@ -94,6 +96,22 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
         FuseContextWaitResponse(Context);\
         Context->InternalResponse->IoStatus.Status =\
             FuseNtStatusFromErrno(Context->FuseResponse->error);\
+    }
+#define FUSE_PROTO_SEND_BEGIN_(OPCODE)  \
+    coro_block(Context->CoroState)      \
+    {                                   \
+        if (FuseOpcodeENOSYS(Context->DeviceObject, FUSE_PROTO_OPCODE_ ## OPCODE))\
+        {                               \
+            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_DEVICE_REQUEST;\
+            coro_break;                 \
+        }                               \
+        FuseContextWaitRequest(Context);
+#define FUSE_PROTO_SEND_END_(OPCODE)    \
+        FuseContextWaitResponse(Context);\
+        Context->InternalResponse->IoStatus.Status =\
+            FuseNtStatusFromErrno(Context->FuseResponse->error);\
+        if (STATUS_INVALID_DEVICE_REQUEST == Context->InternalResponse->IoStatus.Status)\
+            FuseOpcodeSetENOSYS(Context->DeviceObject, FUSE_PROTO_OPCODE_ ## OPCODE);\
     }
 
 static inline VOID FuseProtoInitRequest(FUSE_CONTEXT *Context,
@@ -647,7 +665,7 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    FUSE_PROTO_SEND_BEGIN
+    FUSE_PROTO_SEND_BEGIN_(CREATE)
 
         FuseProtoInitRequest(Context,
             (UINT32)(FUSE_PROTO_REQ_SIZE(create) + Context->Lookup.Name.Length + 1),
@@ -660,7 +678,7 @@ VOID FuseProtoSendCreate(FUSE_CONTEXT *Context)
             Context->Lookup.Name.Length);
         Context->FuseRequest->req.create.name[Context->Lookup.Name.Length] = '\0';
 
-    FUSE_PROTO_SEND_END
+    FUSE_PROTO_SEND_END_(CREATE)
 }
 
 VOID FuseProtoSendOpendir(FUSE_CONTEXT *Context)
@@ -842,36 +860,46 @@ VOID FuseProtoSendWrite(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_END
 }
 
-VOID FuseProtoSendFsync(FUSE_CONTEXT *Context)
+VOID FuseProtoSendFsyncdir(FUSE_CONTEXT *Context)
     /*
-     * Send FSYNC/FSYNCDIR message.
+     * Send FSYNCDIR message.
      *
-     * Context->File->IsDirectory
-     *     true if file is a directory
      * Context->File->Ino
-     *     inode number of related file/directory
+     *     inode number of related directory
      * Context->File->Fh
-     *     handle of related file/directory
+     *     handle of related directory
      */
 {
     PAGED_CODE();
 
-    FUSE_PROTO_SEND_BEGIN
+    FUSE_PROTO_SEND_BEGIN_(FSYNCDIR)
 
-        if (Context->File->IsDirectory)
-        {
-            FuseProtoInitRequest(Context,
-                FUSE_PROTO_REQ_SIZE(fsync), FUSE_PROTO_OPCODE_FSYNCDIR, Context->File->Ino);
-            Context->FuseRequest->req.fsync.fh = Context->File->Fh;
-        }
-        else
-        {
-            FuseProtoInitRequest(Context,
-                FUSE_PROTO_REQ_SIZE(fsync), FUSE_PROTO_OPCODE_FSYNC, Context->File->Ino);
-            Context->FuseRequest->req.fsync.fh = Context->File->Fh;
-        }
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_SIZE(fsync), FUSE_PROTO_OPCODE_FSYNCDIR, Context->File->Ino);
+        Context->FuseRequest->req.fsync.fh = Context->File->Fh;
 
-    FUSE_PROTO_SEND_END
+    FUSE_PROTO_SEND_END_(FSYNCDIR)
+}
+
+VOID FuseProtoSendFsync(FUSE_CONTEXT *Context)
+    /*
+     * Send FSYNC message.
+     *
+     * Context->File->Ino
+     *     inode number of related file
+     * Context->File->Fh
+     *     handle of related file
+     */
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_SEND_BEGIN_(FSYNC)
+
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_SIZE(fsync), FUSE_PROTO_OPCODE_FSYNC, Context->File->Ino);
+        Context->FuseRequest->req.fsync.fh = Context->File->Fh;
+
+    FUSE_PROTO_SEND_END_(FSYNC)
 }
 
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,

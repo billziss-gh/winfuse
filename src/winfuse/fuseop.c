@@ -1834,7 +1834,10 @@ static BOOLEAN FuseOpFlushBuffers(FUSE_CONTEXT *Context)
             coro_break;
         }
 
-        coro_await (FuseProtoSendFsync(Context));
+        if (Context->File->IsDirectory)
+            coro_await (FuseProtoSendFsyncdir(Context));
+        else
+            coro_await (FuseProtoSendFsync(Context));
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status) &&
             STATUS_INVALID_DEVICE_REQUEST != Context->InternalResponse->IoStatus.Status)
             coro_break;
