@@ -125,6 +125,7 @@ L:
     getvolinfo_test ^
     getsecurity_test ^
     rdwr_* ^
+    flush_* ^
     lock_* ^
     querydir_* ^
     dirnotify_test ^

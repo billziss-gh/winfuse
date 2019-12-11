@@ -1823,7 +1823,36 @@ static BOOLEAN FuseOpFlushBuffers(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    return FALSE;
+    coro_block (Context->CoroState)
+    {
+        Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.FlushBuffers.UserContext2;
+
+        if (0 == Context->File)
+        {
+            /* FUSE cannot flush volumes */
+            Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+            coro_break;
+        }
+
+        coro_await (FuseProtoSendFsync(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status) &&
+            STATUS_INVALID_DEVICE_REQUEST != Context->InternalResponse->IoStatus.Status)
+            coro_break;
+
+        coro_await (FuseProtoSendFgetattr(Context));
+        if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
+            coro_break;
+
+        FuseCacheQuickExpireItem(FuseDeviceExtension(Context->DeviceObject)->Cache,
+            Context->File->CacheItem);
+
+        FuseAttrToFileInfo(Context->DeviceObject, &Context->FuseResponse->rsp.getattr.attr,
+            &Context->InternalResponse->Rsp.FlushBuffers.FileInfo);
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+    }
+
+    return coro_active();
 }
 
 static BOOLEAN FuseOpQueryVolumeInformation(FUSE_CONTEXT *Context)
@@ -2331,7 +2360,7 @@ FUSE_OPERATION FuseOperations[FspFsctlTransactKindCount] =
     { 0 },
 
     /* FspFsctlTransactFlushBuffersKind */
-    { 0 },
+    { FuseOpFlushBuffers },
 
     /* FspFsctlTransactQueryVolumeInformationKind */
     { FuseOpQueryVolumeInformation },

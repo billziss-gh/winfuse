@@ -48,6 +48,7 @@ VOID FuseProtoSendRelease(FUSE_CONTEXT *Context);
 VOID FuseProtoSendReaddir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendRead(FUSE_CONTEXT *Context);
 VOID FuseProtoSendWrite(FUSE_CONTEXT *Context);
+VOID FuseProtoSendFsync(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
@@ -80,6 +81,7 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #pragma alloc_text(PAGE, FuseProtoSendReaddir)
 #pragma alloc_text(PAGE, FuseProtoSendRead)
 #pragma alloc_text(PAGE, FuseProtoSendWrite)
+#pragma alloc_text(PAGE, FuseProtoSendFsync)
 #pragma alloc_text(PAGE, FuseAttrToFileInfo)
 #pragma alloc_text(PAGE, FuseNtStatusFromErrno)
 #endif
@@ -836,6 +838,38 @@ VOID FuseProtoSendWrite(FUSE_CONTEXT *Context)
         Context->FuseRequest->req.write.write_flags = 0;   /* !!!: REVISIT */
         Context->FuseRequest->req.write.lock_owner = 0;   /* !!!: REVISIT */
         Context->FuseRequest->req.write.flags = Context->File->OpenFlags;
+
+    FUSE_PROTO_SEND_END
+}
+
+VOID FuseProtoSendFsync(FUSE_CONTEXT *Context)
+    /*
+     * Send FSYNC/FSYNCDIR message.
+     *
+     * Context->File->IsDirectory
+     *     true if file is a directory
+     * Context->File->Ino
+     *     inode number of related file/directory
+     * Context->File->Fh
+     *     handle of related file/directory
+     */
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_SEND_BEGIN
+
+        if (Context->File->IsDirectory)
+        {
+            FuseProtoInitRequest(Context,
+                FUSE_PROTO_REQ_SIZE(fsync), FUSE_PROTO_OPCODE_FSYNCDIR, Context->File->Ino);
+            Context->FuseRequest->req.fsync.fh = Context->File->Fh;
+        }
+        else
+        {
+            FuseProtoInitRequest(Context,
+                FUSE_PROTO_REQ_SIZE(fsync), FUSE_PROTO_OPCODE_FSYNC, Context->File->Ino);
+            Context->FuseRequest->req.fsync.fh = Context->File->Fh;
+        }
 
     FUSE_PROTO_SEND_END
 }
