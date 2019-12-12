@@ -101,20 +101,19 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>FUSE_USE_VERSION=32;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\ext\libfuse\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\WinFuse\opt\libfuse\include\fuse3</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).lib</AdditionalDependencies>
+      <AdditionalDependencies>C:\Program Files\WinFuse\opt\libfuse\lib\fuse3-$(PlatformTarget).lib</AdditionalDependencies>
       <DelayLoadDLLs>
       </DelayLoadDLLs>
     </Link>
     <PostBuildEvent>
-      <Command>copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).dll $(OutDir)
-if exist ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb $(OutDir)
+      <Command>copy "C:\Program Files\WinFuse\opt\libfuse\bin\fuse3-$(PlatformTarget).dll" $(OutDir)
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -126,20 +125,19 @@ if exist ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>FUSE_USE_VERSION=32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\ext\libfuse\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\WinFuse\opt\libfuse\include\fuse3</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).lib</AdditionalDependencies>
+      <AdditionalDependencies>C:\Program Files\WinFuse\opt\libfuse\lib\fuse3-$(PlatformTarget).lib</AdditionalDependencies>
       <DelayLoadDLLs>
       </DelayLoadDLLs>
     </Link>
     <PostBuildEvent>
-      <Command>copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).dll $(OutDir)
-if exist ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb $(OutDir)
+      <Command>copy "C:\Program Files\WinFuse\opt\libfuse\bin\fuse3-$(PlatformTarget).dll" $(OutDir)
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -153,7 +151,7 @@ if exist ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>FUSE_USE_VERSION=32;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\ext\libfuse\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\WinFuse\opt\libfuse\include\fuse3</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
@@ -162,13 +160,12 @@ if exist ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).lib</AdditionalDependencies>
+      <AdditionalDependencies>C:\Program Files\WinFuse\opt\libfuse\lib\fuse3-$(PlatformTarget).lib</AdditionalDependencies>
       <DelayLoadDLLs>
       </DelayLoadDLLs>
     </Link>
     <PostBuildEvent>
-      <Command>copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).dll $(OutDir)
-if exist ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb $(OutDir)
+      <Command>copy "C:\Program Files\WinFuse\opt\libfuse\bin\fuse3-$(PlatformTarget).dll" $(OutDir)
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -182,7 +179,7 @@ if exist ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>FUSE_USE_VERSION=32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\ext\libfuse\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\WinFuse\opt\libfuse\include\fuse3</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <DisableSpecificWarnings>4018</DisableSpecificWarnings>
     </ClCompile>
@@ -191,13 +188,12 @@ if exist ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).lib</AdditionalDependencies>
+      <AdditionalDependencies>C:\Program Files\WinFuse\opt\libfuse\lib\fuse3-$(PlatformTarget).lib</AdditionalDependencies>
       <DelayLoadDLLs>
       </DelayLoadDLLs>
     </Link>
     <PostBuildEvent>
-      <Command>copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).dll $(OutDir)
-if exist ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb copy ..\..\ext\libfuse\build\$(Configuration)\$(PlatformTarget)\lib\fuse3-$(PlatformTarget).pdb $(OutDir)
+      <Command>copy "C:\Program Files\WinFuse\opt\libfuse\bin\fuse3-$(PlatformTarget).dll" $(OutDir)
 </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>

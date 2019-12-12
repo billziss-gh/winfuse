@@ -60,6 +60,7 @@
                 <Directory Id="INSTALLDIR" Name="WinFuse">
                     <Directory Id="BINDIR" Name="bin" />
                     <Directory Id="OPTDIR" Name="opt" />
+                    <Directory Id="SMPDIR" Name="samples" />
                 </Directory>
             </Directory>
         </Directory>
@@ -128,6 +129,25 @@
                 </Component>
             </Directory>
         </DirectoryRef>
+        <DirectoryRef Id="SMPDIR" FileSource="..\..\..\tst">
+            <Directory Id="SMPDIR.memfs_fuse3" Name="memfs-fuse3">
+                <Component Id="C.memfs_fuse3.cpp">
+                    <File Name="memfs-fuse3.cpp" KeyPath="yes" />
+                </Component>
+                <Component Id="C.memfs_fuse3.compat.h">
+                    <File Id="F.memfs_fuse3.compat.h" Name="compat.h" KeyPath="yes" />
+                </Component>
+                <Component Id="C.memfs_fuse3.sln">
+                    <File Name="memfs-fuse3.sln" KeyPath="yes" />
+                </Component>
+                <Component Id="C.memfs_fuse3.vcxproj">
+                    <File Name="memfs-fuse3.vcxproj" KeyPath="yes" />
+                </Component>
+                <Component Id="C.memfs_fuse3.vcxproj.filters">
+                    <File Name="memfs-fuse3.vcxproj.filters" KeyPath="yes" />
+                </Component>
+            </Directory>
+        </DirectoryRef>
 
         <ComponentGroup Id="C.WinFuse.bin">
             <ComponentRef Id="C.winfuse.sys" />
@@ -142,6 +162,13 @@
             <ComponentRef Id="C.libfuse.fuse_types.h" />
             <ComponentRef Id="C.libfuse.fuse.lib" />
             <ComponentRef Id="C.libfuse.License.txt" />
+        </ComponentGroup>
+        <ComponentGroup Id="C.WinFuse.smp">
+            <ComponentRef Id="C.memfs_fuse3.cpp" />
+            <ComponentRef Id="C.memfs_fuse3.compat.h" />
+            <ComponentRef Id="C.memfs_fuse3.sln" />
+            <ComponentRef Id="C.memfs_fuse3.vcxproj" />
+            <ComponentRef Id="C.memfs_fuse3.vcxproj.filters" />
         </ComponentGroup>
 
         <Feature
@@ -175,6 +202,7 @@
                 InstallDefault="local"
                 Absent="allow">
                 <ComponentGroupRef Id="C.opt.libfuse" />
+                <ComponentGroupRef Id="C.WinFuse.smp" />
             </Feature>
         </Feature>
 
