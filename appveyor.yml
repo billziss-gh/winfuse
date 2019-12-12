@@ -39,6 +39,8 @@ build_script:
 - appveyor AddMessage "Reboot complete" -Category Information
 - tools\build.bat %CONFIGURATION%
 - for %%f in ("build\VStudio\build\%CONFIGURATION%\winfuse-*-x64.msi") do start /wait msiexec /i %%f /qn INSTALLLEVEL=1000
+- copy ext\libfuse\build\%CONFIGURATION%\x86\lib\fuse3-x86.dll "C:\Program Files\WinFuse\opt\libfuse\bin"
+- copy ext\libfuse\build\%CONFIGURATION%\x86\lib\fuse3-x86.lib "C:\Program Files\WinFuse\opt\libfuse\lib"
 
 test_script:
 - tools\nmake-ext-test.bat
