@@ -61,6 +61,7 @@
                     <Directory Id="BINDIR" Name="bin" />
                     <Directory Id="OPTDIR" Name="opt" />
                     <Directory Id="SMPDIR" Name="samples" />
+                    <Directory Id="SYMDIR" Name="sym" />
                 </Directory>
             </Directory>
         </Directory>
@@ -148,6 +149,11 @@
                 </Component>
             </Directory>
         </DirectoryRef>
+        <DirectoryRef Id="SYMDIR">
+            <Component Id="C.winfuse.sys.pdb">
+                <File Name="winfuse-$(var.Platform).sys.pdb" Source="..\build\$(var.Configuration)\winfuse-$(var.Platform).sys.public.pdb" KeyPath="yes" />
+            </Component>
+        </DirectoryRef>
 
         <ComponentGroup Id="C.WinFuse.bin">
             <ComponentRef Id="C.winfuse.sys" />
@@ -169,6 +175,9 @@
             <ComponentRef Id="C.memfs_fuse3.sln" />
             <ComponentRef Id="C.memfs_fuse3.vcxproj" />
             <ComponentRef Id="C.memfs_fuse3.vcxproj.filters" />
+        </ComponentGroup>
+        <ComponentGroup Id="C.WinFuse.sym">
+            <ComponentRef Id="C.winfuse.sys.pdb" />
         </ComponentGroup>
 
         <Feature
@@ -203,6 +212,7 @@
                 Absent="allow">
                 <ComponentGroupRef Id="C.opt.libfuse" />
                 <ComponentGroupRef Id="C.WinFuse.smp" />
+                <ComponentGroupRef Id="C.WinFuse.sym" />
             </Feature>
         </Feature>
 

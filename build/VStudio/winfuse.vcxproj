@@ -100,6 +100,8 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>$(MSBuildProgramFiles32)\WinFsp\opt\fsext\lib\winfsp-$(PlatformTarget).lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ProgramDatabaseFile>$(OutDir)$(TargetFileName).pdb</ProgramDatabaseFile>
+      <StripPrivateSymbols>$(OutDir)$(TargetFileName).public.pdb</StripPrivateSymbols>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -108,6 +110,9 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>$(MSBuildProgramFiles32)\WinFsp\opt\fsext\lib\winfsp-$(PlatformTarget).lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ProgramDatabaseFile>$(OutDir)$(TargetFileName).pdb</ProgramDatabaseFile>
+      <StripPrivateSymbols>$(OutDir)$(TargetFileName).public.pdb</StripPrivateSymbols>
+      <AdditionalOptions>/PDBALTPATH:$(TargetFileName).pdb %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -116,6 +121,8 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>$(MSBuildProgramFiles32)\WinFsp\opt\fsext\lib\winfsp-$(PlatformTarget).lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ProgramDatabaseFile>$(OutDir)$(TargetFileName).pdb</ProgramDatabaseFile>
+      <StripPrivateSymbols>$(OutDir)$(TargetFileName).public.pdb</StripPrivateSymbols>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -124,6 +131,9 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>$(MSBuildProgramFiles32)\WinFsp\opt\fsext\lib\winfsp-$(PlatformTarget).lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ProgramDatabaseFile>$(OutDir)$(TargetFileName).pdb</ProgramDatabaseFile>
+      <StripPrivateSymbols>$(OutDir)$(TargetFileName).public.pdb</StripPrivateSymbols>
+      <AdditionalOptions>/PDBALTPATH:$(TargetFileName).pdb %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
