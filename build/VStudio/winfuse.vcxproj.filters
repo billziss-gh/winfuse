@@ -49,4 +49,9 @@
       <Filter>Source</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\src\winfuse\version.rc">
+      <Filter>Source</Filter>
+    </ResourceCompile>
+  </ItemGroup>
 </Project>

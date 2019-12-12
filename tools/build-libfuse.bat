@@ -40,6 +40,8 @@ if errorlevel 1 goto fail
 if not X!DestDir!==X (
     ninja install
     if errorlevel 1 goto fail
+    copy ..\..\..\LGPL2.txt !DestDir!\License.txt
+    if errorlevel 1 goto fail
 )
 
 rem The pkgconfig prefix in file !InstallDir!\lib\pkgconfig\fuse3.pc

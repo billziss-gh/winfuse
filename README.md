@@ -1,5 +1,5 @@
 <h1 align="center">
-    WinFuse &middot; FUSE for Windows and WSL
+    WinFuse &middot; FUSE for the Windows kernel
 </h1>
 
 <p align="center">
