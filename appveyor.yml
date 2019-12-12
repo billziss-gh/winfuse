@@ -38,6 +38,7 @@ install:
 build_script:
 - appveyor AddMessage "Reboot complete" -Category Information
 - tools\build.bat %CONFIGURATION%
+- for %%f in ("build\VStudio\build\%CONFIGURATION%\winfuse-*-x64.msi") do start /wait msiexec /i %%f /qn INSTALLLEVEL=1000
 
 test_script:
 - sc create WinFuse type=kernel binPath=C:\projects\winfuse\build\VStudio\build\%CONFIGURATION%\winfuse-x64.sys
