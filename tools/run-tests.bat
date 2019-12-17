@@ -17,10 +17,20 @@ set dfl_tests=^
     winfuse-tests-x64 ^
     winfuse-tests-x86
 set opt_tests=^
-    sample-memfs-fuse3-x64 ^
-    sample-fsx-memfs-fuse3-x64 ^
-    sample-memfs-fuse3-x86 ^
-    sample-fsx-memfs-fuse3-x86
+    sample-build-memfs-fuse3-x64 ^
+    sample-test0-memfs-fuse3-x64 ^
+    sample-test1-memfs-fuse3-x64 ^
+    sample-testinf-memfs-fuse3-x64 ^
+    sample-fsx0-memfs-fuse3-x64 ^
+    sample-fsx1-memfs-fuse3-x64 ^
+    sample-fsxinf-memfs-fuse3-x64 ^
+    sample-build-memfs-fuse3-x86 ^
+    sample-test0-memfs-fuse3-x86 ^
+    sample-test1-memfs-fuse3-x86 ^
+    sample-testinf-memfs-fuse3-x86 ^
+    sample-fsx0-memfs-fuse3-x86 ^
+    sample-fsx1-memfs-fuse3-x86 ^
+    sample-fsxinf-memfs-fuse3-x86
 
 set tests=
 for %%f in (%dfl_tests%) do (
@@ -94,21 +104,54 @@ winfuse-tests-x86 +*
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
-:sample-memfs-fuse3-x64
-call :__run_sample_test memfs-fuse3 x64
+:sample-build-memfs-fuse3-x64
+call :__run_sample_build memfs-fuse3 x64
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
-:sample-memfs-fuse3-x86
-call :__run_sample_test memfs-fuse3 x86
+:sample-build-memfs-fuse3-x86
+call :__run_sample_build memfs-fuse3 x86
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:__run_sample_build
+call %ProjRoot%\tools\build-sample.bat %Configuration% %2 %1 "%TMP%\%1"
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-test0-memfs-fuse3-x64
+call :__run_sample_test memfs-fuse3 x64 0
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-test1-memfs-fuse3-x64
+call :__run_sample_test memfs-fuse3 x64 1
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-testinf-memfs-fuse3-x64
+call :__run_sample_test memfs-fuse3 x64 -1
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-test0-memfs-fuse3-x86
+call :__run_sample_test memfs-fuse3 x86 0
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-test1-memfs-fuse3-x86
+call :__run_sample_test memfs-fuse3 x86 1
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-testinf-memfs-fuse3-x86
+call :__run_sample_test memfs-fuse3 x86 -1
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
 :__run_sample_test
 set TestExit=0
-call %ProjRoot%\tools\build-sample.bat %Configuration% %2 %1 "%TMP%\%1"
-if !ERRORLEVEL! neq 0 goto fail
-start "" /b "%TMP%\%1\build\%Configuration%\%1-%2.exe" L:
+start "" /b "%TMP%\%1\build\%Configuration%\%1-%2.exe" -oFileInfoTimeout=%3 L:
 waitfor 7BF47D72F6664550B03248ECFE77C7DD /t 3 2>nul
 pushd >nul
 cd L: >nul 2>nul || (echo Unable to find drive L: >&2 & goto fail)
@@ -130,24 +173,41 @@ L:
 if !ERRORLEVEL! neq 0 set TestExit=1
 popd
 taskkill /f /im %1-%2.exe
-rmdir /s/q "%TMP%\%1"
 exit /b !TestExit!
 
-:sample-fsx-memfs-fuse3-x64
-call :__run_sample_fsx_test memfs-fuse3 x64
+:sample-fsx0-memfs-fuse3-x64
+call :__run_sample_fsx_test memfs-fuse3 x64 0
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
-:sample-fsx-memfs-fuse3-x86
-call :__run_sample_fsx_test memfs-fuse3 x86
+:sample-fsx1-memfs-fuse3-x64
+call :__run_sample_fsx_test memfs-fuse3 x64 1
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-fsxinf-memfs-fuse3-x64
+call :__run_sample_fsx_test memfs-fuse3 x64 -1
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-fsx0-memfs-fuse3-x86
+call :__run_sample_fsx_test memfs-fuse3 x86 0
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-fsx1-memfs-fuse3-x86
+call :__run_sample_fsx_test memfs-fuse3 x86 1
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-fsxinf-memfs-fuse3-x86
+call :__run_sample_fsx_test memfs-fuse3 x86 -1
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
 :__run_sample_fsx_test
 set TestExit=0
-call %ProjRoot%\tools\build-sample.bat %Configuration% %2 %1 "%TMP%\%1"
-if !ERRORLEVEL! neq 0 goto fail
-start "" /b "%TMP%\%1\build\%Configuration%\%1-%2.exe" L:
+start "" /b "%TMP%\%1\build\%Configuration%\%1-%2.exe" -oFileInfoTimeout=%3 L:
 waitfor 7BF47D72F6664550B03248ECFE77C7DD /t 3 2>nul
 pushd >nul
 cd L: >nul 2>nul || (echo Unable to find drive L: >&2 & goto fail)
@@ -156,10 +216,11 @@ L:
 if !ERRORLEVEL! neq 0 set TestExit=1
 popd
 taskkill /f /im %1-%2.exe
-rmdir /s/q "%TMP%\%1"
 exit /b !TestExit!
 
 :leak-test
+rem wait a bit to avoid reporting lingering allocations
+waitfor 7BF47D72F6664550B03248ECFE77C7DD /t 3 2>nul
 for /F "tokens=1,2 delims=:" %%i in ('verifier /query ^| findstr ^
     /c:"Current Pool Allocations:" ^
     /c:"CurrentPagedPoolAllocations:" ^
