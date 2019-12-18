@@ -4,7 +4,7 @@
 
 <p align="center">
     <b>Download</b><br>
-    <a href="https://github.com/billziss-gh/winfsp/releases">
+    <a href="https://github.com/billziss-gh/winfuse/releases">
         <img src="https://img.shields.io/github/release/billziss-gh/winfuse/all.svg?label=latest&colorB=e52e4b&style=for-the-badge"/>
     </a>
     <br/>
