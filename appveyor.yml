@@ -18,9 +18,9 @@ init:
 install:
 - git submodule update --init --recursive
 # install Meson & Ninja
-- appveyor AddMessage "Install Meson & Ninja" -Category Information
-- appveyor DownloadFile https://github.com/mesonbuild/meson/releases/download/0.52.0/meson-0.52.0-64.msi
-- for %%f in ("meson-*.msi") do start /wait msiexec /i %%f /qn
+#- appveyor AddMessage "Install Meson & Ninja" -Category Information
+#- appveyor DownloadFile https://github.com/mesonbuild/meson/releases/download/0.52.0/meson-0.52.0-64.msi
+#- for %%f in ("meson-*.msi") do start /wait msiexec /i %%f /qn
 # install WinFsp
 - appveyor AddMessage "Install WinFsp" -Category Information
 - if %WINFSP%==rel appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5/winfsp-1.5.20002.msi
