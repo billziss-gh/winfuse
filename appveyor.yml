@@ -6,8 +6,10 @@ environment:
   matrix:
   - CONFIGURATION: Debug
     WINFSP: rel
+    LXDK: rel
   - CONFIGURATION: Release
     WINFSP: rel
+    LXDK: rel
 
 init:
 #- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
@@ -28,6 +30,12 @@ install:
 - if %WINFSP%==src copy ext\winfsp\build\VStudio\build\%CONFIGURATION%\winfsp-tests-*.zip .
 - for %%f in ("winfsp-*.msi") do start /wait msiexec /i %%f /qn INSTALLLEVEL=1000
 - for %%f in ("winfsp-tests-*.zip") do powershell -command "Expand-Archive -Path %%f -DestinationPath 'C:\Program Files (x86)\WinFsp\bin'"
+# install LxDK
+- appveyor AddMessage "Install LxDK" -Category Information
+- if %LXDK%==rel appveyor DownloadFile https://github.com/billziss-gh/lxdk/releases/download/v0.1/lxdk-0.1.20010.msi
+- if %LXDK%==src tools\build-lxdk.bat %CONFIGURATION%
+- if %LXDK%==src copy ext\lxdk\build\VStudio\build\%CONFIGURATION%\lxdk-*.msi .
+- for %%f in ("lxdk-*.msi") do start /wait msiexec /i %%f /qn INSTALLLEVEL=1000
 # enable test-signing and verifier and reboot
 - appveyor AddMessage "Change boot configuration and reboot" -Category Information
 - bcdedit /set testsigning on

@@ -4,3 +4,6 @@
 [submodule "ext/winfsp"]
 	path = ext/winfsp
 	url = https://github.com/billziss-gh/winfsp.git
+[submodule "ext/lxdk"]
+	path = ext/lxdk
+	url = https://github.com/billziss-gh/lxdk.git
