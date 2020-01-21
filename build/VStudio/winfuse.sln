@@ -18,6 +18,8 @@ Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "winfuse_msi", "installer\wi
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CustomActions", "installer\CustomActions\CustomActions.vcxproj", "{B983A6DD-0F8E-4A2F-AF78-6320D4524D3B}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "wslfuse", "wslfuse.vcxproj", "{D1502F49-342F-4360-8255-6240EBEFE0B3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -78,6 +80,16 @@ Global
 		{B983A6DD-0F8E-4A2F-AF78-6320D4524D3B}.Installer.Release|x86.Build.0 = Release|Win32
 		{B983A6DD-0F8E-4A2F-AF78-6320D4524D3B}.Release|x64.ActiveCfg = Release|x64
 		{B983A6DD-0F8E-4A2F-AF78-6320D4524D3B}.Release|x86.ActiveCfg = Release|Win32
+		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Debug|x64.ActiveCfg = Debug|x64
+		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Debug|x64.Build.0 = Debug|x64
+		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Debug|x86.ActiveCfg = Debug|x64
+		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Installer.Debug|x64.ActiveCfg = Debug|x64
+		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Installer.Debug|x86.ActiveCfg = Debug|x64
+		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Installer.Release|x64.ActiveCfg = Release|x64
+		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Installer.Release|x86.ActiveCfg = Debug|x64
+		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Release|x64.ActiveCfg = Release|x64
+		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Release|x64.Build.0 = Release|x64
+		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

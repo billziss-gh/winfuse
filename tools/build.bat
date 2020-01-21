@@ -68,10 +68,12 @@ if X%SignedPackage%==X (
     echo .Set CabinetNameTemplate=driver.cab >>driver.ddf
     echo .Set DiskDirectory1=. >>driver.ddf
     echo .Set DestinationDir=x64 >>driver.ddf
-    echo driver-x64.inf >>driver.ddf
+    echo winfuse-x64.inf >>driver.ddf
     echo winfuse-x64.sys >>driver.ddf
+    echo wslfuse-x64.inf >>driver.ddf
+    echo wslfuse-x64.sys >>driver.ddf
     echo .Set DestinationDir=x86 >>driver.ddf
-    echo driver-x86.inf >>driver.ddf
+    echo winfuse-x86.inf >>driver.ddf
     echo winfuse-x86.sys >>driver.ddf
     makecab /F driver.ddf
     signtool sign /ac %CrossCert% /i %Issuer% /n %Subject% /t http://timestamp.digicert.com driver.cab

@@ -7,6 +7,7 @@
 <?define OtherUpgradeCode="$(var.UpgradeCode32)"?>
 <?define ProgramFilesFolder="ProgramFiles64Folder"?>
 <?define FsextRegistryKey="Software\WOW6432Node\WinFsp\Fsext"?>
+<?define LxdkRegistryKey="Software\Lxdk\Services"?>
 <?else?>
 <?define UpgradeCode="$(var.UpgradeCode32)"?>
 <?define OtherUpgradeCode="$(var.UpgradeCode64)"?>
@@ -54,6 +55,9 @@
         </Property>
 
         <Property Id="P.FsextRegistryKey">$(var.FsextRegistryKey)</Property>
+<?if $(var.MyArch) = x64?>
+        <Property Id="P.LxdkRegistryKey">$(var.LxdkRegistryKey)</Property>
+<?endif?>
 
         <Directory Id="TARGETDIR" Name="SourceDir">
             <Directory Id="$(var.ProgramFilesFolder)">
@@ -90,6 +94,14 @@
                     Type="string"
                     Value="WinFuse" />
             </Component>
+<?if $(var.MyArch) = x64?>
+            <Component Id="C.wslfuse.sys">
+                <File Name="wslfuse-$(var.Platform).sys" KeyPath="yes" />
+                <RegistryKey
+                    Root="HKLM"
+                    Key="[P.LxdkRegistryKey]\wslfuse" />
+            </Component>
+<?endif?>
         </DirectoryRef>
         <DirectoryRef Id="OPTDIR">
             <Directory Id="OPTDIR.libfuse" Name="libfuse" FileSource="..\build\$(var.Configuration)\libfuse\$(var.Platform)">
@@ -153,10 +165,18 @@
             <Component Id="C.winfuse.sys.pdb">
                 <File Name="winfuse-$(var.Platform).sys.pdb" Source="..\build\$(var.Configuration)\winfuse-$(var.Platform).sys.public.pdb" KeyPath="yes" />
             </Component>
+<?if $(var.MyArch) = x64?>
+            <Component Id="C.wslfuse.sys.pdb">
+                <File Name="wslfuse-$(var.Platform).sys.pdb" Source="..\build\$(var.Configuration)\wslfuse-$(var.Platform).sys.public.pdb" KeyPath="yes" />
+            </Component>
+<?endif?>
         </DirectoryRef>
 
         <ComponentGroup Id="C.WinFuse.bin">
             <ComponentRef Id="C.winfuse.sys" />
+<?if $(var.MyArch) = x64?>
+            <ComponentRef Id="C.wslfuse.sys" />
+<?endif?>
         </ComponentGroup>
         <ComponentGroup Id="C.opt.libfuse">
             <ComponentRef Id="C.libfuse.fuse.dll" />
@@ -178,6 +198,9 @@
         </ComponentGroup>
         <ComponentGroup Id="C.WinFuse.sym">
             <ComponentRef Id="C.winfuse.sys.pdb" />
+<?if $(var.MyArch) = x64?>
+            <ComponentRef Id="C.wslfuse.sys.pdb" />
+<?endif?>
         </ComponentGroup>
 
         <Feature
@@ -237,25 +260,26 @@
 
         <Binary Id="CustomActions" SourceFile="..\build\$(var.Configuration)\CustomActions-$(var.Platform).dll" />
 
+        <!-- AddService WinFuse -->
         <SetProperty
-            Id="Deferred.AddService"
+            Id="Deferred.AddService.WinFuse"
             Value='AddService WinFuse "[BINDIR]winfuse-$(var.Platform).sys"'
-            Before="Deferred.AddService"
+            Before="Deferred.AddService.WinFuse"
             Sequence="execute" />
         <CustomAction
-            Id="Deferred.AddService"
+            Id="Deferred.AddService.WinFuse"
             BinaryKey="CustomActions"
             DllEntry="ExecuteCommand"
             Execute="deferred"
             Impersonate="no"
             Return="check" />
         <SetProperty
-            Id="Rollback.AddService"
+            Id="Rollback.AddService.WinFuse"
             Value='RemoveService WinFuse'
-            Before="Rollback.AddService"
+            Before="Rollback.AddService.WinFuse"
             Sequence="execute" />
         <CustomAction
-            Id="Rollback.AddService"
+            Id="Rollback.AddService.WinFuse"
             BinaryKey="CustomActions"
             DllEntry="ExecuteCommand"
             Execute="rollback"
@@ -266,33 +290,34 @@
                 deferred: AddService on install or repair
                 rollback: RemoveService on install only
             -->
-            <Custom Action="Rollback.AddService" After="InstallServices">
+            <Custom Action="Rollback.AddService.WinFuse" After="InstallServices">
                 <![CDATA[(NOT Installed)]]>
             </Custom>
-            <Custom Action="Deferred.AddService" After="Rollback.AddService">
+            <Custom Action="Deferred.AddService.WinFuse" After="Rollback.AddService.WinFuse">
                 <![CDATA[((NOT Installed) OR REINSTALL)]]>
             </Custom>
         </InstallExecuteSequence>
 
+        <!-- RemoveService WinFuse -->
         <SetProperty
-            Id="Deferred.RemoveService"
+            Id="Deferred.RemoveService.WinFuse"
             Value='RemoveService WinFuse'
-            Before="Deferred.RemoveService"
+            Before="Deferred.RemoveService.WinFuse"
             Sequence="execute" />
         <CustomAction
-            Id="Deferred.RemoveService"
+            Id="Deferred.RemoveService.WinFuse"
             BinaryKey="CustomActions"
             DllEntry="ExecuteCommand"
             Execute="deferred"
             Impersonate="no"
             Return="check" />
         <SetProperty
-            Id="Rollback.RemoveService"
+            Id="Rollback.RemoveService.WinFuse"
             Value='AddService WinFuse "[BINDIR]winfuse-$(var.Platform).sys"'
-            Before="Rollback.RemoveService"
+            Before="Rollback.RemoveService.WinFuse"
             Sequence="execute" />
         <CustomAction
-            Id="Rollback.RemoveService"
+            Id="Rollback.RemoveService.WinFuse"
             BinaryKey="CustomActions"
             DllEntry="ExecuteCommand"
             Execute="rollback"
@@ -303,13 +328,91 @@
                 deferred: RemoveService on uninstall
                 rollback: AddService on uninstall
             -->
-            <Custom Action="Rollback.RemoveService" Before="DeleteServices">
+            <Custom Action="Rollback.RemoveService.WinFuse" Before="DeleteServices">
                 <![CDATA[REMOVE]]>
             </Custom>
-            <Custom Action="Deferred.RemoveService" After="Rollback.RemoveService">
+            <Custom Action="Deferred.RemoveService.WinFuse" After="Rollback.RemoveService.WinFuse">
                 <![CDATA[REMOVE]]>
             </Custom>
         </InstallExecuteSequence>
+
+<?if $(var.MyArch) = x64?>
+        <!-- AddService WslFuse -->
+        <SetProperty
+            Id="Deferred.AddService.WslFuse"
+            Value='AddService WslFuse "[BINDIR]wslfuse-$(var.Platform).sys"'
+            Before="Deferred.AddService.WslFuse"
+            Sequence="execute" />
+        <CustomAction
+            Id="Deferred.AddService.WslFuse"
+            BinaryKey="CustomActions"
+            DllEntry="ExecuteCommand"
+            Execute="deferred"
+            Impersonate="no"
+            Return="check" />
+        <SetProperty
+            Id="Rollback.AddService.WslFuse"
+            Value='RemoveService WslFuse'
+            Before="Rollback.AddService.WslFuse"
+            Sequence="execute" />
+        <CustomAction
+            Id="Rollback.AddService.WslFuse"
+            BinaryKey="CustomActions"
+            DllEntry="ExecuteCommand"
+            Execute="rollback"
+            Impersonate="no"
+            Return="ignore" />
+        <InstallExecuteSequence>
+            <!--
+                deferred: AddService on install or repair
+                rollback: RemoveService on install only
+            -->
+            <Custom Action="Rollback.AddService.WslFuse" After="InstallServices">
+                <![CDATA[(NOT Installed)]]>
+            </Custom>
+            <Custom Action="Deferred.AddService.WslFuse" After="Rollback.AddService.WslFuse">
+                <![CDATA[((NOT Installed) OR REINSTALL)]]>
+            </Custom>
+        </InstallExecuteSequence>
+
+        <!-- RemoveService WslFuse -->
+        <SetProperty
+            Id="Deferred.RemoveService.WslFuse"
+            Value='RemoveService WslFuse'
+            Before="Deferred.RemoveService.WslFuse"
+            Sequence="execute" />
+        <CustomAction
+            Id="Deferred.RemoveService.WslFuse"
+            BinaryKey="CustomActions"
+            DllEntry="ExecuteCommand"
+            Execute="deferred"
+            Impersonate="no"
+            Return="check" />
+        <SetProperty
+            Id="Rollback.RemoveService.WslFuse"
+            Value='AddService WslFuse "[BINDIR]wslfuse-$(var.Platform).sys"'
+            Before="Rollback.RemoveService.WslFuse"
+            Sequence="execute" />
+        <CustomAction
+            Id="Rollback.RemoveService.WslFuse"
+            BinaryKey="CustomActions"
+            DllEntry="ExecuteCommand"
+            Execute="rollback"
+            Impersonate="no"
+            Return="check" />
+        <InstallExecuteSequence>
+            <!--
+                deferred: RemoveService on uninstall
+                rollback: AddService on uninstall
+            -->
+            <Custom Action="Rollback.RemoveService.WslFuse" Before="DeleteServices">
+                <![CDATA[REMOVE]]>
+            </Custom>
+            <Custom Action="Deferred.RemoveService.WslFuse" After="Rollback.RemoveService.WslFuse">
+                <![CDATA[REMOVE]]>
+            </Custom>
+        </InstallExecuteSequence>
+<?endif?>
 
         <CustomAction
             Id="Immediate.CheckReboot"
