@@ -1,7 +1,7 @@
 /**
  * @file compat.h
  *
- * @copyright 2015-2019 Bill Zissimopoulos
+ * @copyright 2019-2020 Bill Zissimopoulos
  */
 /*
  * This file is part of WinFuse.

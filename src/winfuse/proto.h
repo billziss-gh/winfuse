@@ -5,7 +5,7 @@
  *     FUSE: Filesystem in Userspace
  *     Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
  *
- * @copyright 2019 Bill Zissimopoulos
+ * @copyright 2019-2020 Bill Zissimopoulos
  */
 /*
  * This file is part of WinFuse.
