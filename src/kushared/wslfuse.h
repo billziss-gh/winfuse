@@ -112,23 +112,23 @@ typedef struct
 {
     FSP_FSCTL_VOLUME_PARAMS VolumeParams;
     CHAR MountPoint[4096];
-} WSLFUSE_MOUNT_ARG;
+} WSLFUSE_IOCTL_MOUNT_ARG;
 
 typedef struct
 {
     CHAR MountPoint[4096];
-} WSLFUSE_UNMOUNT_ARG;
+} WSLFUSE_IOCTL_UNMOUNT_ARG;
 
 /*
- * _IOWR('F', 'M', sizeof(WSLFUSE_MOUNT_ARG))
- * sh tools/ioc.c 3 70 77 4600 
+ * _IOW('F', 'M', sizeof(WSLFUSE_IOCTL_MOUNT_ARG))
+ * sh tools/ioc.c 1 70 77 4600
  */
-#define WSLFUSE_MOUNT                   0xd1f8464d
+#define WSLFUSE_IOCTL_MOUNT             0x51f8464d
 
 /*
- * _IOWR('F', 'U', sizeof(WSLFUSE_UNMOUNT_ARG))
- * sh tools/ioc.c 3 70 85 4096 
+ * _IOW('F', 'U', sizeof(WSLFUSE_IOCTL_UNMOUNT_ARG))
+ * sh tools/ioc.c 1 70 85 4096
  */
-#define WSLFUSE_UNMOUNT                 0xd0004655
+#define WSLFUSE_IOCTL_UNMOUNT           0x50004655
 
 #endif

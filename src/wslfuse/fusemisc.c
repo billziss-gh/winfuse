@@ -34,6 +34,91 @@ typedef struct
     DEVICE *Device;
 } FILE;
 
+static INT TransferIoctlToSystemBuffer(
+    ULONG Code,
+    PVOID Buffer,
+    PVOID *PSystemBuffer)
+{
+    ULONG Size = (Code >> 16) & 0x3fff;
+    PVOID SystemBuffer = 0;
+    INT Error;
+
+    *PSystemBuffer = 0;
+
+    if (FlagOn(Code, 0xc0000000/* _IOC_WRITE | _IOC_READ */) &&
+        0 != Size)
+    {
+        SystemBuffer = FuseAlloc(Size);
+        if (0 == SystemBuffer)
+        {
+            Error = -ENOMEM;
+            goto exit;
+        }
+
+        try
+        {
+            if (FlagOn(Code, 0x80000000/* _IOC_READ */))
+                ProbeForWrite(Buffer, Size, 1);
+            else
+                ProbeForRead(Buffer, Size, 1);
+
+            if (FlagOn(Code, 0x40000000/* _IOC_WRITE */))
+                RtlCopyMemory(SystemBuffer, Buffer, Size);
+            else
+                RtlZeroMemory(SystemBuffer, Size);
+        }
+        except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            Error = -EFAULT;
+            goto exit;
+        }
+    }
+
+    *PSystemBuffer = SystemBuffer;
+    SystemBuffer = 0;
+    Error = 0;
+
+exit:
+    if (0 != SystemBuffer)
+        FuseFree(SystemBuffer);
+
+    return Error;
+}
+
+static INT TransferSystemToIoctlBuffer(
+    ULONG Code,
+    PVOID Buffer,
+    PVOID *PSystemBuffer)
+{
+    ULONG Size = (Code >> 16) & 0x3fff;
+    PVOID SystemBuffer = *PSystemBuffer;
+    INT Error;
+
+    if (FlagOn(Code, 0x80000000/* _IOC_READ */) &&
+        0 != Size)
+    {
+        try
+        {
+            ProbeForWrite(Buffer, Size, 1);
+            RtlCopyMemory(Buffer, SystemBuffer, Size);
+        }
+        except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            Error = -EFAULT;
+            goto exit;
+        }
+    }
+
+    *PSystemBuffer = 0;
+    Error = 0;
+
+exit:
+    if (0 != SystemBuffer)
+        FuseFree(SystemBuffer);
+
+    return Error;
+}
+
 static INT FileIoctl(
     PLX_CALL_CONTEXT CallContext,
     PLX_FILE File0,
@@ -41,14 +126,19 @@ static INT FileIoctl(
     PVOID Buffer)
 {
     //FILE *File = (FILE *)File0;
+    PVOID SystemBuffer;
     INT Error;
 
     switch (Code)
     {
-    case WSLFUSE_MOUNT:
+    case WSLFUSE_IOCTL_MOUNT:
+        TransferIoctlToSystemBuffer(Code, Buffer, &SystemBuffer);
+        TransferSystemToIoctlBuffer(Code, Buffer, &SystemBuffer);
         break;
 
-    case WSLFUSE_UNMOUNT:
+    case WSLFUSE_IOCTL_UNMOUNT:
+        TransferIoctlToSystemBuffer(Code, Buffer, &SystemBuffer);
+        TransferSystemToIoctlBuffer(Code, Buffer, &SystemBuffer);
         break;
 
     default:

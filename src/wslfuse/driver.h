@@ -35,6 +35,13 @@
 
 #define DRIVER_NAME                     "WslFuse"
 
+/* memory allocation */
+#define FUSE_ALLOC_TAG                  'ESUF'
+#define FuseAlloc(Size)                 ExAllocatePoolWithTag(PagedPool, Size, FUSE_ALLOC_TAG)
+#define FuseAllocNonPaged(Size)         ExAllocatePoolWithTag(NonPagedPool, Size, FUSE_ALLOC_TAG)
+#define FuseFree(Pointer)               ExFreePoolWithTag(Pointer, FUSE_ALLOC_TAG)
+#define FuseFreeExternal(Pointer)       ExFreePool(Pointer)
+
 INT FuseMiscRegister(
     PLX_INSTANCE Instance);
 
