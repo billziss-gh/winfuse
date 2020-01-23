@@ -1,5 +1,5 @@
 /**
- * @file fusermount.c
+ * @file wslfuse/driver.h
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */
@@ -19,9 +19,23 @@
  * associated repository.
  */
 
+#ifndef WSLFUSE_DRIVER_H_INCLUDED
+#define WSLFUSE_DRIVER_H_INCLUDED
+
+#include <ntifs.h>
+#include <lxdk/lxdk.h>
+
 #include <kushared/wslfuse.h>
 
-int main(int argc, char *argv[])
-{
-    return 0;
-}
+/* disable warnings */
+#pragma warning(disable:4100)           /* unreferenced formal parameter */
+#pragma warning(disable:4127)           /* conditional expression is constant */
+#pragma warning(disable:4200)           /* zero-sized array in struct/union */
+#pragma warning(disable:4201)           /* nameless struct/union */
+
+#define DRIVER_NAME                     "WslFuse"
+
+INT FuseMiscRegister(
+    PLX_INSTANCE Instance);
+
+#endif

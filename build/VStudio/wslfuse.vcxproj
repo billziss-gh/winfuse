@@ -84,6 +84,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\wslfuse\fusemisc.c" />
     <ClCompile Include="..\..\src\wslfuse\driver.c" />
   </ItemGroup>
   <ItemGroup>
@@ -121,6 +122,10 @@ stampinf -d * -v $(MyVersion) -f $(OutDir)$(TargetName).inf</Command>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\wslfuse\version.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\kushared\wslfuse.h" />
+    <ClInclude Include="..\..\src\wslfuse\driver.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
