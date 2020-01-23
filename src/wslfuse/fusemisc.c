@@ -21,6 +21,54 @@
 
 #include <wslfuse/driver.h>
 
+static INT TransferIoctlToSystemBuffer(
+    ULONG Code,
+    PVOID Buffer,
+    PVOID *PSystemBuffer);
+static INT TransferSystemToIoctlBuffer(
+    ULONG Code,
+    PVOID Buffer,
+    PVOID *PSystemBuffer);
+static INT FileIoctl(
+    PLX_CALL_CONTEXT CallContext,
+    PLX_FILE File0,
+    ULONG Code,
+    PVOID Buffer);
+static INT FileRead(
+    PLX_CALL_CONTEXT CallContext,
+    PLX_FILE File,
+    PVOID Buffer,
+    SIZE_T Length,
+    POFF_T POffset,
+    PSIZE_T PBytesTransferred);
+static INT FileWrite(
+    PLX_CALL_CONTEXT CallContext,
+    PLX_FILE File,
+    PVOID Buffer,
+    SIZE_T Length,
+    POFF_T POffset,
+    PSIZE_T PBytesTransferred);
+static INT DeviceOpen(
+    PLX_CALL_CONTEXT CallContext,
+    PLX_DEVICE Device,
+    ULONG Flags,
+    PLX_FILE *PFile);
+static INT DeviceDelete(
+    PLX_DEVICE Device);
+INT FuseMiscRegister(
+    PLX_INSTANCE Instance);
+
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(PAGE, TransferIoctlToSystemBuffer)
+#pragma alloc_text(PAGE, TransferSystemToIoctlBuffer)
+#pragma alloc_text(PAGE, FileIoctl)
+#pragma alloc_text(PAGE, FileRead)
+#pragma alloc_text(PAGE, FileWrite)
+#pragma alloc_text(PAGE, DeviceOpen)
+#pragma alloc_text(PAGE, DeviceDelete)
+#pragma alloc_text(PAGE, FuseMiscRegister)
+#endif
+
 #define FUSE_MINOR                      229
 
 typedef struct
@@ -39,6 +87,8 @@ static INT TransferIoctlToSystemBuffer(
     PVOID Buffer,
     PVOID *PSystemBuffer)
 {
+    PAGED_CODE();
+
     ULONG Size = (Code >> 16) & 0x3fff;
     PVOID SystemBuffer = 0;
     INT Error;
@@ -90,6 +140,8 @@ static INT TransferSystemToIoctlBuffer(
     PVOID Buffer,
     PVOID *PSystemBuffer)
 {
+    PAGED_CODE();
+
     ULONG Size = (Code >> 16) & 0x3fff;
     PVOID SystemBuffer = *PSystemBuffer;
     INT Error;
@@ -125,6 +177,8 @@ static INT FileIoctl(
     ULONG Code,
     PVOID Buffer)
 {
+    PAGED_CODE();
+
     //FILE *File = (FILE *)File0;
     PVOID SystemBuffer;
     INT Error;
@@ -160,6 +214,8 @@ static INT FileRead(
     POFF_T POffset,
     PSIZE_T PBytesTransferred)
 {
+    PAGED_CODE();
+
     return 0;
 }
 
@@ -171,6 +227,8 @@ static INT FileWrite(
     POFF_T POffset,
     PSIZE_T PBytesTransferred)
 {
+    PAGED_CODE();
+
     return 0;
 }
 
@@ -180,6 +238,8 @@ static INT DeviceOpen(
     ULONG Flags,
     PLX_FILE *PFile)
 {
+    PAGED_CODE();
+
     static LX_FILE_CALLBACKS FileCallbacks =
     {
         .Ioctl = FileIoctl,
@@ -212,12 +272,16 @@ exit:
 static INT DeviceDelete(
     PLX_DEVICE Device)
 {
+    PAGED_CODE();
+
     return 0;
 }
 
 INT FuseMiscRegister(
     PLX_INSTANCE Instance)
 {
+    PAGED_CODE();
+
     static LX_DEVICE_CALLBACKS DeviceCallbacks =
     {
         .Open = DeviceOpen,
