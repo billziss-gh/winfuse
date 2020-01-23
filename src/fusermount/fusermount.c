@@ -19,7 +19,7 @@
  * associated repository.
  */
 
-#include <kushared/wslfuse.h>
+#include <ku/wslfuse.h>
 
 int main(int argc, char *argv[])
 {

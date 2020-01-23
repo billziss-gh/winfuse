@@ -1,5 +1,5 @@
 /**
- * @file kushared/wslfuse.h
+ * @file ku/wslfuse.h
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */
@@ -19,8 +19,8 @@
  * associated repository.
  */
 
-#ifndef KUSHARED_WSLFUSE_H_INCLUDED
-#define KUSHARED_WSLFUSE_H_INCLUDED
+#ifndef KU_WSLFUSE_H_INCLUDED
+#define KU_WSLFUSE_H_INCLUDED
 
 #if defined(__linux__)
 #include <stdint.h>

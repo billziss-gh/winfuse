@@ -5,7 +5,7 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Source\kushared">
+    <Filter Include="Source\ku">
       <UniqueIdentifier>{1326df5f-028b-4c1c-a2da-339ad94f5954}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -31,8 +31,8 @@
     <ClInclude Include="..\..\src\wslfuse\driver.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\kushared\wslfuse.h">
-      <Filter>Source\kushared</Filter>
+    <ClInclude Include="..\..\src\ku\wslfuse.h">
+      <Filter>Source\ku</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

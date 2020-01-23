@@ -25,7 +25,7 @@
 #include <ntifs.h>
 #include <lxdk/lxdk.h>
 
-#include <kushared/wslfuse.h>
+#include <ku/wslfuse.h>
 
 /* disable warnings */
 #pragma warning(disable:4100)           /* unreferenced formal parameter */
