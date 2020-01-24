@@ -1,5 +1,5 @@
 /**
- * @file km/debug.c
+ * @file shared/km/debug.c
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */
@@ -19,7 +19,7 @@
  * associated repository.
  */
 
-#include <km/shared.h>
+#include <shared/km/shared.h>
 
 #if DBG
 ULONG DebugRandom(VOID)

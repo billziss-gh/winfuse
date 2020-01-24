@@ -5,11 +5,14 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Source\ku">
-      <UniqueIdentifier>{1326df5f-028b-4c1c-a2da-339ad94f5954}</UniqueIdentifier>
+    <Filter Include="Source\shared">
+      <UniqueIdentifier>{b5f7a0e7-3a19-466c-ae52-9eb863760412}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source\km">
-      <UniqueIdentifier>{667469f0-df40-44a6-9c6b-38befb4e17ef}</UniqueIdentifier>
+    <Filter Include="Source\shared\km">
+      <UniqueIdentifier>{677a3c82-e44a-4159-baf3-78ad02ace941}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\shared\ku">
+      <UniqueIdentifier>{712a52fa-6081-4712-a6ab-bc0418438fb8}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -19,8 +22,8 @@
     <ClCompile Include="..\..\src\wslfuse\fusemisc.c">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\km\debug.c">
-      <Filter>Source\km</Filter>
+    <ClCompile Include="..\..\src\shared\km\debug.c">
+      <Filter>Source\shared\km</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -37,11 +40,11 @@
     <ClInclude Include="..\..\src\wslfuse\driver.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\ku\wslfuse.h">
-      <Filter>Source\ku</Filter>
+    <ClInclude Include="..\..\src\shared\km\shared.h">
+      <Filter>Source\shared\km</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\km\shared.h">
-      <Filter>Source\km</Filter>
+    <ClInclude Include="..\..\src\shared\ku\wslfuse.h">
+      <Filter>Source\shared\ku</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

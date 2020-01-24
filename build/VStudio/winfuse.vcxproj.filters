@@ -5,8 +5,11 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Source\km">
-      <UniqueIdentifier>{84def55a-c7cd-4f8b-be11-549cce57ef45}</UniqueIdentifier>
+    <Filter Include="Source\shared">
+      <UniqueIdentifier>{0311c80c-250c-4e98-9df9-0ebb43cf9bc9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\shared\km">
+      <UniqueIdentifier>{af536a30-2398-4512-bed3-c11be05975c5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -37,8 +40,8 @@
     <ClCompile Include="..\..\src\winfuse\file.c">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\km\debug.c">
-      <Filter>Source\km</Filter>
+    <ClCompile Include="..\..\src\shared\km\debug.c">
+      <Filter>Source\shared\km</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -51,8 +54,8 @@
     <ClInclude Include="..\..\src\winfuse\coro.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\km\shared.h">
-      <Filter>Source\km</Filter>
+    <ClInclude Include="..\..\src\shared\km\shared.h">
+      <Filter>Source\shared\km</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

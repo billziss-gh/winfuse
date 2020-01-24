@@ -1,5 +1,5 @@
 /**
- * @file km/shared.h
+ * @file shared/km/shared.h
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */
@@ -19,8 +19,8 @@
  * associated repository.
  */
 
-#ifndef KM_SHARED_H_INCLUDED
-#define KM_SHARED_H_INCLUDED
+#ifndef SHARED_KM_SHARED_H_INCLUDED
+#define SHARED_KM_SHARED_H_INCLUDED
 
 #include <ntifs.h>
 

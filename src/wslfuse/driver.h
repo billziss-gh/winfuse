@@ -23,9 +23,9 @@
 #define WSLFUSE_DRIVER_H_INCLUDED
 
 #define DRIVER_NAME                     "WslFuse"
-#include <km/shared.h>
+#include <shared/km/shared.h>
+#include <shared/ku/wslfuse.h>
 #include <lxdk/lxdk.h>
-#include <ku/wslfuse.h>
 
 INT FuseMiscRegister(
     PLX_INSTANCE Instance);

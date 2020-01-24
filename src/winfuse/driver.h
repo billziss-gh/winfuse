@@ -23,7 +23,7 @@
 #define WINFUSE_DRIVER_H_INCLUDED
 
 #define DRIVER_NAME                     "WinFuse"
-#include <km/shared.h>
+#include <shared/km/shared.h>
 #include <winfsp/fsext.h>
 #include <winfuse/coro.h>
 #include <winfuse/proto.h>
