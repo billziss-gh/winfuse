@@ -117,6 +117,7 @@ static VOID FuseSecurity_ContextFini(FUSE_CONTEXT *Context);
 #pragma alloc_text(PAGE, FuseOpWrite)
 #pragma alloc_text(PAGE, FuseOpQueryInformation)
 #pragma alloc_text(PAGE, FuseOpSetInformation_SetBasicInfo)
+#pragma alloc_text(PAGE, FuseOpSetInformation_SetAllocationSize)
 #pragma alloc_text(PAGE, FuseOpSetInformation_SetFileSize)
 #pragma alloc_text(PAGE, FuseOpSetInformation_SetDelete)
 #pragma alloc_text(PAGE, FuseOpSetInformation_Rename)
@@ -1692,6 +1693,8 @@ static BOOLEAN FuseOpSetInformation_SetDelete(FUSE_CONTEXT *Context)
 
 static BOOLEAN FuseOpSetInformation_Rename(FUSE_CONTEXT *Context)
 {
+    PAGED_CODE();
+
     coro_block (Context->CoroState)
     {
         Context->File = (PVOID)(UINT_PTR)Context->InternalRequest->Req.SetInformation.UserContext2;
