@@ -417,14 +417,6 @@ PVOID FuseAllocatePoolMustSucceed(POOL_TYPE PoolType, SIZE_T Size, ULONG Tag);
 NTSTATUS FuseSafeCopyMemory(PVOID Dst, PVOID Src, ULONG Len);
 NTSTATUS FuseGetTokenUid(PACCESS_TOKEN Token, TOKEN_INFORMATION_CLASS InfoClass, PUINT32 PUid);
 
-/* memory allocation */
-#define FUSE_ALLOC_TAG                  'ESUF'
-#define FuseAlloc(Size)                 ExAllocatePoolWithTag(PagedPool, Size, FUSE_ALLOC_TAG)
-#define FuseAllocNonPaged(Size)         ExAllocatePoolWithTag(NonPagedPool, Size, FUSE_ALLOC_TAG)
-#define FuseAllocMustSucceed(Size)      FuseAllocatePoolMustSucceed(PagedPool, Size, FUSE_ALLOC_TAG)
-#define FuseFree(Pointer)               ExFreePoolWithTag(Pointer, FUSE_ALLOC_TAG)
-#define FuseFreeExternal(Pointer)       ExFreePool(Pointer)
-
 /* hash mix */
 /* Based on the MurmurHash3 fmix32/fmix64 function:
  * See: https://code.google.com/p/smhasher/source/browse/trunk/MurmurHash3.cpp?r=152#68
