@@ -22,35 +22,11 @@
 #ifndef WINFUSE_DRIVER_H_INCLUDED
 #define WINFUSE_DRIVER_H_INCLUDED
 
-#include <ntifs.h>
+#define DRIVER_NAME                     "WinFuse"
+#include <km/shared.h>
 #include <winfsp/fsext.h>
-
-/* disable warnings */
-#pragma warning(disable:4100)           /* unreferenced formal parameter */
-#pragma warning(disable:4127)           /* conditional expression is constant */
-#pragma warning(disable:4200)           /* zero-sized array in struct/union */
-#pragma warning(disable:4201)           /* nameless struct/union */
-
 #include <winfuse/coro.h>
 #include <winfuse/proto.h>
-
-#define DRIVER_NAME                     "WinFuse"
-
-/* debug */
-#if DBG
-ULONG DebugRandom(VOID);
-BOOLEAN DebugMemory(PVOID Memory, SIZE_T Size, BOOLEAN Test);
-#define DEBUGLOG(fmt, ...)              \
-    DbgPrint("[%d] " DRIVER_NAME "!" __FUNCTION__ ": " fmt "\n", KeGetCurrentIrql(), __VA_ARGS__)
-#define DEBUGTEST(Percent)              (DebugRandom() <= (Percent) * 0x7fff / 100)
-#define DEBUGFILL(M, S)                 DebugMemory(M, S, FALSE)
-#define DEBUGGOOD(M, S)                 DebugMemory(M, S, TRUE)
-#else
-#define DEBUGLOG(fmt, ...)              ((void)0)
-#define DEBUGTEST(Percent)              (TRUE)
-#define DEBUGFILL(M, S)                 (TRUE)
-#define DEBUGGOOD(M, S)                 (TRUE)
-#endif
 
 #define FUSE_FSCTL_TRANSACT             \
     CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0xC00 + 'F', METHOD_BUFFERED, FILE_ANY_ACCESS)

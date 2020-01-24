@@ -8,6 +8,9 @@
     <Filter Include="Source\ku">
       <UniqueIdentifier>{1326df5f-028b-4c1c-a2da-339ad94f5954}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\km">
+      <UniqueIdentifier>{667469f0-df40-44a6-9c6b-38befb4e17ef}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\wslfuse\driver.c">
@@ -15,6 +18,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\wslfuse\fusemisc.c">
       <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\km\debug.c">
+      <Filter>Source\km</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -33,6 +39,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\ku\wslfuse.h">
       <Filter>Source\ku</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\km\shared.h">
+      <Filter>Source\km</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

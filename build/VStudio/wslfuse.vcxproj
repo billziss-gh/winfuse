@@ -84,6 +84,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\km\debug.c" />
     <ClCompile Include="..\..\src\wslfuse\fusemisc.c" />
     <ClCompile Include="..\..\src\wslfuse\driver.c" />
   </ItemGroup>
@@ -124,6 +125,7 @@ stampinf -d * -v $(MyVersion) -f $(OutDir)$(TargetName).inf</Command>
     <ResourceCompile Include="..\..\src\wslfuse\version.rc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\km\shared.h" />
     <ClInclude Include="..\..\src\ku\wslfuse.h" />
     <ClInclude Include="..\..\src\wslfuse\driver.h" />
   </ItemGroup>

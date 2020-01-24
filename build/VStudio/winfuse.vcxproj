@@ -140,8 +140,8 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\km\debug.c" />
     <ClCompile Include="..\..\src\winfuse\cache.c" />
-    <ClCompile Include="..\..\src\winfuse\debug.c" />
     <ClCompile Include="..\..\src\winfuse\driver.c" />
     <ClCompile Include="..\..\src\winfuse\file.c" />
     <ClCompile Include="..\..\src\winfuse\fuse.c" />
@@ -152,6 +152,7 @@
     <ClCompile Include="..\..\src\winfuse\util.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\km\shared.h" />
     <ClInclude Include="..\..\src\winfuse\coro.h" />
     <ClInclude Include="..\..\src\winfuse\driver.h" />
     <ClInclude Include="..\..\src\winfuse\proto.h" />

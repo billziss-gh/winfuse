@@ -1,5 +1,5 @@
 /**
- * @file winfuse/debug.c
+ * @file km/debug.c
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */
@@ -19,7 +19,7 @@
  * associated repository.
  */
 
-#include <winfuse/driver.h>
+#include <km/shared.h>
 
 #if DBG
 ULONG DebugRandom(VOID)
