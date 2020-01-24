@@ -21,14 +21,32 @@
 
 #include <wslfuse/driver.h>
 
-static INT TransferIoctlToSystemBuffer(
+typedef struct
+{
+    LX_DEVICE Base;
+} DEVICE;
+
+typedef struct
+{
+    LX_FILE Base;
+    DEVICE *Device;
+} FILE;
+
+static INT FuseMount(
+    DEVICE *Device,
+    WSLFUSE_IOCTL_MOUNT_ARG *Arg);
+static INT FuseUnmount(
+    DEVICE *Device,
+    WSLFUSE_IOCTL_UNMOUNT_ARG *Arg);
+static INT FileIoctlBegin(
     ULONG Code,
     PVOID Buffer,
     PVOID *PSystemBuffer);
-static INT TransferSystemToIoctlBuffer(
+static INT FileIoctlEnd(
     ULONG Code,
     PVOID Buffer,
-    PVOID *PSystemBuffer);
+    PVOID *PSystemBuffer,
+    INT Error);
 static INT FileIoctl(
     PLX_CALL_CONTEXT CallContext,
     PLX_FILE File0,
@@ -59,8 +77,10 @@ INT FuseMiscRegister(
     PLX_INSTANCE Instance);
 
 #ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, TransferIoctlToSystemBuffer)
-#pragma alloc_text(PAGE, TransferSystemToIoctlBuffer)
+#pragma alloc_text(PAGE, FuseMount)
+#pragma alloc_text(PAGE, FuseUnmount)
+#pragma alloc_text(PAGE, FileIoctlBegin)
+#pragma alloc_text(PAGE, FileIoctlEnd)
 #pragma alloc_text(PAGE, FileIoctl)
 #pragma alloc_text(PAGE, FileRead)
 #pragma alloc_text(PAGE, FileWrite)
@@ -71,18 +91,21 @@ INT FuseMiscRegister(
 
 #define FUSE_MINOR                      229
 
-typedef struct
+static INT FuseMount(DEVICE *Device, WSLFUSE_IOCTL_MOUNT_ARG *Arg)
 {
-    LX_DEVICE Base;
-} DEVICE;
+    PAGED_CODE();
 
-typedef struct
+    return -ENOSYS;
+}
+
+static INT FuseUnmount(DEVICE *Device, WSLFUSE_IOCTL_UNMOUNT_ARG *Arg)
 {
-    LX_FILE Base;
-    DEVICE *Device;
-} FILE;
+    PAGED_CODE();
 
-static INT TransferIoctlToSystemBuffer(
+    return -ENOSYS;
+}
+
+static INT FileIoctlBegin(
     ULONG Code,
     PVOID Buffer,
     PVOID *PSystemBuffer)
@@ -135,16 +158,16 @@ exit:
     return Error;
 }
 
-static INT TransferSystemToIoctlBuffer(
+static INT FileIoctlEnd(
     ULONG Code,
     PVOID Buffer,
-    PVOID *PSystemBuffer)
+    PVOID *PSystemBuffer,
+    INT Error)
 {
     PAGED_CODE();
 
     ULONG Size = (Code >> 16) & 0x3fff;
     PVOID SystemBuffer = *PSystemBuffer;
-    INT Error;
 
     if (FlagOn(Code, 0x80000000/* _IOC_READ */) &&
         0 != Size)
@@ -162,7 +185,6 @@ static INT TransferSystemToIoctlBuffer(
     }
 
     *PSystemBuffer = 0;
-    Error = 0;
 
 exit:
     if (0 != SystemBuffer)
@@ -179,20 +201,28 @@ static INT FileIoctl(
 {
     PAGED_CODE();
 
-    //FILE *File = (FILE *)File0;
+    FILE *File = (FILE *)File0;
     PVOID SystemBuffer;
     INT Error;
 
     switch (Code)
     {
     case WSLFUSE_IOCTL_MOUNT:
-        TransferIoctlToSystemBuffer(Code, Buffer, &SystemBuffer);
-        TransferSystemToIoctlBuffer(Code, Buffer, &SystemBuffer);
+        Error = FileIoctlBegin(Code, Buffer, &SystemBuffer);
+        if (0 != Error)
+        {
+            Error = FuseMount(File->Device, SystemBuffer);
+            Error = FileIoctlEnd(Code, Buffer, &SystemBuffer, Error);
+        }
         break;
 
     case WSLFUSE_IOCTL_UNMOUNT:
-        TransferIoctlToSystemBuffer(Code, Buffer, &SystemBuffer);
-        TransferSystemToIoctlBuffer(Code, Buffer, &SystemBuffer);
+        Error = FileIoctlBegin(Code, Buffer, &SystemBuffer);
+        if (0 != Error)
+        {
+            Error = FuseUnmount(File->Device, SystemBuffer);
+            Error = FileIoctlEnd(Code, Buffer, &SystemBuffer, Error);
+        }
         break;
 
     default:
