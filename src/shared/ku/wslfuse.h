@@ -25,8 +25,10 @@
 #if defined(__linux__)
 #include <stdint.h>
 #include <wchar.h>
+#include <linux/ioctl.h>
 typedef char CHAR;
-typedef wchar_t WCHAR;
+typedef uint16_t WCHAR;
+typedef uint8_t UINT8;
 typedef uint16_t UINT16;
 typedef uint32_t UINT32;
 typedef uint64_t UINT64;
@@ -107,28 +109,49 @@ typedef struct
     FSP_FSCTL_VOLUME_PARAMS_V0_FIELD_DEFN
     FSP_FSCTL_VOLUME_PARAMS_V1_FIELD_DEFN
 } FSP_FSCTL_VOLUME_PARAMS;
+#if defined(__linux__)
+_Static_assert(504 == sizeof(FSP_FSCTL_VOLUME_PARAMS),
+    "sizeof(FSP_FSCTL_VOLUME_PARAMS) must be 504.");
+#endif
 
-typedef struct
+typedef union
 {
     FSP_FSCTL_VOLUME_PARAMS VolumeParams;
-    CHAR MountPoint[4096];
-} WSLFUSE_IOCTL_MOUNT_ARG;
+    CHAR VolumeName[FSP_FSCTL_VOLUME_NAME_SIZEMAX / sizeof(WCHAR)];
+} WSLFUSE_IOCTL_CREATEVOLUME_ARG;
+#if defined(__linux__)
+_Static_assert(504 == sizeof(WSLFUSE_IOCTL_CREATEVOLUME_ARG),
+    "sizeof(WSLFUSE_IOCTL_CREATEVOLUME_ARG) must be 504.");
+#endif
 
 typedef struct
 {
-    CHAR MountPoint[4096];
-} WSLFUSE_IOCTL_UNMOUNT_ARG;
+    UINT8 Operation;
+    UINT64 MountId;
+} WSLFUSE_IOCTL_MOUNTID_ARG;
+#if defined(__linux__)
+_Static_assert(16 == sizeof(WSLFUSE_IOCTL_MOUNTID_ARG),
+    "sizeof(WSLFUSE_IOCTL_MOUNTID_ARG) must be 16.");
+#endif
 
 /*
- * _IOW('F', 'M', sizeof(WSLFUSE_IOCTL_MOUNT_ARG))
- * sh tools/ioc.c 1 70 77 4600
+ * _IOWR('F', 'C', WSLFUSE_IOCTL_CREATEVOLUME_ARG)
+ * sh tools/ioc.c 3 70 67 504
  */
-#define WSLFUSE_IOCTL_MOUNT             0x51f8464d
+#define WSLFUSE_IOCTL_CREATEVOLUME      0xc1f84643
+#if defined(__linux__)
+_Static_assert(WSLFUSE_IOCTL_CREATEVOLUME == _IOWR('F', 'C', WSLFUSE_IOCTL_CREATEVOLUME_ARG),
+    "WSLFUSE_IOCTL_CREATEVOLUME");
+#endif
 
 /*
- * _IOW('F', 'U', sizeof(WSLFUSE_IOCTL_UNMOUNT_ARG))
- * sh tools/ioc.c 1 70 85 4096
+ * _IOW('F', 'M', WSLFUSE_IOCTL_MOUNTID_ARG)
+ * sh tools/ioc.c 1 70 77 16
  */
-#define WSLFUSE_IOCTL_UNMOUNT           0x50004655
+#define WSLFUSE_IOCTL_MOUNTID           0x4010464d
+#if defined(__linux__)
+_Static_assert(WSLFUSE_IOCTL_MOUNTID == _IOW('F', 'M', WSLFUSE_IOCTL_MOUNTID_ARG),
+    "WSLFUSE_IOCTL_MOUNTID");
+#endif
 
 #endif

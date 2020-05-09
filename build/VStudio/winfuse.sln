@@ -20,6 +20,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CustomActions", "installer\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "wslfuse", "wslfuse.vcxproj", "{D1502F49-342F-4360-8255-6240EBEFE0B3}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{712F432E-9A84-4A84-A23A-A350147FA15A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fusermount", "tools\fusermount.vcxproj", "{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -90,6 +94,16 @@ Global
 		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Release|x64.ActiveCfg = Release|x64
 		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Release|x64.Build.0 = Release|x64
 		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Release|x86.ActiveCfg = Release|x64
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Debug|x64.ActiveCfg = Debug|x64
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Debug|x64.Build.0 = Debug|x64
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Debug|x86.ActiveCfg = Debug|x86
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Debug|x64.ActiveCfg = Debug|x64
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Debug|x86.ActiveCfg = Debug|x86
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Release|x64.ActiveCfg = Release|x64
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Release|x86.ActiveCfg = Release|x86
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Release|x64.ActiveCfg = Release|x64
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Release|x64.Build.0 = Release|x64
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Release|x86.ActiveCfg = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -98,6 +112,7 @@ Global
 		{82A1BB65-374A-4BAA-8367-938B8BF022FF} = {9A7023CF-AF0C-4EDB-B737-00F9DFB59ED6}
 		{EAF0C19C-B0D4-461F-B8F6-88ED64E43B49} = {B99A48EC-CF26-440C-A8EE-391A4F37980D}
 		{B983A6DD-0F8E-4A2F-AF78-6320D4524D3B} = {B99A48EC-CF26-440C-A8EE-391A4F37980D}
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A} = {712F432E-9A84-4A84-A23A-A350147FA15A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {60493DF0-3048-44CA-B9C3-C6EF0539DBE0}

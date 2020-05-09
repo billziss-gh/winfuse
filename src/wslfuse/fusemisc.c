@@ -32,12 +32,12 @@ typedef struct
     DEVICE *Device;
 } FILE;
 
+static INT FuseCreateVolume(
+    DEVICE *Device,
+    WSLFUSE_IOCTL_CREATEVOLUME_ARG *Arg);
 static INT FuseMount(
     DEVICE *Device,
-    WSLFUSE_IOCTL_MOUNT_ARG *Arg);
-static INT FuseUnmount(
-    DEVICE *Device,
-    WSLFUSE_IOCTL_UNMOUNT_ARG *Arg);
+    WSLFUSE_IOCTL_MOUNTID_ARG *Arg);
 static INT FileIoctlBegin(
     ULONG Code,
     PVOID Buffer,
@@ -77,8 +77,8 @@ INT FuseMiscRegister(
     PLX_INSTANCE Instance);
 
 #ifdef ALLOC_PRAGMA
+#pragma alloc_text(PAGE, FuseCreateVolume)
 #pragma alloc_text(PAGE, FuseMount)
-#pragma alloc_text(PAGE, FuseUnmount)
 #pragma alloc_text(PAGE, FileIoctlBegin)
 #pragma alloc_text(PAGE, FileIoctlEnd)
 #pragma alloc_text(PAGE, FileIoctl)
@@ -91,14 +91,14 @@ INT FuseMiscRegister(
 
 #define FUSE_MINOR                      229
 
-static INT FuseMount(DEVICE *Device, WSLFUSE_IOCTL_MOUNT_ARG *Arg)
+static INT FuseCreateVolume(DEVICE *Device, WSLFUSE_IOCTL_CREATEVOLUME_ARG *Arg)
 {
     PAGED_CODE();
 
     return -ENOSYS;
 }
 
-static INT FuseUnmount(DEVICE *Device, WSLFUSE_IOCTL_UNMOUNT_ARG *Arg)
+static INT FuseMount(DEVICE *Device, WSLFUSE_IOCTL_MOUNTID_ARG *Arg)
 {
     PAGED_CODE();
 
@@ -207,20 +207,20 @@ static INT FileIoctl(
 
     switch (Code)
     {
-    case WSLFUSE_IOCTL_MOUNT:
+    case WSLFUSE_IOCTL_CREATEVOLUME:
         Error = FileIoctlBegin(Code, Buffer, &SystemBuffer);
         if (0 != Error)
         {
-            Error = FuseMount(File->Device, SystemBuffer);
+            Error = FuseCreateVolume(File->Device, SystemBuffer);
             Error = FileIoctlEnd(Code, Buffer, &SystemBuffer, Error);
         }
         break;
 
-    case WSLFUSE_IOCTL_UNMOUNT:
+    case WSLFUSE_IOCTL_MOUNTID:
         Error = FileIoctlBegin(Code, Buffer, &SystemBuffer);
         if (0 != Error)
         {
-            Error = FuseUnmount(File->Device, SystemBuffer);
+            Error = FuseMount(File->Device, SystemBuffer);
             Error = FileIoctlEnd(Code, Buffer, &SystemBuffer, Error);
         }
         break;

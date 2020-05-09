@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source">
+      <UniqueIdentifier>{19a0dac5-da6d-456b-968b-76d18757e235}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\shared">
+      <UniqueIdentifier>{6ab9e8d2-c15d-4ac8-9bef-100b696ae561}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\shared\ku">
+      <UniqueIdentifier>{803a561e-6570-4650-941b-d59b22654754}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\fusermount\fusermount.c">
+      <Filter>Source</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\shared\ku\wslfuse.h">
+      <Filter>Source\shared\ku</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
