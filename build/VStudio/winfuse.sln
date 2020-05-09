@@ -96,14 +96,18 @@ Global
 		{D1502F49-342F-4360-8255-6240EBEFE0B3}.Release|x86.ActiveCfg = Release|x64
 		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Debug|x64.ActiveCfg = Debug|x64
 		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Debug|x64.Build.0 = Debug|x64
-		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Debug|x86.ActiveCfg = Debug|x86
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Debug|x86.ActiveCfg = Debug|x64
 		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Debug|x64.ActiveCfg = Debug|x64
-		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Debug|x86.ActiveCfg = Debug|x86
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Debug|x86.ActiveCfg = Release|x64
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Debug|x86.Build.0 = Release|x64
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Debug|x86.Deploy.0 = Release|x64
 		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Release|x64.ActiveCfg = Release|x64
-		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Release|x86.ActiveCfg = Release|x86
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Release|x86.ActiveCfg = Release|x64
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Release|x86.Build.0 = Release|x64
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Installer.Release|x86.Deploy.0 = Release|x64
 		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Release|x64.ActiveCfg = Release|x64
 		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Release|x64.Build.0 = Release|x64
-		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Release|x86.ActiveCfg = Release|x86
+		{37493B4C-A8CE-4C60-A63B-D11D6A418F9A}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
