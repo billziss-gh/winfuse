@@ -66,6 +66,9 @@ static INT FileWrite(
     SIZE_T Length,
     POFF_T POffset,
     PSIZE_T PBytesTransferred);
+static INT FileDelete(
+    PLX_CALL_CONTEXT CallContext,
+    PLX_FILE File);
 static INT DeviceOpen(
     PLX_CALL_CONTEXT CallContext,
     PLX_DEVICE Device,
@@ -84,6 +87,7 @@ INT FuseMiscRegister(
 #pragma alloc_text(PAGE, FileIoctl)
 #pragma alloc_text(PAGE, FileRead)
 #pragma alloc_text(PAGE, FileWrite)
+#pragma alloc_text(PAGE, FileDelete)
 #pragma alloc_text(PAGE, DeviceOpen)
 #pragma alloc_text(PAGE, DeviceDelete)
 #pragma alloc_text(PAGE, FuseMiscRegister)
@@ -91,14 +95,18 @@ INT FuseMiscRegister(
 
 #define FUSE_MINOR                      229
 
-static INT FuseCreateVolume(DEVICE *Device, WSLFUSE_IOCTL_CREATEVOLUME_ARG *Arg)
+static INT FuseCreateVolume(
+    DEVICE *Device,
+    WSLFUSE_IOCTL_CREATEVOLUME_ARG *Arg)
 {
     PAGED_CODE();
 
     return -ENOSYS;
 }
 
-static INT FuseMount(DEVICE *Device, WSLFUSE_IOCTL_MOUNTID_ARG *Arg)
+static INT FuseMount(
+    DEVICE *Device,
+    WSLFUSE_IOCTL_MOUNTID_ARG *Arg)
 {
     PAGED_CODE();
 
@@ -169,7 +177,8 @@ static INT FileIoctlEnd(
     ULONG Size = (Code >> 16) & 0x3fff;
     PVOID SystemBuffer = *PSystemBuffer;
 
-    if (FlagOn(Code, 0x80000000/* _IOC_READ */) &&
+    if (0 == Error &&
+        FlagOn(Code, 0x80000000/* _IOC_READ */) &&
         0 != Size)
     {
         try
@@ -209,7 +218,7 @@ static INT FileIoctl(
     {
     case WSLFUSE_IOCTL_CREATEVOLUME:
         Error = FileIoctlBegin(Code, Buffer, &SystemBuffer);
-        if (0 != Error)
+        if (0 == Error)
         {
             Error = FuseCreateVolume(File->Device, SystemBuffer);
             Error = FileIoctlEnd(Code, Buffer, &SystemBuffer, Error);
@@ -218,7 +227,7 @@ static INT FileIoctl(
 
     case WSLFUSE_IOCTL_MOUNTID:
         Error = FileIoctlBegin(Code, Buffer, &SystemBuffer);
-        if (0 != Error)
+        if (0 == Error)
         {
             Error = FuseMount(File->Device, SystemBuffer);
             Error = FileIoctlEnd(Code, Buffer, &SystemBuffer, Error);
@@ -227,12 +236,9 @@ static INT FileIoctl(
 
     default:
         Error = -EINVAL;
-        goto exit;
+        break;
     }
 
-    Error = 0;
-
-exit:
     return Error;
 }
 
@@ -262,6 +268,15 @@ static INT FileWrite(
     return 0;
 }
 
+static INT FileDelete(
+    PLX_CALL_CONTEXT CallContext,
+    PLX_FILE File)
+{
+    PAGED_CODE();
+
+    return 0;
+}
+
 static INT DeviceOpen(
     PLX_CALL_CONTEXT CallContext,
     PLX_DEVICE Device,
@@ -272,6 +287,7 @@ static INT DeviceOpen(
 
     static LX_FILE_CALLBACKS FileCallbacks =
     {
+        .Delete = FileDelete,
         .Ioctl = FileIoctl,
         .Read = FileRead,
         .Write = FileWrite,
@@ -288,7 +304,7 @@ static INT DeviceOpen(
         goto exit;
     }
 
-    /* init fields */
+    /* File: initialize fields. File->Base MUST be zeroed out. */
     RtlZeroMemory(File, sizeof *File);
     File->Device = (DEVICE *)Device;
 
@@ -303,6 +319,8 @@ static INT DeviceDelete(
     PLX_DEVICE Device)
 {
     PAGED_CODE();
+
+    /* Device: finalize fields */
 
     return 0;
 }
@@ -327,8 +345,7 @@ INT FuseMiscRegister(
         goto exit;
     }
 
-    /* init fields other than Device->Base */
-    // ...
+    /* Device: initialize fields. Device->Base MUST NOT be zeroed out. */
 
     LxpDevMiscRegister(Instance, &Device->Base, FUSE_MINOR);
 
