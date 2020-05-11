@@ -30,7 +30,8 @@ set opt_tests=^
     sample-testinf-memfs-fuse3-x86 ^
     sample-fsx0-memfs-fuse3-x86 ^
     sample-fsx1-memfs-fuse3-x86 ^
-    sample-fsxinf-memfs-fuse3-x86
+    sample-fsxinf-memfs-fuse3-x86 ^
+    wslfuse-tests
 
 set tests=
 for %%f in (%dfl_tests%) do (
@@ -101,6 +102,12 @@ exit /b 0
 
 :winfuse-tests-x86
 winfuse-tests-x86 +*
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:wslfuse-tests
+wsl sudo mknod /dev/fuse c 10 229
+wsl sudo ./wslfuse-tests.out
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
