@@ -41,7 +41,7 @@ if exist ext\lxdk\build\VStudio\build\%CONFIG% (
 )
 
 mkdir %TARGET% 2>nul
-for %%f in (winfuse-%SUFFIX%.sys winfuse-tests-%SUFFIX%.exe wslfuse.sys wslfuse-tests.out) do (
+for %%f in (winfuse-%SUFFIX%.sys winfuse-tests-%SUFFIX%.exe wslfuse-%SUFFIX%.sys wslfuse-tests.out) do (
     copy build\VStudio\build\%CONFIG%\%%f %TARGET% >nul
 )
 for %%f in (winfsp-%SUFFIX%.sys winfsp-%SUFFIX%.dll winfsp-tests-%SUFFIX%.exe) do (
@@ -70,7 +70,7 @@ echo reg add HKLM\Software\WinFsp\Fsext /v 00093118 /d "winfuse" /f /reg:32     
 echo sc delete LxLdr                                                            >>%TARGET%kminst.bat
 echo sc delete WslFuse                                                          >>%TARGET%kminst.bat
 echo sc create LxLdr type=kernel binPath=%%~dp0lxldr.sys                        >>%TARGET%kminst.bat
-echo sc create WslFuse type=kernel binPath=%%~dp0wslfuse.sys                    >>%TARGET%kminst.bat
+echo sc create WslFuse type=kernel binPath=%%~dp0wslfuse-%SUFFIX%.sys           >>%TARGET%kminst.bat
 echo reg add HKLM\Software\LxDK\Services\wslfuse /f                             >>%TARGET%kminst.bat
 exit /b 0
 
