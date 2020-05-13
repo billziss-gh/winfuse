@@ -106,8 +106,7 @@ if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
 :wslfuse-tests
-wsl sudo mknod /dev/fuse c 10 229
-wsl sudo ./wslfuse-tests.out
+wsl -- sudo mknod /dev/fuse c 10 229; sudo ./wslfuse-tests.out
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
