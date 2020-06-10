@@ -99,7 +99,9 @@
                 <File Name="wslfuse-$(var.Platform).sys" KeyPath="yes" />
                 <RegistryKey
                     Root="HKLM"
-                    Key="[P.LxdkRegistryKey]\wslfuse" />
+                    Key="[P.LxdkRegistryKey]\wslfuse"
+                    ForceCreateOnInstall="yes"
+                    ForceDeleteOnUninstall="yes" />
             </Component>
 <?endif?>
         </DirectoryRef>
