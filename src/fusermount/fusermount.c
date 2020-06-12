@@ -71,6 +71,9 @@ static const char *opt_parse_arg(const char *opt, char *buf, size_t siz)
     const char *p = opt;
     char *q = buf, *endq = q + siz;
 
+    if (0 == p)
+        return 0;
+
     while (endq > q && '\0' != *p && ',' != *p)
     {
         if ('\\' == p[0] && '\0' != p[1])
@@ -78,25 +81,24 @@ static const char *opt_parse_arg(const char *opt, char *buf, size_t siz)
         *q++ = *p++;
     }
 
-    if (endq == q && buf < endq && '\0' != *p && ',' != *p)
-        buf[0] = '\0';
-
-    if (buf == q && '\0' == *p)
+    if (endq == q || (buf == q && '\0' == *p))
         return 0;
 
+    *q++ = '\0';
     if ('\0' != *p)
         p++;
 
     return p;
 }
 
-static void utf8_to_utf16(const char *src, uint16_t *dst, size_t siz)
+static void utf8_to_utf16(const char *src0, uint16_t *dst, size_t siz)
 {
+    const uint8_t *src = src0;
     uint16_t *dstend = dst + siz / sizeof(uint16_t);
 
     while (dstend > dst)
     {
-        uint32_t c = (uint32_t)*src++;
+        uint32_t c = *src++;
         uint32_t w = 0xfffd; /* unicode replacement char */
 
         if (0x80 > c)
@@ -168,7 +170,8 @@ static int get_mnt_id(const char *mountpoint)
         }
     }
 
-    errno = 0;
+    if (-1 == mnt_id)
+        errno = ENODEV;
 
 exit:
     if (0 != file)
@@ -239,14 +242,15 @@ static void mount_opt_parse(struct mount_opts *mo)
             utf8_to_utf16(optval, mo->VolumeParams.Prefix,
                 sizeof mo->VolumeParams.Prefix);
             for (WCHAR *P = mo->VolumeParams.Prefix; *P; P++)
-                if (L'/' == *P)
+                if ('/' == *P)
                     *P = '\\';
         }
         else if (0 == strcmp(optarg, "FileSystemName"))
         {
+            utf8_to_utf16("FUSE-", mo->VolumeParams.FileSystemName,
+                sizeof mo->VolumeParams.FileSystemName);
             utf8_to_utf16(optval, mo->VolumeParams.FileSystemName + 5,
                 sizeof mo->VolumeParams.FileSystemName - 5 * sizeof(WCHAR));
-            memcpy(mo->VolumeParams.FileSystemName, L"FUSE-", 5 * sizeof(WCHAR));
         }
     }
 
@@ -270,8 +274,9 @@ static void mount_opt_parse(struct mount_opts *mo)
     mo->VolumeParams.PostCleanupWhenModifiedOnly = 1;
     mo->VolumeParams.PassQueryDirectoryFileName = 1;
     mo->VolumeParams.DeviceControl = 1;
-    if (L'\0' == mo->VolumeParams.FileSystemName[0])
-        memcpy(mo->VolumeParams.FileSystemName, L"FUSE", 5 * sizeof(WCHAR));
+    if ('\0' == mo->VolumeParams.FileSystemName[0])
+        utf8_to_utf16("FUSE", mo->VolumeParams.FileSystemName,
+            sizeof mo->VolumeParams.FileSystemName);
 
     if (mo->VolumeParams.SectorSize < 512 ||
         mo->VolumeParams.SectorSize > 4096)
@@ -426,7 +431,7 @@ exit:
 static void do_unmount(void)
 {
     int success = 0;
-    int fusefd;
+    int fusefd = -1;
     int mnt_id;
     WSLFUSE_IOCTL_MOUNTID_ARG MountArg;
 
@@ -491,7 +496,8 @@ static void do_unmount(void)
     success = 1;
 
 exit:
-    close(fusefd);
+    if (-1 != fusefd)
+        close(fusefd);
 
     if (!success)
         exit(1);
@@ -534,8 +540,9 @@ int main(int argc, char *argv[])
         { "quiet", no_argument, 0, 'q' },
         { 0 },
     };
-    while (-1 != getopt_long(argc, argv, "hVo:uzq", longopts, 0))
-        switch (optopt)
+    int opt;
+    while (-1 != (opt = getopt_long(argc, argv, "hVo:uzq", longopts, 0)))
+        switch (opt)
         {
         default:
         case 'h':
@@ -558,7 +565,7 @@ int main(int argc, char *argv[])
             break;
         }
 
-    if (argc + 1 != optind)
+    if (argc != optind + 1)
         usage();
 
     args.mountpoint = realpath(argv[optind], 0);
