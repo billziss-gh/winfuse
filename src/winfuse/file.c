@@ -21,31 +21,27 @@
 
 #include <winfuse/driver.h>
 
-VOID FuseFileDeviceInit(PDEVICE_OBJECT DeviceObject)
+VOID FuseFileInstanceInit(FUSE_DEVICE_EXTENSION *Instance)
 {
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
-
-    KeInitializeSpinLock(&DeviceExtension->FileListLock);
-    InitializeListHead(&DeviceExtension->FileList);
+    KeInitializeSpinLock(&Instance->FileListLock);
+    InitializeListHead(&Instance->FileList);
 }
 
-VOID FuseFileDeviceFini(PDEVICE_OBJECT DeviceObject)
+VOID FuseFileInstanceFini(FUSE_DEVICE_EXTENSION *Instance)
 {
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
     FUSE_FILE *File;
 
-    for (PLIST_ENTRY Entry = DeviceExtension->FileList.Flink; &DeviceExtension->FileList != Entry;)
+    for (PLIST_ENTRY Entry = Instance->FileList.Flink; &Instance->FileList != Entry;)
     {
         File = CONTAINING_RECORD(Entry, FUSE_FILE, ListEntry);
         Entry = Entry->Flink;
-        FuseCacheDereferenceItem(DeviceExtension->Cache, File->CacheItem);
+        FuseCacheDereferenceItem(Instance->Cache, File->CacheItem);
         FuseFree(File);
     }
 }
 
-NTSTATUS FuseFileCreate(PDEVICE_OBJECT DeviceObject, FUSE_FILE **PFile)
+NTSTATUS FuseFileCreate(FUSE_DEVICE_EXTENSION *Instance, FUSE_FILE **PFile)
 {
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
     KIRQL Irql;
     FUSE_FILE *File;
 
@@ -58,25 +54,24 @@ NTSTATUS FuseFileCreate(PDEVICE_OBJECT DeviceObject, FUSE_FILE **PFile)
 
     RtlZeroMemory(File, sizeof *File);
 
-    KeAcquireSpinLock(&DeviceExtension->FileListLock, &Irql);
-    InsertTailList(&DeviceExtension->FileList, &File->ListEntry);
-    KeReleaseSpinLock(&DeviceExtension->FileListLock, Irql);
+    KeAcquireSpinLock(&Instance->FileListLock, &Irql);
+    InsertTailList(&Instance->FileList, &File->ListEntry);
+    KeReleaseSpinLock(&Instance->FileListLock, Irql);
 
     *PFile = File;
 
     return STATUS_SUCCESS;
 }
 
-VOID FuseFileDelete(PDEVICE_OBJECT DeviceObject, FUSE_FILE *File)
+VOID FuseFileDelete(FUSE_DEVICE_EXTENSION *Instance, FUSE_FILE *File)
 {
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
     KIRQL Irql;
 
-    KeAcquireSpinLock(&DeviceExtension->FileListLock, &Irql);
+    KeAcquireSpinLock(&Instance->FileListLock, &Irql);
     RemoveEntryList(&File->ListEntry);
-    KeReleaseSpinLock(&DeviceExtension->FileListLock, Irql);
+    KeReleaseSpinLock(&Instance->FileListLock, Irql);
 
-    FuseCacheDereferenceItem(DeviceExtension->Cache, File->CacheItem);
+    FuseCacheDereferenceItem(Instance->Cache, File->CacheItem);
 
     DEBUGFILL(File, sizeof *File);
     FuseFree(File);

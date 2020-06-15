@@ -24,107 +24,11 @@
 
 #define DRIVER_NAME                     "WinFuse"
 #include <shared/km/shared.h>
-#include <winfsp/fsext.h>
 #include <winfuse/coro.h>
 #include <winfuse/proto.h>
 
 #define FUSE_FSCTL_TRANSACT             \
     CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0xC00 + 'F', METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-/* read/write locks */
-#define FUSE_RWLOCK_USE_SEMAPHORE
-//#define FUSE_RWLOCK_USE_ERESOURCE
-typedef struct _FUSE_RWLOCK
-{
-#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
-    KSEMAPHORE OrderSem;
-    KSEMAPHORE WriteSem;
-    LONG Readers;
-#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
-    ERESOURCE Resource;
-#else
-#error One of FUSE_RWLOCK_USE_SEMAPHORE or FUSE_RWLOCK_USE_ERESOURCE must be defined.
-#endif
-} FUSE_RWLOCK;
-static inline
-VOID FuseRwlockInitialize(FUSE_RWLOCK *Lock)
-{
-#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
-    KeInitializeSemaphore(&Lock->OrderSem, 1, 1);
-    KeInitializeSemaphore(&Lock->WriteSem, 1, 1);
-    Lock->Readers = 0;
-#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
-    ExInitializeResourceLite(&Lock->Resource);
-#endif
-}
-static inline
-VOID FuseRwlockFinalize(FUSE_RWLOCK *Lock)
-{
-#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
-#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
-    ExDeleteResourceLite(&Lock->Resource);
-#endif
-}
-static inline
-BOOLEAN FuseRwlockEnterWriter(FUSE_RWLOCK *Lock, PVOID Owner)
-{
-#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
-    NTSTATUS Result;
-    Result = FsRtlCancellableWaitForSingleObject(&Lock->OrderSem, 0, 0);
-    if (STATUS_SUCCESS == Result)
-    {
-        Result = FsRtlCancellableWaitForSingleObject(&Lock->WriteSem, 0, 0);
-        KeReleaseSemaphore(&Lock->OrderSem, 1, 1, FALSE);
-    }
-    return STATUS_SUCCESS == Result;
-#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
-    ExAcquireResourceExclusiveLite(&Lock->Resource, TRUE);
-    ExSetResourceOwnerPointer(&Lock->Resource, (PVOID)((UINT_PTR)Owner | 3));
-    return TRUE;
-#endif
-}
-static inline
-BOOLEAN FuseRwlockEnterReader(FUSE_RWLOCK *Lock, PVOID Owner)
-{
-#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
-    NTSTATUS Result;
-    Result = FsRtlCancellableWaitForSingleObject(&Lock->OrderSem, 0, 0);
-    if (STATUS_SUCCESS == Result)
-    {
-        if (1 == InterlockedIncrement(&Lock->Readers))
-        {
-            Result = FsRtlCancellableWaitForSingleObject(&Lock->WriteSem, 0, 0);
-            if (STATUS_SUCCESS != Result)
-                InterlockedDecrement(&Lock->Readers);
-        }
-        KeReleaseSemaphore(&Lock->OrderSem, 1, 1, FALSE);
-    }
-    return STATUS_SUCCESS == Result;
-#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
-    ExAcquireResourceSharedLite(&Lock->Resource, TRUE);
-    ExSetResourceOwnerPointer(&Lock->Resource, (PVOID)((UINT_PTR)Owner | 3));
-    return TRUE;
-#endif
-}
-static inline
-VOID FuseRwlockLeaveWriter(FUSE_RWLOCK *Lock, PVOID Owner)
-{
-#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
-    KeReleaseSemaphore(&Lock->WriteSem, 1, 1, FALSE);
-#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
-    ExReleaseResourceForThreadLite(&Lock->Resource, (ERESOURCE_THREAD)((UINT_PTR)Owner | 3));
-#endif
-}
-static inline
-VOID FuseRwlockLeaveReader(FUSE_RWLOCK *Lock, PVOID Owner)
-{
-#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
-    if (0 == InterlockedDecrement(&Lock->Readers))
-        KeReleaseSemaphore(&Lock->WriteSem, 1, 1, FALSE);
-#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
-    ExReleaseResourceForThreadLite(&Lock->Resource, (ERESOURCE_THREAD)((UINT_PTR)Owner | 3));
-#endif
-}
 
 /* device management */
 typedef struct _FUSE_DEVICE_EXTENSION
@@ -157,20 +61,18 @@ FUSE_DEVICE_EXTENSION *FuseDeviceExtension(PDEVICE_OBJECT DeviceObject)
     return (PVOID)((PUINT8)DeviceObject->DeviceExtension + FuseProvider.DeviceExtensionOffset);
 }
 static inline
-BOOLEAN FuseOpcodeENOSYS(PDEVICE_OBJECT DeviceObject, UINT32 Opcode)
+BOOLEAN FuseInstanceGetOpcodeENOSYS(FUSE_DEVICE_EXTENSION *Instance, UINT32 Opcode)
 {
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
-    ASSERT(sizeof DeviceExtension->OpcodeENOSYS / sizeof DeviceExtension->OpcodeENOSYS[0] > (Opcode >> 5));
-    ASSERT(8 * sizeof DeviceExtension->OpcodeENOSYS[0] > (Opcode & 0x1f));
-    return !!(DeviceExtension->OpcodeENOSYS[Opcode >> 5] & (1 << (Opcode & 0x1f)));
+    ASSERT(sizeof Instance->OpcodeENOSYS / sizeof Instance->OpcodeENOSYS[0] > (Opcode >> 5));
+    ASSERT(8 * sizeof Instance->OpcodeENOSYS[0] > (Opcode & 0x1f));
+    return !!(Instance->OpcodeENOSYS[Opcode >> 5] & (1 << (Opcode & 0x1f)));
 }
 static inline
-VOID FuseOpcodeSetENOSYS(PDEVICE_OBJECT DeviceObject, UINT32 Opcode)
+VOID FuseInstanceSetOpcodeENOSYS(FUSE_DEVICE_EXTENSION *Instance, UINT32 Opcode)
 {
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
-    ASSERT(sizeof DeviceExtension->OpcodeENOSYS / sizeof DeviceExtension->OpcodeENOSYS[0] > (Opcode >> 5));
-    ASSERT(8 * sizeof DeviceExtension->OpcodeENOSYS[0] > (Opcode & 0x1f));
-    DeviceExtension->OpcodeENOSYS[Opcode >> 5] |= (1 << (Opcode & 0x1f));
+    ASSERT(sizeof Instance->OpcodeENOSYS / sizeof Instance->OpcodeENOSYS[0] > (Opcode >> 5));
+    ASSERT(8 * sizeof Instance->OpcodeENOSYS[0] > (Opcode & 0x1f));
+    Instance->OpcodeENOSYS[Opcode >> 5] |= (1 << (Opcode & 0x1f));
 }
 
 /* FUSE files */
@@ -184,10 +86,10 @@ typedef struct _FUSE_FILE
     UINT32 IsReparsePoint:1;
     PVOID CacheItem;
 } FUSE_FILE;
-VOID FuseFileDeviceInit(PDEVICE_OBJECT DeviceObject);
-VOID FuseFileDeviceFini(PDEVICE_OBJECT DeviceObject);
-NTSTATUS FuseFileCreate(PDEVICE_OBJECT DeviceObject, FUSE_FILE **PFile);
-VOID FuseFileDelete(PDEVICE_OBJECT DeviceObject, FUSE_FILE *File);
+VOID FuseFileInstanceInit(FUSE_DEVICE_EXTENSION *Instance);
+VOID FuseFileInstanceFini(FUSE_DEVICE_EXTENSION *Instance);
+NTSTATUS FuseFileCreate(FUSE_DEVICE_EXTENSION *Instance, FUSE_FILE **PFile);
+VOID FuseFileDelete(FUSE_DEVICE_EXTENSION *Instance, FUSE_FILE *File);
 
 /* FUSE processing context */
 typedef struct _FUSE_CONTEXT FUSE_CONTEXT;
@@ -227,7 +129,7 @@ struct _FUSE_CONTEXT
     FUSE_CONTEXT *DictNext;
     LIST_ENTRY ListEntry;
     FUSE_CONTEXT_FINI *Fini;
-    PDEVICE_OBJECT DeviceObject;
+    FUSE_DEVICE_EXTENSION *Instance;
     FSP_FSCTL_TRANSACT_REQ *InternalRequest;
     FSP_FSCTL_TRANSACT_RSP *InternalResponse;
     FSP_FSCTL_DECLSPEC_ALIGN UINT8 InternalResponseBuf[sizeof(FSP_FSCTL_TRANSACT_RSP)];
@@ -298,27 +200,23 @@ INT FuseOpGuardResult_(BOOLEAN RwlockResult)
 static inline
 INT FuseOpGuardAcquireExclusive(FUSE_CONTEXT *Context)
 {
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
-    return FuseOpGuardResult_(FuseRwlockEnterWriter(&DeviceExtension->OpGuardLock, Context));
+    return FuseOpGuardResult_(FuseRwlockEnterWriter(&Context->Instance->OpGuardLock, Context));
 }
 static inline
 INT FuseOpGuardAcquireShared(FUSE_CONTEXT *Context)
 {
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
-    return FuseOpGuardResult_(FuseRwlockEnterReader(&DeviceExtension->OpGuardLock, Context));
+    return FuseOpGuardResult_(FuseRwlockEnterReader(&Context->Instance->OpGuardLock, Context));
 }
 static inline
 INT FuseOpGuardReleaseExclusive(FUSE_CONTEXT *Context)
 {
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
-    FuseRwlockLeaveWriter(&DeviceExtension->OpGuardLock, Context);
+    FuseRwlockLeaveWriter(&Context->Instance->OpGuardLock, Context);
     return FuseOpGuardFalse;
 }
 static inline
 INT FuseOpGuardReleaseShared(FUSE_CONTEXT *Context)
 {
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
-    FuseRwlockLeaveReader(&DeviceExtension->OpGuardLock, Context);
+    FuseRwlockLeaveReader(&Context->Instance->OpGuardLock, Context);
     return FuseOpGuardFalse;
 }
 #define FuseContextStatus(S)            \
@@ -390,7 +288,7 @@ VOID FuseProtoSendRead(FUSE_CONTEXT *Context);
 VOID FuseProtoSendWrite(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFsyncdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFsync(FUSE_CONTEXT *Context);
-VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
+VOID FuseAttrToFileInfo(FUSE_DEVICE_EXTENSION *Instance,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 static inline
 VOID FuseFileTimeToUnixTime(UINT64 FileTime0, PUINT64 sec, PUINT32 nsec)

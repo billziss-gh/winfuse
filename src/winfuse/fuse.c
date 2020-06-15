@@ -76,7 +76,7 @@ static NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PAR
     DeviceExtension->Cache = Cache;
     KeInitializeEvent(&DeviceExtension->InitEvent, NotificationEvent, FALSE);
 
-    FuseFileDeviceInit(DeviceObject);
+    FuseFileInstanceInit(DeviceExtension);
 
     Result = FuseProtoPostInit(DeviceObject);
     if (!NT_SUCCESS(Result))
@@ -121,7 +121,7 @@ static VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
 
     FuseIoqDelete(DeviceExtension->Ioq);
 
-    FuseFileDeviceFini(DeviceObject);
+    FuseFileInstanceFini(DeviceExtension);
 
     FuseCacheDelete(DeviceExtension->Cache);
 
@@ -399,7 +399,7 @@ VOID FuseContextCreate(FUSE_CONTEXT **PContext,
     }
 
     RtlZeroMemory(Context, sizeof *Context);
-    Context->DeviceObject = DeviceObject;
+    Context->Instance = FuseDeviceExtension(DeviceObject);
     Context->InternalRequest = InternalRequest;
     Context->InternalResponse = (PVOID)&Context->InternalResponseBuf;
     Context->InternalResponse->Size = sizeof(FSP_FSCTL_TRANSACT_RSP);

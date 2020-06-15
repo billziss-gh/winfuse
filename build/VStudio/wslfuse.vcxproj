@@ -60,7 +60,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\src;C:\Program Files\LxDK\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;$(MSBuildProgramFiles32)\WinFsp\opt\fsext\inc;$(MSBuildProgramFiles32)\WinFsp\inc;C:\Program Files\LxDK\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>C:\Program Files\LxDK\lib\lxcore.lib;C:\Program Files\LxDK\lib\lxldr.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -70,7 +70,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\..\src;C:\Program Files\LxDK\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;$(MSBuildProgramFiles32)\WinFsp\opt\fsext\inc;$(MSBuildProgramFiles32)\WinFsp\inc;C:\Program Files\LxDK\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>C:\Program Files\LxDK\lib\lxcore.lib;C:\Program Files\LxDK\lib\lxldr.lib;%(AdditionalDependencies)</AdditionalDependencies>

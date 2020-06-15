@@ -50,7 +50,7 @@ VOID FuseProtoSendRead(FUSE_CONTEXT *Context);
 VOID FuseProtoSendWrite(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFsyncdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFsync(FUSE_CONTEXT *Context);
-VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
+VOID FuseAttrToFileInfo(FUSE_DEVICE_EXTENSION *Instance,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 
@@ -100,7 +100,7 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 #define FUSE_PROTO_SEND_BEGIN_(OPCODE)  \
     coro_block(Context->CoroState)      \
     {                                   \
-        if (FuseOpcodeENOSYS(Context->DeviceObject, FUSE_PROTO_OPCODE_ ## OPCODE))\
+        if (FuseInstanceGetOpcodeENOSYS(Context->Instance, FUSE_PROTO_OPCODE_ ## OPCODE))\
         {                               \
             Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_INVALID_DEVICE_REQUEST;\
             coro_break;                 \
@@ -111,7 +111,7 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
         Context->InternalResponse->IoStatus.Status =\
             FuseNtStatusFromErrno(Context->FuseResponse->error);\
         if (STATUS_INVALID_DEVICE_REQUEST == Context->InternalResponse->IoStatus.Status)\
-            FuseOpcodeSetENOSYS(Context->DeviceObject, FUSE_PROTO_OPCODE_ ## OPCODE);\
+            FuseInstanceSetOpcodeENOSYS(Context->Instance, FUSE_PROTO_OPCODE_ ## OPCODE);\
     }
 
 static inline VOID FuseProtoInitRequest(FUSE_CONTEXT *Context,
@@ -902,16 +902,15 @@ VOID FuseProtoSendFsync(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_END_(FSYNC)
 }
 
-VOID FuseAttrToFileInfo(PDEVICE_OBJECT DeviceObject,
+VOID FuseAttrToFileInfo(FUSE_DEVICE_EXTENSION *Instance,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo)
 {
     PAGED_CODE();
 
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
     UINT64 AllocationUnit;
 
-    AllocationUnit = (UINT64)DeviceExtension->VolumeParams->SectorSize *
-        (UINT64)DeviceExtension->VolumeParams->SectorsPerAllocationUnit;
+    AllocationUnit = (UINT64)Instance->VolumeParams->SectorSize *
+        (UINT64)Instance->VolumeParams->SectorsPerAllocationUnit;
 
     switch (Attr->mode & 0170000)
     {

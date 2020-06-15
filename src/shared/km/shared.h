@@ -23,6 +23,7 @@
 #define SHARED_KM_SHARED_H_INCLUDED
 
 #include <ntifs.h>
+#include <winfsp/fsext.h>
 
 /* disable warnings */
 #pragma warning(disable:4100)           /* unreferenced formal parameter */
@@ -53,5 +54,100 @@ BOOLEAN DebugMemory(PVOID Memory, SIZE_T Size, BOOLEAN Test);
 #define FuseAllocMustSucceed(Size)      FuseAllocatePoolMustSucceed(PagedPool, Size, FUSE_ALLOC_TAG)
 #define FuseFree(Pointer)               ExFreePoolWithTag(Pointer, FUSE_ALLOC_TAG)
 #define FuseFreeExternal(Pointer)       ExFreePool(Pointer)
+
+/* read/write locks */
+#define FUSE_RWLOCK_USE_SEMAPHORE
+//#define FUSE_RWLOCK_USE_ERESOURCE
+typedef struct _FUSE_RWLOCK
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+    KSEMAPHORE OrderSem;
+    KSEMAPHORE WriteSem;
+    LONG Readers;
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ERESOURCE Resource;
+#else
+#error One of FUSE_RWLOCK_USE_SEMAPHORE or FUSE_RWLOCK_USE_ERESOURCE must be defined.
+#endif
+} FUSE_RWLOCK;
+static inline
+VOID FuseRwlockInitialize(FUSE_RWLOCK *Lock)
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+    KeInitializeSemaphore(&Lock->OrderSem, 1, 1);
+    KeInitializeSemaphore(&Lock->WriteSem, 1, 1);
+    Lock->Readers = 0;
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ExInitializeResourceLite(&Lock->Resource);
+#endif
+}
+static inline
+VOID FuseRwlockFinalize(FUSE_RWLOCK *Lock)
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ExDeleteResourceLite(&Lock->Resource);
+#endif
+}
+static inline
+BOOLEAN FuseRwlockEnterWriter(FUSE_RWLOCK *Lock, PVOID Owner)
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+    NTSTATUS Result;
+    Result = FsRtlCancellableWaitForSingleObject(&Lock->OrderSem, 0, 0);
+    if (STATUS_SUCCESS == Result)
+    {
+        Result = FsRtlCancellableWaitForSingleObject(&Lock->WriteSem, 0, 0);
+        KeReleaseSemaphore(&Lock->OrderSem, 1, 1, FALSE);
+    }
+    return STATUS_SUCCESS == Result;
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ExAcquireResourceExclusiveLite(&Lock->Resource, TRUE);
+    ExSetResourceOwnerPointer(&Lock->Resource, (PVOID)((UINT_PTR)Owner | 3));
+    return TRUE;
+#endif
+}
+static inline
+BOOLEAN FuseRwlockEnterReader(FUSE_RWLOCK *Lock, PVOID Owner)
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+    NTSTATUS Result;
+    Result = FsRtlCancellableWaitForSingleObject(&Lock->OrderSem, 0, 0);
+    if (STATUS_SUCCESS == Result)
+    {
+        if (1 == InterlockedIncrement(&Lock->Readers))
+        {
+            Result = FsRtlCancellableWaitForSingleObject(&Lock->WriteSem, 0, 0);
+            if (STATUS_SUCCESS != Result)
+                InterlockedDecrement(&Lock->Readers);
+        }
+        KeReleaseSemaphore(&Lock->OrderSem, 1, 1, FALSE);
+    }
+    return STATUS_SUCCESS == Result;
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ExAcquireResourceSharedLite(&Lock->Resource, TRUE);
+    ExSetResourceOwnerPointer(&Lock->Resource, (PVOID)((UINT_PTR)Owner | 3));
+    return TRUE;
+#endif
+}
+static inline
+VOID FuseRwlockLeaveWriter(FUSE_RWLOCK *Lock, PVOID Owner)
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+    KeReleaseSemaphore(&Lock->WriteSem, 1, 1, FALSE);
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ExReleaseResourceForThreadLite(&Lock->Resource, (ERESOURCE_THREAD)((UINT_PTR)Owner | 3));
+#endif
+}
+static inline
+VOID FuseRwlockLeaveReader(FUSE_RWLOCK *Lock, PVOID Owner)
+{
+#if defined(FUSE_RWLOCK_USE_SEMAPHORE)
+    if (0 == InterlockedDecrement(&Lock->Readers))
+        KeReleaseSemaphore(&Lock->WriteSem, 1, 1, FALSE);
+#elif defined(FUSE_RWLOCK_USE_ERESOURCE)
+    ExReleaseResourceForThreadLite(&Lock->Resource, (ERESOURCE_THREAD)((UINT_PTR)Owner | 3));
+#endif
+}
 
 #endif

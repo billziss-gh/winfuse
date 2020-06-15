@@ -23,6 +23,12 @@
 #define SHARED_KU_WSLFUSE_H_INCLUDED
 
 #if defined(__linux__)
+/*
+ * We duplicate some of the definitions from WinFsp and WinFuse
+ * to avoid having either of them as a build dependency when
+ * building on Linux.
+ */
+
 #include <stdint.h>
 #include <wchar.h>
 #include <linux/ioctl.h>
@@ -32,13 +38,6 @@ typedef uint8_t UINT8;
 typedef uint16_t UINT16;
 typedef uint32_t UINT32;
 typedef uint64_t UINT64;
-#endif
-
-/*
- * We duplicate some of the definitions from WinFsp and WinFuse
- * to avoid having either of them as a build dependency when
- * building on Linux.
- */
 
 #define FSP_FSCTL_DISK_DEVICE_NAME      "WinFsp.Disk"
 #define FSP_FSCTL_NET_DEVICE_NAME       "WinFsp.Net"
@@ -109,7 +108,6 @@ typedef struct
     FSP_FSCTL_VOLUME_PARAMS_V0_FIELD_DEFN
     FSP_FSCTL_VOLUME_PARAMS_V1_FIELD_DEFN
 } FSP_FSCTL_VOLUME_PARAMS;
-#if defined(__linux__)
 _Static_assert(504 == sizeof(FSP_FSCTL_VOLUME_PARAMS),
     "sizeof(FSP_FSCTL_VOLUME_PARAMS) must be 504.");
 #endif
