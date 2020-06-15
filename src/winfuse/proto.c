@@ -21,10 +21,10 @@
 
 #include <winfuse/driver.h>
 
-NTSTATUS FuseProtoPostInit(PDEVICE_OBJECT DeviceObject);
+NTSTATUS FuseProtoPostInit(FUSE_DEVICE_EXTENSION *Instance);
 VOID FuseProtoSendInit(FUSE_CONTEXT *Context);
 VOID FuseProtoSendLookup(FUSE_CONTEXT *Context);
-NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList);
+NTSTATUS FuseProtoPostForget(FUSE_DEVICE_EXTENSION *Instance, PLIST_ENTRY ForgetList);
 static VOID FuseProtoPostForget_ContextFini(FUSE_CONTEXT *Context);
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context);
 VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
@@ -126,20 +126,20 @@ static inline VOID FuseProtoInitRequest(FUSE_CONTEXT *Context,
     Context->FuseRequest->pid = Context->OrigPid;
 }
 
-NTSTATUS FuseProtoPostInit(PDEVICE_OBJECT DeviceObject)
+NTSTATUS FuseProtoPostInit(FUSE_DEVICE_EXTENSION *Instance)
 {
     PAGED_CODE();
 
     FUSE_CONTEXT *Context;
 
-    FuseContextCreate(&Context, DeviceObject, 0);
+    FuseContextCreate(&Context, Instance, 0);
     ASSERT(0 != Context);
     if (FuseContextIsStatus(Context))
         return FuseContextToStatus(Context);
 
     Context->InternalResponse->Hint = FUSE_PROTO_OPCODE_INIT;
 
-    FuseIoqPostPending(FuseDeviceExtension(DeviceObject)->Ioq, Context);
+    FuseIoqPostPending(Instance->Ioq, Context);
 
     return STATUS_SUCCESS;
 }
@@ -188,13 +188,13 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_END
 }
 
-NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList)
+NTSTATUS FuseProtoPostForget(FUSE_DEVICE_EXTENSION *Instance, PLIST_ENTRY ForgetList)
 {
     PAGED_CODE();
 
     FUSE_CONTEXT *Context;
 
-    FuseContextCreate(&Context, DeviceObject, 0);
+    FuseContextCreate(&Context, Instance, 0);
     ASSERT(0 != Context);
     if (FuseContextIsStatus(Context))
         return FuseContextToStatus(Context);
@@ -208,7 +208,7 @@ NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList
     Context->Forget.ForgetList.Flink->Blink = &Context->Forget.ForgetList;
     Context->Forget.ForgetList.Blink->Flink = &Context->Forget.ForgetList;
 
-    FuseIoqPostPending(FuseDeviceExtension(DeviceObject)->Ioq, Context);
+    FuseIoqPostPending(Instance->Ioq, Context);
 
     return STATUS_SUCCESS;
 }

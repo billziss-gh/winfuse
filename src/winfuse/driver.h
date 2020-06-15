@@ -187,7 +187,7 @@ struct _FUSE_CONTEXT
     };
 };
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
-    PDEVICE_OBJECT DeviceObject, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
+    FUSE_DEVICE_EXTENSION *Instance, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
 VOID FuseContextDelete(FUSE_CONTEXT *Context);
 static inline
 INT FuseOpGuardResult_(BOOLEAN RwlockResult)
@@ -245,7 +245,7 @@ typedef struct _FUSE_CACHE_GEN FUSE_CACHE_GEN;
 NTSTATUS FuseCacheCreate(ULONG Capacity, BOOLEAN CaseInsensitive, FUSE_CACHE **PCache);
 VOID FuseCacheDelete(FUSE_CACHE *Cache);
 VOID FuseCacheExpirationRoutine(FUSE_CACHE *Cache,
-    PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
+    FUSE_DEVICE_EXTENSION *Instance, UINT64 ExpirationTime);
 NTSTATUS FuseCacheReferenceGen(FUSE_CACHE *Cache, PVOID *PGen);
 VOID FuseCacheDereferenceGen(FUSE_CACHE *Cache, PVOID Gen);
 BOOLEAN FuseCacheGetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
@@ -260,10 +260,10 @@ VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList);
 BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForgetOne);
 
 /* protocol implementation */
-NTSTATUS FuseProtoPostInit(PDEVICE_OBJECT DeviceObject);
+NTSTATUS FuseProtoPostInit(FUSE_DEVICE_EXTENSION *Instance);
 VOID FuseProtoSendInit(FUSE_CONTEXT *Context);
 VOID FuseProtoSendLookup(FUSE_CONTEXT *Context);
-NTSTATUS FuseProtoPostForget(PDEVICE_OBJECT DeviceObject, PLIST_ENTRY ForgetList);
+NTSTATUS FuseProtoPostForget(FUSE_DEVICE_EXTENSION *Instance, PLIST_ENTRY ForgetList);
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context);
 VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
 VOID FuseProtoSendStatfs(FUSE_CONTEXT *Context);

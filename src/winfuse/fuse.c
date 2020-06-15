@@ -26,7 +26,7 @@ static VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject);
 static VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
 static NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp);
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
-    PDEVICE_OBJECT DeviceObject, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
+    FUSE_DEVICE_EXTENSION *Instance, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
 VOID FuseContextDelete(FUSE_CONTEXT *Context);
 
 #ifdef ALLOC_PRAGMA
@@ -78,7 +78,7 @@ static NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PAR
 
     FuseFileInstanceInit(DeviceExtension);
 
-    Result = FuseProtoPostInit(DeviceObject);
+    Result = FuseProtoPostInit(DeviceExtension);
     if (!NT_SUCCESS(Result))
         goto fail;
 
@@ -136,9 +136,9 @@ static VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 Expi
 
     KeEnterCriticalRegion();
 
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
+    FUSE_DEVICE_EXTENSION *Instance = FuseDeviceExtension(DeviceObject);
 
-    FuseCacheExpirationRoutine(DeviceExtension->Cache, DeviceObject, ExpirationTime);
+    FuseCacheExpirationRoutine(Instance->Cache, Instance, ExpirationTime);
 
     KeLeaveCriticalRegion();
 }
@@ -283,7 +283,7 @@ request:
 
             ASSERT(FspFsctlTransactReservedKind != InternalRequest->Kind);
 
-            FuseContextCreate(&Context, DeviceObject, InternalRequest);
+            FuseContextCreate(&Context, DeviceExtension, InternalRequest);
             ASSERT(0 != Context);
 
             Continue = FALSE;
@@ -376,7 +376,7 @@ FSP_FSEXT_PROVIDER FuseProvider =
 };
 
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
-    PDEVICE_OBJECT DeviceObject, FSP_FSCTL_TRANSACT_REQ *InternalRequest)
+    FUSE_DEVICE_EXTENSION *Instance, FSP_FSCTL_TRANSACT_REQ *InternalRequest)
 {
     PAGED_CODE();
 
@@ -399,7 +399,7 @@ VOID FuseContextCreate(FUSE_CONTEXT **PContext,
     }
 
     RtlZeroMemory(Context, sizeof *Context);
-    Context->Instance = FuseDeviceExtension(DeviceObject);
+    Context->Instance = Instance;
     Context->InternalRequest = InternalRequest;
     Context->InternalResponse = (PVOID)&Context->InternalResponseBuf;
     Context->InternalResponse->Size = sizeof(FSP_FSCTL_TRANSACT_RSP);

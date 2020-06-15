@@ -62,7 +62,7 @@
 NTSTATUS FuseCacheCreate(ULONG Capacity, BOOLEAN CaseInsensitive, FUSE_CACHE **PCache);
 VOID FuseCacheDelete(FUSE_CACHE *Cache);
 VOID FuseCacheExpirationRoutine(FUSE_CACHE *Cache,
-    PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
+    FUSE_DEVICE_EXTENSION *Instance, UINT64 ExpirationTime);
 NTSTATUS FuseCacheReferenceGen(FUSE_CACHE *Cache, PVOID *PGen);
 VOID FuseCacheDereferenceGen(FUSE_CACHE *Cache, PVOID Gen);
 BOOLEAN FuseCacheGetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
@@ -329,7 +329,7 @@ VOID FuseCacheDelete(FUSE_CACHE *Cache)
 }
 
 VOID FuseCacheExpirationRoutine(FUSE_CACHE *Cache,
-    PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime)
+    FUSE_DEVICE_EXTENSION *Instance, UINT64 ExpirationTime)
 {
     PAGED_CODE();
 
@@ -361,7 +361,7 @@ VOID FuseCacheExpirationRoutine(FUSE_CACHE *Cache,
     if (!IsListEmpty(&ForgetList))
     {
         BOOLEAN Success = DEBUGTEST(90) &&
-            NT_SUCCESS(FuseProtoPostForget(DeviceObject, &ForgetList));
+            NT_SUCCESS(FuseProtoPostForget(Instance, &ForgetList));
         if (!Success)
         {
             ASSERT(!IsListEmpty(&ForgetList));
