@@ -21,10 +21,10 @@
 
 #include <winfuse/driver.h>
 
-NTSTATUS FuseProtoPostInit(FUSE_DEVICE_EXTENSION *Instance);
+NTSTATUS FuseProtoPostInit(FUSE_INSTANCE *Instance);
 VOID FuseProtoSendInit(FUSE_CONTEXT *Context);
 VOID FuseProtoSendLookup(FUSE_CONTEXT *Context);
-NTSTATUS FuseProtoPostForget(FUSE_DEVICE_EXTENSION *Instance, PLIST_ENTRY ForgetList);
+NTSTATUS FuseProtoPostForget(FUSE_INSTANCE *Instance, PLIST_ENTRY ForgetList);
 static VOID FuseProtoPostForget_ContextFini(FUSE_CONTEXT *Context);
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context);
 VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
@@ -50,7 +50,7 @@ VOID FuseProtoSendRead(FUSE_CONTEXT *Context);
 VOID FuseProtoSendWrite(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFsyncdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFsync(FUSE_CONTEXT *Context);
-VOID FuseAttrToFileInfo(FUSE_DEVICE_EXTENSION *Instance,
+VOID FuseAttrToFileInfo(FUSE_INSTANCE *Instance,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
 
@@ -126,7 +126,7 @@ static inline VOID FuseProtoInitRequest(FUSE_CONTEXT *Context,
     Context->FuseRequest->pid = Context->OrigPid;
 }
 
-NTSTATUS FuseProtoPostInit(FUSE_DEVICE_EXTENSION *Instance)
+NTSTATUS FuseProtoPostInit(FUSE_INSTANCE *Instance)
 {
     PAGED_CODE();
 
@@ -188,7 +188,7 @@ VOID FuseProtoSendLookup(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_END
 }
 
-NTSTATUS FuseProtoPostForget(FUSE_DEVICE_EXTENSION *Instance, PLIST_ENTRY ForgetList)
+NTSTATUS FuseProtoPostForget(FUSE_INSTANCE *Instance, PLIST_ENTRY ForgetList)
 {
     PAGED_CODE();
 
@@ -902,7 +902,7 @@ VOID FuseProtoSendFsync(FUSE_CONTEXT *Context)
     FUSE_PROTO_SEND_END_(FSYNC)
 }
 
-VOID FuseAttrToFileInfo(FUSE_DEVICE_EXTENSION *Instance,
+VOID FuseAttrToFileInfo(FUSE_INSTANCE *Instance,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo)
 {
     PAGED_CODE();

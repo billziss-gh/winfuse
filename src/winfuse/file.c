@@ -21,13 +21,13 @@
 
 #include <winfuse/driver.h>
 
-VOID FuseFileInstanceInit(FUSE_DEVICE_EXTENSION *Instance)
+VOID FuseFileInstanceInit(FUSE_INSTANCE *Instance)
 {
     KeInitializeSpinLock(&Instance->FileListLock);
     InitializeListHead(&Instance->FileList);
 }
 
-VOID FuseFileInstanceFini(FUSE_DEVICE_EXTENSION *Instance)
+VOID FuseFileInstanceFini(FUSE_INSTANCE *Instance)
 {
     FUSE_FILE *File;
 
@@ -40,7 +40,7 @@ VOID FuseFileInstanceFini(FUSE_DEVICE_EXTENSION *Instance)
     }
 }
 
-NTSTATUS FuseFileCreate(FUSE_DEVICE_EXTENSION *Instance, FUSE_FILE **PFile)
+NTSTATUS FuseFileCreate(FUSE_INSTANCE *Instance, FUSE_FILE **PFile)
 {
     KIRQL Irql;
     FUSE_FILE *File;
@@ -63,7 +63,7 @@ NTSTATUS FuseFileCreate(FUSE_DEVICE_EXTENSION *Instance, FUSE_FILE **PFile)
     return STATUS_SUCCESS;
 }
 
-VOID FuseFileDelete(FUSE_DEVICE_EXTENSION *Instance, FUSE_FILE *File)
+VOID FuseFileDelete(FUSE_INSTANCE *Instance, FUSE_FILE *File)
 {
     KIRQL Irql;
 

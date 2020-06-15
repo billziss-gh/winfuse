@@ -26,7 +26,7 @@ static VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject);
 static VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
 static NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp);
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
-    FUSE_DEVICE_EXTENSION *Instance, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
+    FUSE_INSTANCE *Instance, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
 VOID FuseContextDelete(FUSE_CONTEXT *Context);
 
 #ifdef ALLOC_PRAGMA
@@ -44,7 +44,7 @@ static NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PAR
 
     KeEnterCriticalRegion();
 
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
+    FUSE_INSTANCE *Instance = FuseInstanceFromDeviceObject(DeviceObject);
     FUSE_IOQ *Ioq = 0;
     FUSE_CACHE *Cache = 0;
     NTSTATUS Result;
@@ -70,15 +70,15 @@ static NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PAR
     if (!NT_SUCCESS(Result))
         goto fail;
 
-    DeviceExtension->VolumeParams = VolumeParams;
-    FuseRwlockInitialize(&DeviceExtension->OpGuardLock);
-    DeviceExtension->Ioq = Ioq;
-    DeviceExtension->Cache = Cache;
-    KeInitializeEvent(&DeviceExtension->InitEvent, NotificationEvent, FALSE);
+    Instance->VolumeParams = VolumeParams;
+    FuseRwlockInitialize(&Instance->OpGuardLock);
+    Instance->Ioq = Ioq;
+    Instance->Cache = Cache;
+    KeInitializeEvent(&Instance->InitEvent, NotificationEvent, FALSE);
 
-    FuseFileInstanceInit(DeviceExtension);
+    FuseFileInstanceInit(Instance);
 
-    Result = FuseProtoPostInit(DeviceExtension);
+    Result = FuseProtoPostInit(Instance);
     if (!NT_SUCCESS(Result))
         goto fail;
 
@@ -104,7 +104,7 @@ static VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
 
     KeEnterCriticalRegion();
 
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
+    FUSE_INSTANCE *Instance = FuseInstanceFromDeviceObject(DeviceObject);
 
     /*
      * The order of finalization is IMPORTANT:
@@ -119,13 +119,13 @@ static VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject)
      * CacheItem references.
      */
 
-    FuseIoqDelete(DeviceExtension->Ioq);
+    FuseIoqDelete(Instance->Ioq);
 
-    FuseFileInstanceFini(DeviceExtension);
+    FuseFileInstanceFini(Instance);
 
-    FuseCacheDelete(DeviceExtension->Cache);
+    FuseCacheDelete(Instance->Cache);
 
-    FuseRwlockFinalize(&DeviceExtension->OpGuardLock);
+    FuseRwlockFinalize(&Instance->OpGuardLock);
 
     KeLeaveCriticalRegion();
 }
@@ -136,7 +136,7 @@ static VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 Expi
 
     KeEnterCriticalRegion();
 
-    FUSE_DEVICE_EXTENSION *Instance = FuseDeviceExtension(DeviceObject);
+    FUSE_INSTANCE *Instance = FuseInstanceFromDeviceObject(DeviceObject);
 
     FuseCacheExpirationRoutine(Instance->Cache, Instance, ExpirationTime);
 
@@ -210,7 +210,7 @@ static NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp)
             return STATUS_BUFFER_TOO_SMALL;
     }
 
-    FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(DeviceObject);
+    FUSE_INSTANCE *Instance = FuseInstanceFromDeviceObject(DeviceObject);
     FSP_FSCTL_TRANSACT_REQ *InternalRequest = 0;
     FSP_FSCTL_TRANSACT_RSP InternalResponse;
     FUSE_CONTEXT *Context;
@@ -219,14 +219,14 @@ static NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 
     if (0 != FuseResponse)
     {
-        Context = FuseIoqEndProcessing(DeviceExtension->Ioq, FuseResponse->unique);
+        Context = FuseIoqEndProcessing(Instance->Ioq, FuseResponse->unique);
         if (0 == Context)
             goto request;
 
         Continue = FuseContextProcess(Context, FuseResponse, 0, 0);
 
         if (Continue)
-            FuseIoqPostPending(DeviceExtension->Ioq, Context);
+            FuseIoqPostPending(Instance->Ioq, Context);
         else if (0 == Context->InternalRequest)
             FuseContextDelete(Context);
         else
@@ -247,14 +247,14 @@ request:
     {
         RtlZeroMemory(FuseRequest, FUSE_PROTO_REQ_HEADER_SIZE);
 
-        Context = FuseIoqNextPending(DeviceExtension->Ioq);
+        Context = FuseIoqNextPending(Instance->Ioq);
         if (0 == Context)
         {
-            UINT32 VersionMajor = DeviceExtension->VersionMajor;
+            UINT32 VersionMajor = Instance->VersionMajor;
             MemoryBarrier();
             if (0 == VersionMajor)
             {
-                Result = FsRtlCancellableWaitForSingleObject(&DeviceExtension->InitEvent,
+                Result = FsRtlCancellableWaitForSingleObject(&Instance->InitEvent,
                     0, Irp);
                 if (STATUS_TIMEOUT == Result || STATUS_THREAD_IS_TERMINATING == Result)
                     Result = STATUS_CANCELLED;
@@ -262,7 +262,7 @@ request:
                     goto exit;
                 ASSERT(STATUS_SUCCESS == Result);
 
-                VersionMajor = DeviceExtension->VersionMajor;
+                VersionMajor = Instance->VersionMajor;
             }
             if ((UINT32)-1 == VersionMajor)
             {
@@ -283,7 +283,7 @@ request:
 
             ASSERT(FspFsctlTransactReservedKind != InternalRequest->Kind);
 
-            FuseContextCreate(&Context, DeviceExtension, InternalRequest);
+            FuseContextCreate(&Context, Instance, InternalRequest);
             ASSERT(0 != Context);
 
             Continue = FALSE;
@@ -302,7 +302,7 @@ request:
         if (Continue)
         {
             ASSERT(!FuseContextIsStatus(Context));
-            FuseIoqStartProcessing(DeviceExtension->Ioq, Context);
+            FuseIoqStartProcessing(Instance->Ioq, Context);
         }
         else if (FuseContextIsStatus(Context))
         {
@@ -324,7 +324,7 @@ request:
             case FUSE_PROTO_OPCODE_FORGET:
             case FUSE_PROTO_OPCODE_BATCH_FORGET:
                 if (!IsListEmpty(&Context->Forget.ForgetList))
-                    FuseIoqPostPending(DeviceExtension->Ioq, Context);
+                    FuseIoqPostPending(Instance->Ioq, Context);
                 else
                     FuseContextDelete(Context);
                 break;
@@ -360,7 +360,7 @@ FSP_FSEXT_PROVIDER FuseProvider =
     FUSE_FSCTL_TRANSACT,
 
     /* DeviceExtensionSize */
-    sizeof(FUSE_DEVICE_EXTENSION),
+    sizeof(FUSE_INSTANCE),
 
     /* DeviceInit */
     FuseDeviceInit,
@@ -376,7 +376,7 @@ FSP_FSEXT_PROVIDER FuseProvider =
 };
 
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
-    FUSE_DEVICE_EXTENSION *Instance, FSP_FSCTL_TRANSACT_REQ *InternalRequest)
+    FUSE_INSTANCE *Instance, FSP_FSCTL_TRANSACT_REQ *InternalRequest)
 {
     PAGED_CODE();
 

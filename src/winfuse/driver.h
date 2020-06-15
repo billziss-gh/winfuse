@@ -30,8 +30,8 @@
 #define FUSE_FSCTL_TRANSACT             \
     CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0xC00 + 'F', METHOD_BUFFERED, FILE_ANY_ACCESS)
 
-/* device management */
-typedef struct _FUSE_DEVICE_EXTENSION
+/* FUSE instances */
+typedef struct _FUSE_INSTANCE
 {
     FSP_FSCTL_VOLUME_PARAMS *VolumeParams;
     FUSE_RWLOCK OpGuardLock;
@@ -53,22 +53,22 @@ typedef struct _FUSE_DEVICE_EXTENSION
      * file system.
      */
     UINT32 OpcodeENOSYS[2];
-} FUSE_DEVICE_EXTENSION;
+} FUSE_INSTANCE;
 extern FSP_FSEXT_PROVIDER FuseProvider;
 static inline
-FUSE_DEVICE_EXTENSION *FuseDeviceExtension(PDEVICE_OBJECT DeviceObject)
+FUSE_INSTANCE *FuseInstanceFromDeviceObject(PDEVICE_OBJECT DeviceObject)
 {
     return (PVOID)((PUINT8)DeviceObject->DeviceExtension + FuseProvider.DeviceExtensionOffset);
 }
 static inline
-BOOLEAN FuseInstanceGetOpcodeENOSYS(FUSE_DEVICE_EXTENSION *Instance, UINT32 Opcode)
+BOOLEAN FuseInstanceGetOpcodeENOSYS(FUSE_INSTANCE *Instance, UINT32 Opcode)
 {
     ASSERT(sizeof Instance->OpcodeENOSYS / sizeof Instance->OpcodeENOSYS[0] > (Opcode >> 5));
     ASSERT(8 * sizeof Instance->OpcodeENOSYS[0] > (Opcode & 0x1f));
     return !!(Instance->OpcodeENOSYS[Opcode >> 5] & (1 << (Opcode & 0x1f)));
 }
 static inline
-VOID FuseInstanceSetOpcodeENOSYS(FUSE_DEVICE_EXTENSION *Instance, UINT32 Opcode)
+VOID FuseInstanceSetOpcodeENOSYS(FUSE_INSTANCE *Instance, UINT32 Opcode)
 {
     ASSERT(sizeof Instance->OpcodeENOSYS / sizeof Instance->OpcodeENOSYS[0] > (Opcode >> 5));
     ASSERT(8 * sizeof Instance->OpcodeENOSYS[0] > (Opcode & 0x1f));
@@ -86,10 +86,10 @@ typedef struct _FUSE_FILE
     UINT32 IsReparsePoint:1;
     PVOID CacheItem;
 } FUSE_FILE;
-VOID FuseFileInstanceInit(FUSE_DEVICE_EXTENSION *Instance);
-VOID FuseFileInstanceFini(FUSE_DEVICE_EXTENSION *Instance);
-NTSTATUS FuseFileCreate(FUSE_DEVICE_EXTENSION *Instance, FUSE_FILE **PFile);
-VOID FuseFileDelete(FUSE_DEVICE_EXTENSION *Instance, FUSE_FILE *File);
+VOID FuseFileInstanceInit(FUSE_INSTANCE *Instance);
+VOID FuseFileInstanceFini(FUSE_INSTANCE *Instance);
+NTSTATUS FuseFileCreate(FUSE_INSTANCE *Instance, FUSE_FILE **PFile);
+VOID FuseFileDelete(FUSE_INSTANCE *Instance, FUSE_FILE *File);
 
 /* FUSE processing context */
 typedef struct _FUSE_CONTEXT FUSE_CONTEXT;
@@ -129,7 +129,7 @@ struct _FUSE_CONTEXT
     FUSE_CONTEXT *DictNext;
     LIST_ENTRY ListEntry;
     FUSE_CONTEXT_FINI *Fini;
-    FUSE_DEVICE_EXTENSION *Instance;
+    FUSE_INSTANCE *Instance;
     FSP_FSCTL_TRANSACT_REQ *InternalRequest;
     FSP_FSCTL_TRANSACT_RSP *InternalResponse;
     FSP_FSCTL_DECLSPEC_ALIGN UINT8 InternalResponseBuf[sizeof(FSP_FSCTL_TRANSACT_RSP)];
@@ -187,7 +187,7 @@ struct _FUSE_CONTEXT
     };
 };
 VOID FuseContextCreate(FUSE_CONTEXT **PContext,
-    FUSE_DEVICE_EXTENSION *Instance, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
+    FUSE_INSTANCE *Instance, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
 VOID FuseContextDelete(FUSE_CONTEXT *Context);
 static inline
 INT FuseOpGuardResult_(BOOLEAN RwlockResult)
@@ -245,7 +245,7 @@ typedef struct _FUSE_CACHE_GEN FUSE_CACHE_GEN;
 NTSTATUS FuseCacheCreate(ULONG Capacity, BOOLEAN CaseInsensitive, FUSE_CACHE **PCache);
 VOID FuseCacheDelete(FUSE_CACHE *Cache);
 VOID FuseCacheExpirationRoutine(FUSE_CACHE *Cache,
-    FUSE_DEVICE_EXTENSION *Instance, UINT64 ExpirationTime);
+    FUSE_INSTANCE *Instance, UINT64 ExpirationTime);
 NTSTATUS FuseCacheReferenceGen(FUSE_CACHE *Cache, PVOID *PGen);
 VOID FuseCacheDereferenceGen(FUSE_CACHE *Cache, PVOID Gen);
 BOOLEAN FuseCacheGetEntry(FUSE_CACHE *Cache, UINT64 ParentIno, PSTRING Name,
@@ -260,10 +260,10 @@ VOID FuseCacheDeleteForgotten(PLIST_ENTRY ForgetList);
 BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForgetOne);
 
 /* protocol implementation */
-NTSTATUS FuseProtoPostInit(FUSE_DEVICE_EXTENSION *Instance);
+NTSTATUS FuseProtoPostInit(FUSE_INSTANCE *Instance);
 VOID FuseProtoSendInit(FUSE_CONTEXT *Context);
 VOID FuseProtoSendLookup(FUSE_CONTEXT *Context);
-NTSTATUS FuseProtoPostForget(FUSE_DEVICE_EXTENSION *Instance, PLIST_ENTRY ForgetList);
+NTSTATUS FuseProtoPostForget(FUSE_INSTANCE *Instance, PLIST_ENTRY ForgetList);
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context);
 VOID FuseProtoFillBatchForget(FUSE_CONTEXT *Context);
 VOID FuseProtoSendStatfs(FUSE_CONTEXT *Context);
@@ -288,7 +288,7 @@ VOID FuseProtoSendRead(FUSE_CONTEXT *Context);
 VOID FuseProtoSendWrite(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFsyncdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFsync(FUSE_CONTEXT *Context);
-VOID FuseAttrToFileInfo(FUSE_DEVICE_EXTENSION *Instance,
+VOID FuseAttrToFileInfo(FUSE_INSTANCE *Instance,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
 static inline
 VOID FuseFileTimeToUnixTime(UINT64 FileTime0, PUINT64 sec, PUINT32 nsec)

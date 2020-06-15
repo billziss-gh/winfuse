@@ -150,7 +150,7 @@ static BOOLEAN FuseOpReserved_Init(FUSE_CONTEXT *Context)
         if (!NT_SUCCESS(Context->InternalResponse->IoStatus.Status))
             coro_break;
 
-        FUSE_DEVICE_EXTENSION *Instance = Context->Instance;
+        FUSE_INSTANCE *Instance = Context->Instance;
         if (FUSE_PROTO_VERSION != Context->FuseResponse->rsp.init.major)
         {
             Instance->VersionMajor = (UINT32)-1;
@@ -182,7 +182,7 @@ static BOOLEAN FuseOpReserved_Forget(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    FUSE_DEVICE_EXTENSION *Instance = Context->Instance;
+    FUSE_INSTANCE *Instance = Context->Instance;
 
     ASSERT(!IsListEmpty(&Context->Forget.ForgetList));
     if (16 > Instance->VersionMinor ||
@@ -1366,9 +1366,9 @@ static BOOLEAN FuseOpRead(FUSE_CONTEXT *Context)
                 Context->Read.Length = 512;
 #endif
 #if 0
-            FUSE_DEVICE_EXTENSION *DeviceExtension = FuseDeviceExtension(Context->DeviceObject);
-            if (Context->Read.Length > DeviceExtension->VolumeParams.MaxRead)
-                Context->Read.Length = DeviceExtension->VolumeParams.MaxRead;
+            FUSE_DEVICE_EXTENSION *Instance = FuseDeviceExtension(Context->DeviceObject);
+            if (Context->Read.Length > Instance->VolumeParams.MaxRead)
+                Context->Read.Length = Instance->VolumeParams.MaxRead;
 #endif
 
             coro_await (FuseProtoSendRead(Context));
