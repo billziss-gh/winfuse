@@ -25,6 +25,30 @@
     <ClCompile Include="..\..\src\shared\km\debug.c">
       <Filter>Source\shared\km</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\util.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\path.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\ioq.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\cache.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\file.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\proto.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\fuseop.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\context.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\wslfuse\version.rc">
@@ -45,6 +69,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\shared\ku\wslfuse.h">
       <Filter>Source\shared\ku</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\shared\km\coro.h">
+      <Filter>Source\shared\km</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\shared\km\proto.h">
+      <Filter>Source\shared\km</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

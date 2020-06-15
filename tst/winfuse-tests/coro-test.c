@@ -21,7 +21,7 @@
 
 #include <windows.h>
 #include <tlib/testsuite.h>
-#include <winfuse/coro.h>
+#include <shared/km/coro.h>
 
 static void bprintf(char **b, const char *format, ...)
 {

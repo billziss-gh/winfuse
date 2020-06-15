@@ -1,5 +1,5 @@
 /**
- * @file winfuse/proto.h
+ * @file shared/km/proto.h
  *
  * This file is derived from libfuse/include/fuse_kernel.h:
  *     FUSE: Filesystem in Userspace
@@ -23,8 +23,8 @@
  * associated repository.
  */
 
-#ifndef WINFUSE_PROTO_H_INCLUDED
-#define WINFUSE_PROTO_H_INCLUDED
+#ifndef SHARED_KM_PROTO_H_INCLUDED
+#define SHARED_KM_PROTO_H_INCLUDED
 
 #define FUSE_PROTO_VERSION              7
 #define FUSE_PROTO_MINOR_VERSION        29

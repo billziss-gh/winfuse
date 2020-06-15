@@ -22,9 +22,9 @@
 #include <winfsp/winfsp.h>
 #include <tlib/testsuite.h>
 
-#define WINFUSE_DRIVER_H_INCLUDED
+#define SHARED_KM_SHARED_H_INCLUDED
 #define PAGED_CODE()
-#include <winfuse/path.c>
+#include <shared/km/path.c>
 
 void path_prefix_test(void)
 {

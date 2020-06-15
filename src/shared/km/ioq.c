@@ -1,5 +1,5 @@
 /**
- * @file winfuse/ioq.c
+ * @file shared/km/ioq.c
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */
@@ -19,7 +19,7 @@
  * associated repository.
  */
 
-#include <winfuse/driver.h>
+#include <shared/km/shared.h>
 
 NTSTATUS FuseIoqCreate(FUSE_IOQ **PIoq);
 VOID FuseIoqDelete(FUSE_IOQ *Ioq);

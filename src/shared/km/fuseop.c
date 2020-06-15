@@ -1,5 +1,5 @@
 /**
- * @file winfuse/fuseop.c
+ * @file shared/km/fuseop.c
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */
@@ -19,7 +19,7 @@
  * associated repository.
  */
 
-#include <winfuse/driver.h>
+#include <shared/km/shared.h>
 
 static BOOLEAN FuseOpReserved_Init(FUSE_CONTEXT *Context);
 static BOOLEAN FuseOpReserved_Destroy(FUSE_CONTEXT *Context);

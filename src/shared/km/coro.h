@@ -1,5 +1,5 @@
 /**
- * @file winfuse/coro.h
+ * @file shared/km/coro.h
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */
@@ -19,8 +19,8 @@
  * associated repository.
  */
 
-#ifndef WINFUSE_CORO_H_INCLUDED
-#define WINFUSE_CORO_H_INCLUDED
+#ifndef SHARED_KM_CORO_H_INCLUDED
+#define SHARED_KM_CORO_H_INCLUDED
 
 /*
  * Nested coroutines

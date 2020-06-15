@@ -1,5 +1,5 @@
 /**
- * @file winfuse/proto.c
+ * @file shared/km/proto.c
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */
@@ -19,7 +19,7 @@
  * associated repository.
  */
 
-#include <winfuse/driver.h>
+#include <shared/km/shared.h>
 
 NTSTATUS FuseProtoPostInit(FUSE_INSTANCE *Instance);
 VOID FuseProtoSendInit(FUSE_CONTEXT *Context);

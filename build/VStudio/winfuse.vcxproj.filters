@@ -16,31 +16,34 @@
     <ClCompile Include="..\..\src\winfuse\driver.c">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\winfuse\ioq.c">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\winfuse\cache.c">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\winfuse\proto.c">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\winfuse\fuseop.c">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\winfuse\fuse.c">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\winfuse\util.c">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\winfuse\path.c">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\winfuse\file.c">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\shared\km\debug.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\util.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\path.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\ioq.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\cache.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\file.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\proto.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\fuseop.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\context.c">
       <Filter>Source\shared\km</Filter>
     </ClCompile>
   </ItemGroup>
@@ -48,13 +51,13 @@
     <ClInclude Include="..\..\src\winfuse\driver.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\winfuse\proto.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\winfuse\coro.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\shared\km\shared.h">
+      <Filter>Source\shared\km</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\shared\km\coro.h">
+      <Filter>Source\shared\km</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\shared\km\proto.h">
       <Filter>Source\shared\km</Filter>
     </ClInclude>
   </ItemGroup>

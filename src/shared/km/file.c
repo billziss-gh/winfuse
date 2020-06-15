@@ -1,5 +1,5 @@
 /**
- * @file winfuse/file.c
+ * @file shared/km/file.c
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */
@@ -19,7 +19,7 @@
  * associated repository.
  */
 
-#include <winfuse/driver.h>
+#include <shared/km/shared.h>
 
 VOID FuseFileInstanceInit(FUSE_INSTANCE *Instance)
 {

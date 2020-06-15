@@ -63,7 +63,7 @@
       <AdditionalIncludeDirectories>..\..\src;$(MSBuildProgramFiles32)\WinFsp\opt\fsext\inc;$(MSBuildProgramFiles32)\WinFsp\inc;C:\Program Files\LxDK\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>C:\Program Files\LxDK\lib\lxcore.lib;C:\Program Files\LxDK\lib\lxldr.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(MSBuildProgramFiles32)\WinFsp\opt\fsext\lib\winfsp-$(PlatformTarget).lib;C:\Program Files\LxDK\lib\lxcore.lib;C:\Program Files\LxDK\lib\lxldr.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ProgramDatabaseFile>$(OutDir)$(TargetFileName).pdb</ProgramDatabaseFile>
       <StripPrivateSymbols>$(OutDir)$(TargetFileName).public.pdb</StripPrivateSymbols>
     </Link>
@@ -73,7 +73,7 @@
       <AdditionalIncludeDirectories>..\..\src;$(MSBuildProgramFiles32)\WinFsp\opt\fsext\inc;$(MSBuildProgramFiles32)\WinFsp\inc;C:\Program Files\LxDK\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>C:\Program Files\LxDK\lib\lxcore.lib;C:\Program Files\LxDK\lib\lxldr.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(MSBuildProgramFiles32)\WinFsp\opt\fsext\lib\winfsp-$(PlatformTarget).lib;C:\Program Files\LxDK\lib\lxcore.lib;C:\Program Files\LxDK\lib\lxldr.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ProgramDatabaseFile>$(OutDir)$(TargetFileName).pdb</ProgramDatabaseFile>
       <StripPrivateSymbols>$(OutDir)$(TargetFileName).public.pdb</StripPrivateSymbols>
       <AdditionalOptions>/PDBALTPATH:$(TargetFileName).pdb %(AdditionalOptions)</AdditionalOptions>
@@ -83,7 +83,15 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\shared\km\cache.c" />
+    <ClCompile Include="..\..\src\shared\km\context.c" />
     <ClCompile Include="..\..\src\shared\km\debug.c" />
+    <ClCompile Include="..\..\src\shared\km\file.c" />
+    <ClCompile Include="..\..\src\shared\km\fuseop.c" />
+    <ClCompile Include="..\..\src\shared\km\ioq.c" />
+    <ClCompile Include="..\..\src\shared\km\path.c" />
+    <ClCompile Include="..\..\src\shared\km\proto.c" />
+    <ClCompile Include="..\..\src\shared\km\util.c" />
     <ClCompile Include="..\..\src\wslfuse\fusemisc.c" />
     <ClCompile Include="..\..\src\wslfuse\driver.c" />
   </ItemGroup>
@@ -124,6 +132,8 @@ stampinf -d * -v $(MyVersion) -f $(OutDir)$(TargetName).inf</Command>
     <ResourceCompile Include="..\..\src\wslfuse\version.rc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\shared\km\coro.h" />
+    <ClInclude Include="..\..\src\shared\km\proto.h" />
     <ClInclude Include="..\..\src\shared\km\shared.h" />
     <ClInclude Include="..\..\src\shared\ku\wslfuse.h" />
     <ClInclude Include="..\..\src\wslfuse\driver.h" />

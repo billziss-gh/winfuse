@@ -1,5 +1,5 @@
 /**
- * @file winfuse/util.c
+ * @file shared/km/util.c
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */
@@ -19,7 +19,7 @@
  * associated repository.
  */
 
-#include <winfuse/driver.h>
+#include <shared/km/shared.h>
 
 PVOID FuseAllocatePoolMustSucceed(POOL_TYPE PoolType, SIZE_T Size, ULONG Tag);
 NTSTATUS FuseSafeCopyMemory(PVOID Dst, PVOID Src, ULONG Len);

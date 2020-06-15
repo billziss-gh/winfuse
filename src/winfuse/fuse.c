@@ -25,17 +25,12 @@ static NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PAR
 static VOID FuseDeviceFini(PDEVICE_OBJECT DeviceObject);
 static VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 ExpirationTime);
 static NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp);
-VOID FuseContextCreate(FUSE_CONTEXT **PContext,
-    FUSE_INSTANCE *Instance, FSP_FSCTL_TRANSACT_REQ *InternalRequest);
-VOID FuseContextDelete(FUSE_CONTEXT *Context);
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, FuseDeviceInit)
 #pragma alloc_text(PAGE, FuseDeviceFini)
 #pragma alloc_text(PAGE, FuseDeviceExpirationRoutine)
 #pragma alloc_text(PAGE, FuseDeviceTransact)
-#pragma alloc_text(PAGE, FuseContextCreate)
-#pragma alloc_text(PAGE, FuseContextDelete)
 #endif
 
 static NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PARAMS *VolumeParams)
@@ -141,42 +136,6 @@ static VOID FuseDeviceExpirationRoutine(PDEVICE_OBJECT DeviceObject, UINT64 Expi
     FuseCacheExpirationRoutine(Instance->Cache, Instance, ExpirationTime);
 
     KeLeaveCriticalRegion();
-}
-
-static inline BOOLEAN FuseContextProcess(FUSE_CONTEXT *Context,
-    FUSE_PROTO_RSP *FuseResponse, FUSE_PROTO_REQ *FuseRequest, ULONG FuseRequestLength)
-{
-    ASSERT(0 == FuseRequest || 0 == FuseResponse);
-    ASSERT(0 != FuseRequest || 0 != FuseResponse);
-
-    UINT32 Kind = 0 == Context->InternalRequest ?
-        FspFsctlTransactReservedKind : Context->InternalRequest->Kind;
-
-    if (0 == Context->FuseRequest && 0 == Context->FuseResponse &&
-        0 != FuseOperations[Kind].Guard)
-    {
-        ASSERT(FuseOpGuardFalse == Context->OpGuardResult);
-        Context->OpGuardResult = FuseOperations[Kind].Guard(Context, TRUE);
-        if (FuseOpGuardCancel == Context->OpGuardResult)
-        {
-            Context->InternalResponse->IoStatus.Status = (UINT32)STATUS_CANCELLED;
-            return FALSE;
-        }
-    }
-
-    Context->FuseRequest = FuseRequest;
-    Context->FuseResponse = FuseResponse;
-    Context->FuseRequestLength = FuseRequestLength;
-
-    BOOLEAN Result = FuseOperations[Kind].Proc(Context);
-
-    if (!Result && FuseOpGuardTrue == Context->OpGuardResult)
-    {
-        FuseOperations[Kind].Guard(Context, FALSE);
-        Context->OpGuardResult = FuseOpGuardFalse;
-    }
-
-    return Result;
 }
 
 static NTSTATUS FuseDeviceTransact(PDEVICE_OBJECT DeviceObject, PIRP Irp)
@@ -374,58 +333,3 @@ FSP_FSEXT_PROVIDER FuseProvider =
     /* DeviceTransact */
     FuseDeviceTransact,
 };
-
-VOID FuseContextCreate(FUSE_CONTEXT **PContext,
-    FUSE_INSTANCE *Instance, FSP_FSCTL_TRANSACT_REQ *InternalRequest)
-{
-    PAGED_CODE();
-
-    FUSE_CONTEXT *Context;
-    UINT32 Kind = 0 == InternalRequest ?
-        FspFsctlTransactReservedKind : InternalRequest->Kind;
-
-    ASSERT(FspFsctlTransactKindCount > Kind);
-    if (0 == FuseOperations[Kind].Proc)
-    {
-        *PContext = FuseContextStatus(STATUS_INVALID_DEVICE_REQUEST);
-        return;
-    }
-
-    Context = FuseAlloc(sizeof *Context);
-    if (0 == Context)
-    {
-        *PContext = FuseContextStatus(STATUS_INSUFFICIENT_RESOURCES);
-        return;
-    }
-
-    RtlZeroMemory(Context, sizeof *Context);
-    Context->Instance = Instance;
-    Context->InternalRequest = InternalRequest;
-    Context->InternalResponse = (PVOID)&Context->InternalResponseBuf;
-    Context->InternalResponse->Size = sizeof(FSP_FSCTL_TRANSACT_RSP);
-    Context->InternalResponse->Kind = Kind;
-    Context->InternalResponse->Hint = 0 != InternalRequest ? InternalRequest->Hint : 0;
-    *PContext = Context;
-}
-
-VOID FuseContextDelete(FUSE_CONTEXT *Context)
-{
-    PAGED_CODE();
-
-    if (FuseOpGuardTrue == Context->OpGuardResult)
-    {
-        UINT32 Kind = 0 == Context->InternalRequest ?
-            FspFsctlTransactReservedKind : Context->InternalRequest->Kind;
-        FuseOperations[Kind].Guard(Context, FALSE);
-    }
-
-    if (0 != Context->Fini)
-        Context->Fini(Context);
-    if (0 != Context->InternalRequest)
-        FuseFree(Context->InternalRequest);
-    if ((PVOID)&Context->InternalResponseBuf != Context->InternalResponse)
-        FuseFree(Context->InternalResponse);
-
-    DEBUGFILL(Context, sizeof *Context);
-    FuseFree(Context);
-}

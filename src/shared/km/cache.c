@@ -1,5 +1,5 @@
 /**
- * @file winfuse/cache.c
+ * @file shared/km/cache.c
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */
@@ -19,7 +19,7 @@
  * associated repository.
  */
 
-#include <winfuse/driver.h>
+#include <shared/km/shared.h>
 
 /*
  * FUSE "entry" cache

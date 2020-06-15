@@ -1,5 +1,5 @@
 /**
- * @file winfuse/path.c
+ * @file shared/km/path.c
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */
@@ -19,7 +19,7 @@
  * associated repository.
  */
 
-#include <winfuse/driver.h>
+#include <shared/km/shared.h>
 
 VOID FusePosixPathPrefix(PSTRING Path, PSTRING Prefix, PSTRING Remain);
 VOID FusePosixPathSuffix(PSTRING Path, PSTRING Remain, PSTRING Suffix);

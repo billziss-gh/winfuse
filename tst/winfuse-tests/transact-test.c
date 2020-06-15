@@ -23,7 +23,7 @@
 #include <tlib/testsuite.h>
 #include <process.h>
 #include <strsafe.h>
-#include <winfuse/proto.h>
+#include <shared/km/proto.h>
 
 #define FUSE_FSCTL_TRANSACT             \
     CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0xC00 + 'F', METHOD_BUFFERED, FILE_ANY_ACCESS)
