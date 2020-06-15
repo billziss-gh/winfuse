@@ -92,7 +92,7 @@
     <ClCompile Include="..\..\src\shared\km\path.c" />
     <ClCompile Include="..\..\src\shared\km\proto.c" />
     <ClCompile Include="..\..\src\shared\km\util.c" />
-    <ClCompile Include="..\..\src\wslfuse\fusemisc.c" />
+    <ClCompile Include="..\..\src\wslfuse\device.c" />
     <ClCompile Include="..\..\src\wslfuse\driver.c" />
   </ItemGroup>
   <ItemGroup>

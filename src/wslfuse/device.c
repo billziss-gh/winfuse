@@ -1,5 +1,5 @@
 /**
- * @file wslfuse/fusemisc.c
+ * @file wslfuse/device.c
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */

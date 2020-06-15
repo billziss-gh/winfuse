@@ -1,5 +1,5 @@
 /**
- * @file winfuse/fuse.c
+ * @file winfuse/device.c
  *
  * @copyright 2019-2020 Bill Zissimopoulos
  */

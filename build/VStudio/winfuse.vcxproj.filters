@@ -16,9 +16,6 @@
     <ClCompile Include="..\..\src\winfuse\driver.c">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\winfuse\fuse.c">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\shared\km\debug.c">
       <Filter>Source\shared\km</Filter>
     </ClCompile>
@@ -45,6 +42,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\shared\km\context.c">
       <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\winfuse\device.c">
+      <Filter>Source</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

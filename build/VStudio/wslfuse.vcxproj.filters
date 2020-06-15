@@ -19,9 +19,6 @@
     <ClCompile Include="..\..\src\wslfuse\driver.c">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\wslfuse\fusemisc.c">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\shared\km\debug.c">
       <Filter>Source\shared\km</Filter>
     </ClCompile>
@@ -48,6 +45,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\shared\km\context.c">
       <Filter>Source\shared\km</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wslfuse\device.c">
+      <Filter>Source</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

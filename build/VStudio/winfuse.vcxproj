@@ -150,7 +150,7 @@
     <ClCompile Include="..\..\src\shared\km\proto.c" />
     <ClCompile Include="..\..\src\shared\km\util.c" />
     <ClCompile Include="..\..\src\winfuse\driver.c" />
-    <ClCompile Include="..\..\src\winfuse\fuse.c" />
+    <ClCompile Include="..\..\src\winfuse\device.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\shared\km\coro.h" />
