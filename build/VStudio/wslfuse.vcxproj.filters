@@ -49,6 +49,9 @@
     <ClCompile Include="..\..\src\wslfuse\device.c">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\shared\km\instance.c">
+      <Filter>Source\shared\km</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\wslfuse\version.rc">

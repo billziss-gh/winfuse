@@ -145,6 +145,7 @@
     <ClCompile Include="..\..\src\shared\km\debug.c" />
     <ClCompile Include="..\..\src\shared\km\file.c" />
     <ClCompile Include="..\..\src\shared\km\fuseop.c" />
+    <ClCompile Include="..\..\src\shared\km\instance.c" />
     <ClCompile Include="..\..\src\shared\km\ioq.c" />
     <ClCompile Include="..\..\src\shared\km\path.c" />
     <ClCompile Include="..\..\src\shared\km\proto.c" />

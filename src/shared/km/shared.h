@@ -197,16 +197,18 @@ VOID FuseRwlockLeaveReader(FUSE_RWLOCK *Lock, PVOID Owner)
 }
 
 /* FUSE instances */
+typedef struct _FUSE_IOQ FUSE_IOQ;
+typedef struct _FUSE_CACHE FUSE_CACHE;
 typedef struct _FUSE_INSTANCE
 {
     FSP_FSCTL_VOLUME_PARAMS *VolumeParams;
     FUSE_RWLOCK OpGuardLock;
-    PVOID Ioq;
-    PVOID Cache;
-    KEVENT InitEvent;
-    UINT32 VersionMajor, VersionMinor;
+    FUSE_IOQ *Ioq;
+    FUSE_CACHE *Cache;
     KSPIN_LOCK FileListLock;
     LIST_ENTRY FileList;
+    KEVENT InitEvent;
+    UINT32 VersionMajor, VersionMinor;
     /*
      * The following bitmap is used to remember which opcodes have returned ENOSYS.
      *
@@ -220,6 +222,14 @@ typedef struct _FUSE_INSTANCE
      */
     UINT32 OpcodeENOSYS[2];
 } FUSE_INSTANCE;
+NTSTATUS FuseInstanceInit(FUSE_INSTANCE *Instance, FSP_FSCTL_VOLUME_PARAMS *VolumeParams);
+VOID FuseInstanceFini(FUSE_INSTANCE *Instance);
+VOID FuseInstanceExpirationRoutine(FUSE_INSTANCE *Instance, UINT64 ExpirationTime);
+NTSTATUS FuseInstanceTransact(FUSE_INSTANCE *Instance,
+    FUSE_PROTO_RSP *FuseResponse, ULONG InputBufferLength,
+    FUSE_PROTO_REQ *FuseRequest, PULONG POutputBufferLength,
+    PDEVICE_OBJECT DeviceObject, PFILE_OBJECT FileObject,
+    PIRP CancellableIrp);
 static inline
 BOOLEAN FuseInstanceGetOpcodeENOSYS(FUSE_INSTANCE *Instance, UINT32 Opcode)
 {
@@ -426,7 +436,6 @@ INT FuseOpGuardReleaseShared(FUSE_CONTEXT *Context)
 #define FuseContextWaitResponse(C)      do { coro_yield; } while (0 == (C)->FuseResponse)
 
 /* FUSE I/O queue */
-typedef struct _FUSE_IOQ FUSE_IOQ;
 NTSTATUS FuseIoqCreate(FUSE_IOQ **PIoq);
 VOID FuseIoqDelete(FUSE_IOQ *Ioq);
 VOID FuseIoqStartProcessing(FUSE_IOQ *Ioq, FUSE_CONTEXT *Context);
@@ -435,7 +444,6 @@ VOID FuseIoqPostPending(FUSE_IOQ *Ioq, FUSE_CONTEXT *Context);
 FUSE_CONTEXT *FuseIoqNextPending(FUSE_IOQ *Ioq); /* does not block! */
 
 /* FUSE "entry" cache */
-typedef struct _FUSE_CACHE FUSE_CACHE;
 typedef struct _FUSE_CACHE_GEN FUSE_CACHE_GEN;
 NTSTATUS FuseCacheCreate(ULONG Capacity, BOOLEAN CaseInsensitive, FUSE_CACHE **PCache);
 VOID FuseCacheDelete(FUSE_CACHE *Cache);
