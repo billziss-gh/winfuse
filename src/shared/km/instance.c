@@ -192,7 +192,15 @@ request:
         if (0 == Context)
         {
             UINT32 VersionMajor = Instance->VersionMajor;
-            MemoryBarrier();
+            _ReadWriteBarrier();
+                /*
+                 * Compiler barrier only.
+                 *
+                 * A full memory barrier is not needed here, because:
+                 *
+                 * - WaitForSingleObject acts on a NotificationEvent that stays signaled.
+                 * - WaitForSingleObject is a memory barrier.
+                 */
             if (0 == VersionMajor)
             {
                 Result = FsRtlCancellableWaitForSingleObject(&Instance->InitEvent,
