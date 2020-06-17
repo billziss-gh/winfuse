@@ -52,7 +52,7 @@ NTSTATUS FuseInstanceInit(FUSE_INSTANCE *Instance, FSP_FSCTL_VOLUME_PARAMS *Volu
     if (!NT_SUCCESS(Result))
         goto exit;
 
-    Result = FuseCacheCreate(0, 1/*!VolumeParams->CaseSensitiveSearch*/, &Instance->Cache);
+    Result = FuseCacheCreate(0, 0/*!VolumeParams->CaseSensitiveSearch*/, &Instance->Cache);
     if (!NT_SUCCESS(Result))
         goto exit;
 
