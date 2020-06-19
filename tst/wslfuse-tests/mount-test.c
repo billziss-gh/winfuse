@@ -19,7 +19,9 @@
  * associated repository.
  */
 
+#include <errno.h>
 #include <fcntl.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <shared/ku/wslfuse.h>
@@ -43,10 +45,11 @@ static void mount_createvol_dotest(wchar_t *Prefix)
     ASSERT(-1 != fusefd);
 
     res = ioctl(fusefd, WSLFUSE_IOCTL_CREATEVOLUME, &CreateArg);
-    ASSERT(-1 != res);
+    ASSERT(0 == res);
+    ASSERT(0 == strncmp(CreateArg.VolumeName, "\\Device\\Volume{", 15));
 
     res = close(fusefd);
-    ASSERT(-1 != res);
+    ASSERT(0 == res);
 }
 
 static void mount_createvol_test(void)
@@ -57,6 +60,65 @@ static void mount_createvol_test(void)
 
 static void mount_unmount_test(void)
 {
+    WSLFUSE_IOCTL_MOUNTID_ARG MountArg;
+    int fusefd, res;
+
+    fusefd = open("/dev/fuse", O_RDWR);
+    ASSERT(-1 != fusefd);
+
+    MountArg.Operation = '?';
+    MountArg.MountId = 0x42424242;
+    res = ioctl(fusefd, WSLFUSE_IOCTL_MOUNTID, &MountArg);
+    ASSERT(-1 == res);
+    ASSERT(ENOENT == errno);
+
+    MountArg.Operation = '-';
+    MountArg.MountId = 0x42424242;
+    res = ioctl(fusefd, WSLFUSE_IOCTL_MOUNTID, &MountArg);
+    ASSERT(-1 == res);
+    ASSERT(ENOENT == errno);
+
+    MountArg.Operation = '+';
+    MountArg.MountId = 0x42424242;
+    res = ioctl(fusefd, WSLFUSE_IOCTL_MOUNTID, &MountArg);
+    ASSERT(0 == res);
+
+    MountArg.Operation = '+';
+    MountArg.MountId = 0x42424242;
+    res = ioctl(fusefd, WSLFUSE_IOCTL_MOUNTID, &MountArg);
+    ASSERT(-1 == res);
+    ASSERT(EEXIST == errno);
+
+    MountArg.Operation = '?';
+    MountArg.MountId = 0x42424242;
+    res = ioctl(fusefd, WSLFUSE_IOCTL_MOUNTID, &MountArg);
+    ASSERT(0 == res);
+
+    MountArg.Operation = '?';
+    MountArg.MountId = 0x43434343;
+    res = ioctl(fusefd, WSLFUSE_IOCTL_MOUNTID, &MountArg);
+    ASSERT(-1 == res);
+    ASSERT(ENOENT == errno);
+
+    MountArg.Operation = '-';
+    MountArg.MountId = 0x42424242;
+    res = ioctl(fusefd, WSLFUSE_IOCTL_MOUNTID, &MountArg);
+    ASSERT(0 == res);
+
+    MountArg.Operation = '-';
+    MountArg.MountId = 0x42424242;
+    res = ioctl(fusefd, WSLFUSE_IOCTL_MOUNTID, &MountArg);
+    ASSERT(-1 == res);
+    ASSERT(ENOENT == errno);
+
+    MountArg.Operation = '?';
+    MountArg.MountId = 0x42424242;
+    res = ioctl(fusefd, WSLFUSE_IOCTL_MOUNTID, &MountArg);
+    ASSERT(-1 == res);
+    ASSERT(ENOENT == errno);
+
+    res = close(fusefd);
+    ASSERT(0 == res);
 }
 
 void mount_tests(void)
