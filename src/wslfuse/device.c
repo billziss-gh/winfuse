@@ -400,6 +400,17 @@ static INT FileRead(
     if (0 == VolumeFileObject)
         return -ENODEV;
 
+    try
+    {
+        if ((UINT_PTR)Buffer + Length < (UINT_PTR)Buffer ||
+            (UINT_PTR)Buffer + Length > MM_USER_PROBE_ADDRESS)
+            *(PUINT8)MM_USER_PROBE_ADDRESS = 0;
+    }
+    except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return -EFAULT;
+    }
+
     Result = FuseInstanceTransact(&File->FuseInstance,
         0, 0,
         Buffer, &OutputBufferLength,
@@ -429,6 +440,17 @@ static INT FileWrite(
     VolumeFileObject = InterlockedCompareExchangePointer(&File->VolumeFileObject, 0, 0);
     if (0 == VolumeFileObject)
         return -ENODEV;
+
+    try
+    {
+        if ((UINT_PTR)Buffer + Length < (UINT_PTR)Buffer ||
+            (UINT_PTR)Buffer + Length > MM_USER_PROBE_ADDRESS)
+            *(PUINT8)MM_USER_PROBE_ADDRESS = 0;
+    }
+    except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return -EFAULT;
+    }
 
     Result = FuseInstanceTransact(&File->FuseInstance,
         Buffer, InputBufferLength,
