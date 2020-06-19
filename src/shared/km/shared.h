@@ -199,9 +199,16 @@ VOID FuseRwlockLeaveReader(FUSE_RWLOCK *Lock, PVOID Owner)
 /* FUSE instances */
 typedef struct _FUSE_IOQ FUSE_IOQ;
 typedef struct _FUSE_CACHE FUSE_CACHE;
+typedef enum _FUSE_INSTANCE_TYPE
+{
+    FuseInstanceWindows = 'W',
+    FuseInstanceCygwin = 'C',
+    FuseInstanceLinux = 'L',
+} FUSE_INSTANCE_TYPE;
 typedef struct _FUSE_INSTANCE
 {
     FSP_FSCTL_VOLUME_PARAMS *VolumeParams;
+    FUSE_INSTANCE_TYPE InstanceType;
     FUSE_RWLOCK OpGuardLock;
     FUSE_IOQ *Ioq;
     FUSE_CACHE *Cache;
@@ -222,7 +229,9 @@ typedef struct _FUSE_INSTANCE
      */
     UINT32 OpcodeENOSYS[2];
 } FUSE_INSTANCE;
-NTSTATUS FuseInstanceInit(FUSE_INSTANCE *Instance, FSP_FSCTL_VOLUME_PARAMS *VolumeParams);
+NTSTATUS FuseInstanceInit(FUSE_INSTANCE *Instance,
+    FSP_FSCTL_VOLUME_PARAMS *VolumeParams,
+    FUSE_INSTANCE_TYPE InstanceType);
 VOID FuseInstanceFini(FUSE_INSTANCE *Instance);
 VOID FuseInstanceExpirationRoutine(FUSE_INSTANCE *Instance, UINT64 ExpirationTime);
 NTSTATUS FuseInstanceTransact(FUSE_INSTANCE *Instance,
@@ -507,6 +516,6 @@ VOID FuseUnixTimeToFileTime(UINT64 sec, UINT32 nsec, PUINT64 PFileTime)
     INT64 FileTime = (INT64)sec * 10000000 + (INT64)nsec / 100 + 116444736000000000LL;
     *PFileTime = FileTime;
 }
-NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
+NTSTATUS FuseNtStatusFromErrno(FUSE_INSTANCE_TYPE InstanceType, INT32 Errno);
 
 #endif

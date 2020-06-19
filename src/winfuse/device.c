@@ -42,7 +42,7 @@ static NTSTATUS FuseDeviceInit(PDEVICE_OBJECT DeviceObject, FSP_FSCTL_VOLUME_PAR
 
     KeEnterCriticalRegion();
 
-    Result = FuseInstanceInit(Instance, VolumeParams);
+    Result = FuseInstanceInit(Instance, VolumeParams, FuseInstanceWindows);
 
     KeLeaveCriticalRegion();
 

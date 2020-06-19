@@ -43,7 +43,7 @@ static void mount_createvol_dotest(wchar_t *Prefix)
     ASSERT(-1 != fusefd);
 
     res = ioctl(fusefd, WSLFUSE_IOCTL_CREATEVOLUME, &CreateArg);
-    //ASSERT(-1 != res);
+    ASSERT(-1 != res);
 
     res = close(fusefd);
     ASSERT(-1 != res);
@@ -52,7 +52,7 @@ static void mount_createvol_dotest(wchar_t *Prefix)
 static void mount_createvol_test(void)
 {
     mount_createvol_dotest(0);
-    mount_createvol_dotest(L"\\\\winfuse-tests\\share");
+    mount_createvol_dotest(L"\\\\wslfuse-tests\\share");
 }
 
 static void mount_unmount_test(void)

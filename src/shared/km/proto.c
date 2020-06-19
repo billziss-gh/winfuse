@@ -52,7 +52,7 @@ VOID FuseProtoSendFsyncdir(FUSE_CONTEXT *Context);
 VOID FuseProtoSendFsync(FUSE_CONTEXT *Context);
 VOID FuseAttrToFileInfo(FUSE_INSTANCE *Instance,
     FUSE_PROTO_ATTR *Attr, FSP_FSCTL_FILE_INFO *FileInfo);
-NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
+NTSTATUS FuseNtStatusFromErrno(FUSE_INSTANCE_TYPE InstanceType, INT32 Errno);
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, FuseProtoPostInit)
@@ -94,8 +94,9 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
         FuseContextWaitRequest(Context);
 #define FUSE_PROTO_SEND_END             \
         FuseContextWaitResponse(Context);\
-        Context->InternalResponse->IoStatus.Status =\
-            FuseNtStatusFromErrno(Context->FuseResponse->error);\
+        Context->InternalResponse->IoStatus.Status = 0 == Context->FuseResponse->error ?\
+            STATUS_SUCCESS :\
+            FuseNtStatusFromErrno(Context->Instance->InstanceType, Context->FuseResponse->error);\
     }
 #define FUSE_PROTO_SEND_BEGIN_(OPCODE)  \
     coro_block(Context->CoroState)      \
@@ -108,8 +109,9 @@ NTSTATUS FuseNtStatusFromErrno(INT32 Errno);
         FuseContextWaitRequest(Context);
 #define FUSE_PROTO_SEND_END_(OPCODE)    \
         FuseContextWaitResponse(Context);\
-        Context->InternalResponse->IoStatus.Status =\
-            FuseNtStatusFromErrno(Context->FuseResponse->error);\
+        Context->InternalResponse->IoStatus.Status = 0 == Context->FuseResponse->error ?\
+            STATUS_SUCCESS :\
+            FuseNtStatusFromErrno(Context->Instance->InstanceType, Context->FuseResponse->error);\
         if (STATUS_INVALID_DEVICE_REQUEST == Context->InternalResponse->IoStatus.Status)\
             FuseInstanceSetOpcodeENOSYS(Context->Instance, FUSE_PROTO_OPCODE_ ## OPCODE);\
     }
@@ -948,19 +950,42 @@ VOID FuseAttrToFileInfo(FUSE_INSTANCE *Instance,
     FileInfo->EaSize = 0;
 }
 
-NTSTATUS FuseNtStatusFromErrno(INT32 Errno)
+NTSTATUS FuseNtStatusFromErrno(FUSE_INSTANCE_TYPE InstanceType, INT32 Errno)
 {
     PAGED_CODE();
 
     if (0 > Errno)
         Errno = -Errno;
 
-    switch (Errno)
+    switch (InstanceType)
     {
-    #undef FUSE_ERRNO
-    #define FUSE_ERRNO 87
-    #include <winfuse/errno.i>
     default:
-        return STATUS_ACCESS_DENIED;
+    case FuseInstanceWindows:
+        switch (Errno)
+        {
+        #undef FUSE_ERRNO
+        #define FUSE_ERRNO 87
+        #include "errno.i"
+        default:
+            return STATUS_ACCESS_DENIED;
+        }
+    case FuseInstanceCygwin:
+        switch (Errno)
+        {
+        #undef FUSE_ERRNO
+        #define FUSE_ERRNO 67
+        #include "errno.i"
+        default:
+            return STATUS_ACCESS_DENIED;
+        }
+    case FuseInstanceLinux:
+        switch (Errno)
+        {
+        #undef FUSE_ERRNO
+        #define FUSE_ERRNO 76
+        #include "errno.i"
+        default:
+            return STATUS_ACCESS_DENIED;
+        }
     }
 }

@@ -21,7 +21,9 @@
 
 #include <shared/km/shared.h>
 
-NTSTATUS FuseInstanceInit(FUSE_INSTANCE *Instance, FSP_FSCTL_VOLUME_PARAMS *VolumeParams);
+NTSTATUS FuseInstanceInit(FUSE_INSTANCE *Instance,
+    FSP_FSCTL_VOLUME_PARAMS *VolumeParams,
+    FUSE_INSTANCE_TYPE InstanceType);
 VOID FuseInstanceFini(FUSE_INSTANCE *Instance);
 VOID FuseInstanceExpirationRoutine(FUSE_INSTANCE *Instance, UINT64 ExpirationTime);
 NTSTATUS FuseInstanceTransact(FUSE_INSTANCE *Instance,
@@ -37,7 +39,9 @@ NTSTATUS FuseInstanceTransact(FUSE_INSTANCE *Instance,
 #pragma alloc_text(PAGE, FuseInstanceTransact)
 #endif
 
-NTSTATUS FuseInstanceInit(FUSE_INSTANCE *Instance, FSP_FSCTL_VOLUME_PARAMS *VolumeParams)
+NTSTATUS FuseInstanceInit(FUSE_INSTANCE *Instance,
+    FSP_FSCTL_VOLUME_PARAMS *VolumeParams,
+    FUSE_INSTANCE_TYPE InstanceType)
 {
     PAGED_CODE();
 
@@ -45,6 +49,7 @@ NTSTATUS FuseInstanceInit(FUSE_INSTANCE *Instance, FSP_FSCTL_VOLUME_PARAMS *Volu
 
     RtlZeroMemory(Instance, sizeof *Instance);
     Instance->VolumeParams = VolumeParams;
+    Instance->InstanceType = InstanceType;
 
     FuseRwlockInitialize(&Instance->OpGuardLock);
 

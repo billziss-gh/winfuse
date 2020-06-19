@@ -115,7 +115,7 @@ _Static_assert(504 == sizeof(FSP_FSCTL_VOLUME_PARAMS),
 typedef union
 {
     FSP_FSCTL_VOLUME_PARAMS VolumeParams;
-    CHAR VolumeName[FSP_FSCTL_VOLUME_NAME_SIZEMAX / sizeof(WCHAR)];
+    CHAR VolumeName[(FSP_FSCTL_VOLUME_NAME_SIZEMAX / sizeof(WCHAR)) * 3 / 2];
 } WSLFUSE_IOCTL_CREATEVOLUME_ARG;
 #if defined(__linux__)
 _Static_assert(504 == sizeof(WSLFUSE_IOCTL_CREATEVOLUME_ARG),

@@ -21,22 +21,11 @@
 
 #include <wslfuse/driver.h>
 
-static INT CreateInitialNamespace(
-    PLX_INSTANCE Instance);
 DRIVER_INITIALIZE DriverEntry;
 
 #ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, CreateInitialNamespace)
 #pragma alloc_text(INIT, DriverEntry)
 #endif
-
-static INT CreateInitialNamespace(
-    PLX_INSTANCE Instance)
-{
-    PAGED_CODE();
-
-    return FuseMiscRegister(Instance);
-}
 
 NTSTATUS DriverEntry(
     PDRIVER_OBJECT DriverObject,
@@ -47,5 +36,5 @@ NTSTATUS DriverEntry(
         DbgBreakPoint();
 #endif
 
-    return LxldrRegisterService(DriverObject, TRUE, CreateInitialNamespace);
+    return LxldrRegisterService(DriverObject, TRUE, FuseMiscRegister);
 }
