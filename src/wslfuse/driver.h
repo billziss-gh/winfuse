@@ -22,7 +22,6 @@
 #ifndef WSLFUSE_DRIVER_H_INCLUDED
 #define WSLFUSE_DRIVER_H_INCLUDED
 
-#define DRIVER_NAME                     "WslFuse"
 #include <shared/km/shared.h>
 #include <shared/ku/wslfuse.h>
 #include <lxdk/lxdk.h>

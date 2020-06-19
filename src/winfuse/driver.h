@@ -22,7 +22,6 @@
 #ifndef WINFUSE_DRIVER_H_INCLUDED
 #define WINFUSE_DRIVER_H_INCLUDED
 
-#define DRIVER_NAME                     "WinFuse"
 #include <shared/km/shared.h>
 
 #define FUSE_FSCTL_TRANSACT             \
