@@ -352,7 +352,7 @@ static void do_mount(void)
     /*
      * Mount the WinFsp volume using drvfs.
      */
-    if (-1 == mount(args.mountpoint, CreateArg.VolumeName, "drvfs", 0, 0))
+    if (-1 == mount(CreateArg.VolumeName, args.mountpoint, "drvfs", 0, 0))
     {
         warn("mount: cannot mount %s: %s", args.mountpoint, strerror(errno));
         goto exit;
