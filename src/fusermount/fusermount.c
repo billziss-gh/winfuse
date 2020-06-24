@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <spawn.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -30,6 +31,7 @@
 #include <sys/mount.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <shared/ku/wslfuse.h>
 
@@ -46,6 +48,7 @@ static struct
 struct mount_opts
 {
     FSP_FSCTL_VOLUME_PARAMS VolumeParams;
+    char WindowsMountPoint[260];
     int set_attr_timeout, attr_timeout;
     int set_FileInfoTimeout,
         set_DirInfoTimeout,
@@ -118,7 +121,7 @@ static void utf8_to_utf16(const char *src0, uint16_t *dst, size_t siz)
             c = (c & 0x0f) << 12;
             if (0x80 != (*src & 0x80))
                 goto copy;
-            c |= (*src++ & 0x3f) << 6;
+            c |= (uint32_t)(*src++ & 0x3f) << 6;
             if (0x80 != (*src & 0x80))
                 goto copy;
             c |= *src++ & 0x3f;
@@ -200,7 +203,15 @@ static void mount_opt_parse(struct mount_opts *mo)
         if (0 != optval)
             *optval++ = '\0';
 
-        if (0 == strcmp(optarg, "attr_timeout"))
+        if (0 == strcmp(optarg, "Volume"))
+        {
+            strncpy(mo->WindowsMountPoint, optval, sizeof mo->WindowsMountPoint);
+            mo->WindowsMountPoint[sizeof mo->WindowsMountPoint - 1] = '\0';
+            for (char *P = mo->WindowsMountPoint; *P; P++)
+                if ('/' == *P)
+                    *P = '\\';
+        }
+        else if (0 == strcmp(optarg, "attr_timeout"))
         {
             mo->set_attr_timeout = 1;
             mo->attr_timeout = (int)strtol(optval, 0, 10);
@@ -298,6 +309,140 @@ static void mount_opt_parse(struct mount_opts *mo)
             (UINT32)(mo->VolumeParams.VolumeCreationTime & 0xffffffff);
 }
 
+static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_t *pidp, int *ofdp)
+{
+    int res;
+    pid_t pid;
+    int ifd[2] = { -1, -1 };
+    int ofd[2] = { -1, -1 };
+    posix_spawn_file_actions_t actions;
+    posix_spawnattr_t attr;
+    char *argv[4];
+    char *p, *endp;
+    ssize_t bytes;
+    int initdone_actions = 0, initdone_attr = 0;
+
+    if (-1 == pipe(ifd))
+    {
+        res = errno;
+        goto exit;
+    }
+
+    if (-1 == pipe(ofd))
+    {
+        res = errno;
+        goto exit;
+    }
+
+    res = posix_spawn_file_actions_init(&actions);
+    if (0 != res)
+        goto exit;
+    initdone_actions = 1;
+
+    res = posix_spawn_file_actions_addclose(&actions, ifd[0]);
+    if (0 != res)
+        goto exit;
+    res = posix_spawn_file_actions_adddup2(&actions, ifd[1], 1);
+    if (0 != res)
+        goto exit;
+    res = posix_spawn_file_actions_addclose(&actions, ifd[1]);
+    if (0 != res)
+        goto exit;
+
+    res = posix_spawn_file_actions_addclose(&actions, ofd[1]);
+    if (0 != res)
+        goto exit;
+    res = posix_spawn_file_actions_adddup2(&actions, ofd[0], 0);
+    if (0 != res)
+        goto exit;
+    res = posix_spawn_file_actions_addclose(&actions, ofd[0]);
+    if (0 != res)
+        goto exit;
+
+    res = posix_spawnattr_init(&attr);
+    if (0 != res)
+        goto exit;
+    initdone_attr = 1;
+
+    res = posix_spawnattr_setflags(&attr, POSIX_SPAWN_RESETIDS);
+    if (0 != res)
+        goto exit;
+
+    argv[0] = "/usr/bin/fusermount-helper.exe";
+    argv[1] = (char *)VolumeName;
+    argv[2] = '\0' != MountPoint[0] ? (char *)MountPoint : 0;
+    argv[3] = 0;
+    res = posix_spawn(&pid, argv[0], &actions, 0, argv, 0);
+    if (0 != res)
+        goto exit;
+
+    close(ifd[1]); ifd[1] = -1;
+    close(ofd[0]); ofd[0] = -1;
+
+    for (p = MountPoint, endp = MountPoint + 260 - 1; endp > p; p += bytes)
+    {
+        bytes = read(ifd[0], p, (size_t)(endp - p));
+        if (-1 == bytes)
+        {
+            if (EINTR != errno)
+            {
+                res = errno;
+                goto exit;
+            }
+            bytes = 0;
+        }
+        else if (0 == bytes || 0 != memchr(p, 0, (size_t)bytes))
+        {
+            p += bytes;
+            break;
+        }
+    }
+    *p = '\0';
+
+    if (MountPoint == p)
+    {
+        res = EINVAL;
+        goto exit;
+    }
+
+    close(ifd[0]); ifd[0] = -1;
+
+    *pidp = pid;
+    *ofdp = ofd[1]; ofd[1] = -1;
+
+    res = 0;
+
+exit:
+    if (initdone_attr)
+        posix_spawnattr_destroy(&attr);
+
+    if (initdone_actions)
+        posix_spawn_file_actions_destroy(&actions);
+
+    if (-1 != ofd[1])
+        close(ofd[1]);
+    if (-1 != ofd[0])
+        close(ofd[0]);
+
+    if (-1 != ifd[1])
+        close(ifd[1]);
+    if (-1 != ifd[0])
+        close(ifd[0]);
+
+    return res;
+}
+
+static void stop_mount_helper(pid_t pid, int ofd)
+{
+    ssize_t bytes;
+    (void)bytes;
+
+    bytes = write(ofd, "STOP", 4 + 1);
+    close(ofd);
+
+    waitpid(pid, 0, 0);
+}
+
 static void do_mount(void)
 {
     int success = 0;
@@ -307,6 +452,8 @@ static void do_mount(void)
     int mounted = 0, mnt_id;
     WSLFUSE_IOCTL_CREATEVOLUME_ARG CreateArg;
     WSLFUSE_IOCTL_MOUNTID_ARG MountArg;
+    pid_t helper_pid = -1;
+    int helper_fd = -1;
     struct msghdr msg;
     struct cmsghdr *cmsg;
     char cmsgbuf[CMSG_SPACE(sizeof fusefd)];
@@ -350,9 +497,20 @@ static void do_mount(void)
     }
 
     /*
+     * Start the Windows side helper process to create the Windows mount point.
+     */
+    errno = start_mount_helper(CreateArg.VolumeName, mo.WindowsMountPoint,
+        &helper_pid, &helper_fd);
+    if (0 != errno)
+    {
+        warn("mount: cannot set Windows mount point: %s", strerror(errno));
+        goto exit;
+    }
+
+    /*
      * Mount the WinFsp volume using drvfs.
      */
-    if (-1 == mount(CreateArg.VolumeName, args.mountpoint, "drvfs", 0, 0))
+    if (-1 == mount(mo.WindowsMountPoint, args.mountpoint, "drvfs", 0, 0))
     {
         warn("mount: cannot mount %s: %s", args.mountpoint, strerror(errno));
         goto exit;
@@ -418,13 +576,15 @@ exit:
             umount2(args.mountpoint, UMOUNT_NOFOLLOW);
     }
 
+    if (-1 != helper_pid)
+        stop_mount_helper(helper_pid, helper_fd);
+
     if (-1 != fusefd)
         close(fusefd);
 
     if (!success)
         exit(1);
 
-    /* ???: auto_unmount and daemonization support? */
     exit(0);
 }
 
