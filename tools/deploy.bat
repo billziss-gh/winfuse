@@ -58,6 +58,7 @@ for %%f in (
         winfuse-tests-%Suffix%.exe
         wslfuse-tests.out
         fusermount.out
+        fusermount-helper.exe
         deploy-setup.bat
     "!WINFSP!"
         winfsp-%Suffix%.sys
