@@ -22,8 +22,8 @@ if not X%2==X set Chkpnt=%2
     echo sc start lxldr
 ) > %~dp0..\build\VStudio\build\%Config%\deploy-setup.bat
 
-if exist %~dp0ext\winfsp\build\VStudio\build\%Config% (
-    set WINFSP=%~dp0ext\winfsp\build\VStudio\build\%Config%\
+if exist %~dp0..\ext\winfsp\build\VStudio\build\%Config% (
+    set WINFSP=%~dp0..\ext\winfsp\build\VStudio\build\%Config%\
 ) else (
     set RegKey="HKLM\SOFTWARE\WinFsp"
     set RegVal="InstallDir"
@@ -36,8 +36,8 @@ if exist %~dp0ext\winfsp\build\VStudio\build\%Config% (
     if not exist "!WINFSP!" (echo cannot find WinFsp installation >&2 & goto fail)
 )
 
-if exist %~dp0ext\lxdk\build\VStudio\build\%Config% (
-    set LXDK=%~dp0ext\lxdk\build\VStudio\build\%Config%\
+if exist %~dp0..\ext\lxdk\build\VStudio\build\%Config% (
+    set LXDK=%~dp0..\ext\lxdk\build\VStudio\build\%Config%\
 ) else (
     set RegKey="HKLM\SOFTWARE\LxDK"
     set RegVal="InstallDir"
