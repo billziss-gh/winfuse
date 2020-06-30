@@ -85,7 +85,7 @@ int wmain(int argc, wchar_t **argv)
         fatal(1, "cannot find winfsp");
 
     if (2 > argc || 3 < argc)
-        fatal(2, "usage: VolumeName [WindowsMountPoint]");
+        fatal(2, "usage: VolumeName [WinMountPoint]");
 
     memset(&Desc, 0, sizeof Desc);
     Desc.VolumeName = argv[1];

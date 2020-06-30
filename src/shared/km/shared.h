@@ -474,6 +474,8 @@ BOOLEAN FuseCacheForgetOne(PLIST_ENTRY ForgetList, FUSE_PROTO_FORGET_ONE *PForge
 /* protocol implementation */
 NTSTATUS FuseProtoPostInit(FUSE_INSTANCE *Instance);
 VOID FuseProtoSendInit(FUSE_CONTEXT *Context);
+NTSTATUS FuseProtoPostDestroy(FUSE_INSTANCE *Instance);
+VOID FuseProtoSendDestroy(FUSE_CONTEXT *Context);
 VOID FuseProtoSendLookup(FUSE_CONTEXT *Context);
 NTSTATUS FuseProtoPostForget(FUSE_INSTANCE *Instance, PLIST_ENTRY ForgetList);
 VOID FuseProtoFillForget(FUSE_CONTEXT *Context);

@@ -23,6 +23,8 @@
 
 NTSTATUS FuseProtoPostInit(FUSE_INSTANCE *Instance);
 VOID FuseProtoSendInit(FUSE_CONTEXT *Context);
+NTSTATUS FuseProtoPostDestroy(FUSE_INSTANCE *Instance);
+VOID FuseProtoSendDestroy(FUSE_CONTEXT *Context);
 VOID FuseProtoSendLookup(FUSE_CONTEXT *Context);
 NTSTATUS FuseProtoPostForget(FUSE_INSTANCE *Instance, PLIST_ENTRY ForgetList);
 static VOID FuseProtoPostForget_ContextFini(FUSE_CONTEXT *Context);
@@ -57,6 +59,8 @@ NTSTATUS FuseNtStatusFromErrno(FUSE_INSTANCE_TYPE InstanceType, INT32 Errno);
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text(PAGE, FuseProtoPostInit)
 #pragma alloc_text(PAGE, FuseProtoSendInit)
+#pragma alloc_text(PAGE, FuseProtoPostDestroy)
+#pragma alloc_text(PAGE, FuseProtoSendDestroy)
 #pragma alloc_text(PAGE, FuseProtoSendLookup)
 #pragma alloc_text(PAGE, FuseProtoPostForget)
 #pragma alloc_text(PAGE, FuseProtoPostForget_ContextFini)
@@ -161,6 +165,39 @@ VOID FuseProtoSendInit(FUSE_CONTEXT *Context)
         Context->FuseRequest->req.init.minor = FUSE_PROTO_MINOR_VERSION;
         Context->FuseRequest->req.init.max_readahead = 0;   /* !!!: REVISIT */
         Context->FuseRequest->req.init.flags = 0;           /* !!!: REVISIT */
+
+    FUSE_PROTO_SEND_END
+}
+
+NTSTATUS FuseProtoPostDestroy(FUSE_INSTANCE *Instance)
+{
+    PAGED_CODE();
+
+    FUSE_CONTEXT *Context;
+
+    FuseContextCreate(&Context, Instance, 0);
+    ASSERT(0 != Context);
+    if (FuseContextIsStatus(Context))
+        return FuseContextToStatus(Context);
+
+    Context->InternalResponse->Hint = FUSE_PROTO_OPCODE_DESTROY;
+
+    FuseIoqPostPending(Instance->Ioq, Context);
+
+    return STATUS_SUCCESS;
+}
+
+VOID FuseProtoSendDestroy(FUSE_CONTEXT *Context)
+    /*
+     * Send DESTROY message.
+     */
+{
+    PAGED_CODE();
+
+    FUSE_PROTO_SEND_BEGIN
+
+        FuseProtoInitRequest(Context,
+            FUSE_PROTO_REQ_HEADER_SIZE, FUSE_PROTO_OPCODE_DESTROY, 0);
 
     FUSE_PROTO_SEND_END
 }

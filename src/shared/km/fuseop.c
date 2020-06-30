@@ -175,7 +175,14 @@ static BOOLEAN FuseOpReserved_Destroy(FUSE_CONTEXT *Context)
 {
     PAGED_CODE();
 
-    return FALSE;
+    coro_block (Context->CoroState)
+    {
+        coro_await (FuseProtoSendDestroy(Context));
+
+        Context->InternalResponse->IoStatus.Status = STATUS_SUCCESS;
+    }
+
+    return coro_active();
 }
 
 static BOOLEAN FuseOpReserved_Forget(FUSE_CONTEXT *Context)

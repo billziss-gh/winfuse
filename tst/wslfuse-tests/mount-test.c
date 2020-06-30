@@ -58,6 +58,7 @@ static void mount_createvol_test(void)
     mount_createvol_dotest(L"\\\\wslfuse-tests\\share");
 }
 
+#if 0
 static void mount_unmount_test(void)
 {
     WSLFUSE_IOCTL_MOUNTID_ARG MountArg;
@@ -120,9 +121,12 @@ static void mount_unmount_test(void)
     res = close(fusefd);
     ASSERT(0 == res);
 }
+#endif
 
 void mount_tests(void)
 {
     TEST(mount_createvol_test);
+#if 0
     TEST(mount_unmount_test);
+#endif
 }

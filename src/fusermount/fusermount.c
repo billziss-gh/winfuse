@@ -48,7 +48,7 @@ static struct
 struct mount_opts
 {
     FSP_FSCTL_VOLUME_PARAMS VolumeParams;
-    char WindowsMountPoint[260];
+    char WinMountPoint[260];
     int set_attr_timeout, attr_timeout;
     int set_FileInfoTimeout,
         set_DirInfoTimeout,
@@ -205,9 +205,9 @@ static void mount_opt_parse(struct mount_opts *mo)
 
         if (0 == strcmp(optarg, "Volume"))
         {
-            strncpy(mo->WindowsMountPoint, optval, sizeof mo->WindowsMountPoint);
-            mo->WindowsMountPoint[sizeof mo->WindowsMountPoint - 1] = '\0';
-            for (char *P = mo->WindowsMountPoint; *P; P++)
+            strncpy(mo->WinMountPoint, optval, sizeof mo->WinMountPoint);
+            mo->WinMountPoint[sizeof mo->WinMountPoint - 1] = '\0';
+            for (char *P = mo->WinMountPoint; *P; P++)
                 if ('/' == *P)
                     *P = '\\';
         }
@@ -451,7 +451,8 @@ static void do_mount(void)
     int commfd, fusefd = -1;
     int mounted = 0, mnt_id;
     WSLFUSE_IOCTL_CREATEVOLUME_ARG CreateArg;
-    WSLFUSE_IOCTL_MOUNTID_ARG MountArg;
+    WSLFUSE_IOCTL_WINMOUNT_ARG WinMountArg;
+    WSLFUSE_IOCTL_LXMOUNT_ARG LxMountArg;
     pid_t helper_pid = -1;
     int helper_fd = -1;
     struct msghdr msg;
@@ -459,6 +460,7 @@ static void do_mount(void)
     char cmsgbuf[CMSG_SPACE(sizeof fusefd)];
     struct iovec iov;
     char dummy = 0;
+    int msgsent = 0;
 
     mount_opt_parse(&mo);
 
@@ -499,7 +501,7 @@ static void do_mount(void)
     /*
      * Start the Windows side helper process to create the Windows mount point.
      */
-    errno = start_mount_helper(CreateArg.VolumeName, mo.WindowsMountPoint,
+    errno = start_mount_helper(CreateArg.VolumeName, mo.WinMountPoint,
         &helper_pid, &helper_fd);
     if (0 != errno)
     {
@@ -508,22 +510,13 @@ static void do_mount(void)
     }
 
     /*
-     * Mount the WinFsp volume using drvfs.
+     * Associate the Windows mount point with the /dev/fuse fd.
      */
-    if (-1 == mount(mo.WindowsMountPoint, args.mountpoint, "drvfs", 0, 0))
+    memset(&WinMountArg, 0, sizeof WinMountArg);
+    memcpy(WinMountArg.WinMountPoint, mo.WinMountPoint, sizeof WinMountArg.WinMountPoint);
+    if (-1 == ioctl(fusefd, WSLFUSE_IOCTL_WINMOUNT, &WinMountArg))
     {
-        warn("mount: cannot mount %s: %s", args.mountpoint, strerror(errno));
-        goto exit;
-    }
-    mounted = 1;
-
-    /*
-     * Get the mnt_id of the newly mounted file system.
-     */
-    mnt_id = get_mnt_id(args.mountpoint);
-    if (-1 == mnt_id)
-    {
-        warn("mount: cannot get mnt_id: %s", strerror(errno));
+        warn("mount: cannot ioctl(M) /dev/fuse: %s", strerror(errno));
         goto exit;
     }
 
@@ -549,21 +542,37 @@ static void do_mount(void)
             warn("mount: cannot sendmsg to _FUSE_COMMFD: %s", strerror(errno));
             goto exit;
         }
+    msgsent = 1;
 
     /*
-     * From this point forward we cannot tolerate failures.
-     * The ioctl below will not fail (unless passed invalid data).
+     * Mount the WinFsp volume using drvfs.
      */
+    if (-1 == mount(mo.WinMountPoint, args.mountpoint, "drvfs", 0, 0))
+    {
+        warn("mount: cannot mount %s: %s", args.mountpoint, strerror(errno));
+        goto exit;
+    }
+    mounted = 1;
+
+    /*
+     * Get the mnt_id of the newly mounted file system.
+     */
+    mnt_id = get_mnt_id(args.mountpoint);
+    if (-1 == mnt_id)
+    {
+        warn("mount: cannot get mnt_id: %s", strerror(errno));
+        goto exit;
+    }
 
     /*
      * Associate the WSL mnt_id with the /dev/fuse fd.
      */
-    memset(&MountArg, 0, sizeof MountArg);
-    MountArg.Operation = '+';
-    MountArg.MountId = (UINT64)mnt_id;
-    if (-1 == ioctl(fusefd, WSLFUSE_IOCTL_MOUNTID, &MountArg))
+    memset(&LxMountArg, 0, sizeof LxMountArg);
+    LxMountArg.Operation = '+';
+    LxMountArg.LxMountId = (UINT64)mnt_id;
+    if (-1 == ioctl(fusefd, WSLFUSE_IOCTL_LXMOUNT, &LxMountArg))
     {
-        warn("mount: cannot ioctl(M) /dev/fuse: %s", strerror(errno));
+        warn("mount: cannot ioctl(m) /dev/fuse: %s", strerror(errno));
         goto exit;
     }
 
@@ -574,6 +583,14 @@ exit:
     {
         if (mounted)
             umount2(args.mountpoint, UMOUNT_NOFOLLOW);
+
+        if (msgsent)
+        {
+            memset(&LxMountArg, 0, sizeof LxMountArg);
+            LxMountArg.Operation = '-';
+            LxMountArg.LxMountId = (UINT64)-1LL;
+            ioctl(fusefd, WSLFUSE_IOCTL_LXMOUNT, &LxMountArg);
+        }
     }
 
     if (-1 != helper_pid)
@@ -593,7 +610,7 @@ static void do_unmount(void)
     int success = 0;
     int fusefd = -1;
     int mnt_id;
-    WSLFUSE_IOCTL_MOUNTID_ARG MountArg;
+    WSLFUSE_IOCTL_LXMOUNT_ARG LxMountArg;
 
     /*
      * Open the /dev/fuse device.
@@ -616,18 +633,6 @@ static void do_unmount(void)
     }
 
     /*
-     * Verify the WSL mnt_id with WinFuse.
-     */
-    memset(&MountArg, 0, sizeof MountArg);
-    MountArg.Operation = '?';
-    MountArg.MountId = (UINT64)mnt_id;
-    if (-1 == ioctl(fusefd, WSLFUSE_IOCTL_MOUNTID, &MountArg))
-    {
-        warn("unmount: unknown mountpoint %s", args.mountpoint);
-        goto exit;
-    }
-
-    /*
      * Unmount the previously mounted file system.
      */
     if (-1 == umount2(args.mountpoint, UMOUNT_NOFOLLOW | (args.lazy ? MNT_DETACH : 0)))
@@ -637,19 +642,14 @@ static void do_unmount(void)
     }
 
     /*
-     * From this point forward we cannot tolerate failures.
-     * The ioctl below will not fail (unless passed invalid data).
-     */
-
-    /*
      * Disassociate the WSL mnt_id from the /dev/fuse fd.
      */
-    memset(&MountArg, 0, sizeof MountArg);
-    MountArg.Operation = '-';
-    MountArg.MountId = (UINT64)mnt_id;
-    if (-1 == ioctl(fusefd, WSLFUSE_IOCTL_MOUNTID, &MountArg))
+    memset(&LxMountArg, 0, sizeof LxMountArg);
+    LxMountArg.Operation = '-';
+    LxMountArg.LxMountId = (UINT64)mnt_id;
+    if (-1 == ioctl(fusefd, WSLFUSE_IOCTL_LXMOUNT, &LxMountArg) && ENOENT != errno)
     {
-        warn("unmount: cannot ioctl(M) /dev/fuse: %s", strerror(errno));
+        warn("unmount: cannot ioctl(m) /dev/fuse: %s", strerror(errno));
         goto exit;
     }
 

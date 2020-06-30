@@ -124,12 +124,21 @@ _Static_assert(504 == sizeof(WSLFUSE_IOCTL_CREATEVOLUME_ARG),
 
 typedef struct
 {
-    UINT8 Operation;
-    UINT64 MountId;
-} WSLFUSE_IOCTL_MOUNTID_ARG;
+    CHAR WinMountPoint[260];
+} WSLFUSE_IOCTL_WINMOUNT_ARG;
 #if defined(__linux__)
-_Static_assert(16 == sizeof(WSLFUSE_IOCTL_MOUNTID_ARG),
-    "sizeof(WSLFUSE_IOCTL_MOUNTID_ARG) must be 16.");
+_Static_assert(260 == sizeof(WSLFUSE_IOCTL_WINMOUNT_ARG),
+    "sizeof(WSLFUSE_IOCTL_WINMOUNT_ARG) must be 260.");
+#endif
+
+typedef struct
+{
+    UINT8 Operation;
+    UINT64 LxMountId;
+} WSLFUSE_IOCTL_LXMOUNT_ARG;
+#if defined(__linux__)
+_Static_assert(16 == sizeof(WSLFUSE_IOCTL_LXMOUNT_ARG),
+    "sizeof(WSLFUSE_IOCTL_LXMOUNT_ARG) must be 16.");
 #endif
 
 /*
@@ -143,13 +152,23 @@ _Static_assert(WSLFUSE_IOCTL_CREATEVOLUME == _IOWR('F', 'C', WSLFUSE_IOCTL_CREAT
 #endif
 
 /*
- * _IOW('F', 'M', WSLFUSE_IOCTL_MOUNTID_ARG)
- * sh tools/ioc.c 1 70 77 16
+ * _IOW('F', 'M', WSLFUSE_IOCTL_WINMOUNT_ARG)
+ * sh tools/ioc.c 1 70 77 260
  */
-#define WSLFUSE_IOCTL_MOUNTID           0x4010464d
+#define WSLFUSE_IOCTL_WINMOUNT          0x4104464d
 #if defined(__linux__)
-_Static_assert(WSLFUSE_IOCTL_MOUNTID == _IOW('F', 'M', WSLFUSE_IOCTL_MOUNTID_ARG),
-    "WSLFUSE_IOCTL_MOUNTID");
+_Static_assert(WSLFUSE_IOCTL_WINMOUNT == _IOW('F', 'M', WSLFUSE_IOCTL_WINMOUNT_ARG),
+    "WSLFUSE_IOCTL_WINMOUNT");
+#endif
+
+/*
+ * _IOW('F', 'm', WSLFUSE_IOCTL_LXMOUNT_ARG)
+ * sh tools/ioc.c 1 70 109 16
+ */
+#define WSLFUSE_IOCTL_LXMOUNT           0x4010466d
+#if defined(__linux__)
+_Static_assert(WSLFUSE_IOCTL_LXMOUNT == _IOW('F', 'm', WSLFUSE_IOCTL_LXMOUNT_ARG),
+    "WSLFUSE_IOCTL_LXMOUNT");
 #endif
 
 #endif

@@ -24,38 +24,27 @@
 #define FUSE_MINOR                      229
 
 typedef struct _FILE FILE;
-typedef struct _MOUNTID MOUNTID;
 typedef struct _DEVICE DEVICE;
 
 struct _FILE
 {
     LX_FILE Base;
     DEVICE *Device;
-    EX_PUSH_LOCK CreateVolumeLock;
+    EX_PUSH_LOCK VolumeLock;
     FSP_FSCTL_VOLUME_PARAMS VolumeParams;
     HANDLE VolumeHandle;
     PFILE_OBJECT VolumeFileObject;
     FUSE_INSTANCE FuseInstance;
-};
-
-struct _MOUNTID
-{
-    LIST_ENTRY ListEntry;
-    UINT64 MountId;
+    HANDLE WinMountHandle;
+    LIST_ENTRY LxMountListEntry;
+    UINT64 LxMountId;
 };
 
 struct _DEVICE
 {
     LX_DEVICE Base;
-    EX_PUSH_LOCK MountListLock;
-    LIST_ENTRY MountList;
-        /*
-         * The mount id list is maintained as a linked list.
-         * This will make searches slow, but this should be ok,
-         * because it is unlikely that there will be too many
-         * mounts to track. If this assumption changes we may
-         * have to revisit.
-         */
+    EX_PUSH_LOCK LxMountListLock;
+    LIST_ENTRY LxMountList;
 };
 
 static INT FileIoctlCreateVolume(
@@ -74,7 +63,7 @@ static INT FileIoctlCreateVolume(
     WCHAR VolumeName[FSP_FSCTL_VOLUME_NAME_SIZEMAX / sizeof(WCHAR)];
     ULONG VolumeNameSize;
 
-    ExAcquirePushLockExclusive(&File->CreateVolumeLock);
+    ExAcquirePushLockExclusive(&File->VolumeLock);
 
     if (0 != File->VolumeFileObject)
     {
@@ -182,68 +171,147 @@ exit:
             FuseInstanceFini(&File->FuseInstance);
     }
 
-    ExReleasePushLockExclusive(&File->CreateVolumeLock);
+    ExReleasePushLockExclusive(&File->VolumeLock);
 
     /* !!!: REVISIT */
     return NT_SUCCESS(IoStatus.Status) ? 0 : -EIO;
 }
 
-static INT FileIoctlMount(
+static INT FileIoctlWinMount(
     FILE *File,
-    WSLFUSE_IOCTL_MOUNTID_ARG *Arg)
+    WSLFUSE_IOCTL_WINMOUNT_ARG *Arg)
+{
+    UNICODE_STRING WinMountPoint;
+    WCHAR WinMountPointBuf[4 + sizeof Arg->WinMountPoint];
+    ULONG WinMountPointSize;
+    OBJECT_ATTRIBUTES ObjectAttributes;
+    HANDLE WinMountHandle;
+    NTSTATUS Result;
+
+    ExAcquirePushLockExclusive(&File->VolumeLock);
+
+    if (0 != File->WinMountHandle)
+    {
+        Result = STATUS_INVALID_PARAMETER;
+        goto exit;
+    }
+
+    Arg->WinMountPoint[sizeof Arg->WinMountPoint - 1] = '\0';
+    WinMountPointSize = (ULONG)strlen(Arg->WinMountPoint);
+
+    WinMountPointBuf[0] = '\\';
+    WinMountPointBuf[1] = '?';
+    WinMountPointBuf[2] = '?';
+    WinMountPointBuf[3] = '\\';
+
+    Result = RtlUTF8ToUnicodeN(
+        WinMountPointBuf + 4,
+        sizeof WinMountPointBuf - 4,
+        &WinMountPointSize,
+        Arg->WinMountPoint,
+        WinMountPointSize);
+    if (!NT_SUCCESS(Result))
+        goto exit;
+
+    WinMountPoint.Length = WinMountPoint.MaximumLength =
+        (USHORT)(4 * sizeof(WCHAR) + WinMountPointSize);
+    WinMountPoint.Buffer = WinMountPointBuf;
+
+    InitializeObjectAttributes(
+        &ObjectAttributes,
+        &WinMountPoint,
+        OBJ_KERNEL_HANDLE,
+        0/*RootDirectory*/,
+        0/*SecurityDescriptor*/);
+
+    Result = ZwOpenSymbolicLinkObject(&WinMountHandle, 0, &ObjectAttributes);
+    if (!NT_SUCCESS(Result))
+        goto exit;
+
+    File->WinMountHandle = WinMountHandle;
+
+    Result = STATUS_SUCCESS;
+
+exit:
+    ExReleasePushLockExclusive(&File->VolumeLock);
+
+    /* !!!: REVISIT */
+    return NT_SUCCESS(Result) ? 0 : -EIO;
+}
+
+static INT FileIoctlLxMount(
+    FILE *File,
+    WSLFUSE_IOCTL_LXMOUNT_ARG *Arg)
 {
     DEVICE *Device = File->Device;
-    MOUNTID *MountId;
+    FILE *LxMountFile;
+    IO_STATUS_BLOCK IoStatus;
     INT Error = 0;
 
-    ExAcquirePushLockExclusive(&Device->MountListLock);
+    ExAcquirePushLockExclusive(&Device->LxMountListLock);
 
-    MountId = 0;
-    for (PLIST_ENTRY Entry = Device->MountList.Flink; &Device->MountList != Entry;)
+    if ((UINT64)-1LL == Arg->LxMountId)
+        LxMountFile = File;
+    else
     {
-        MOUNTID *Temp = CONTAINING_RECORD(Entry, MOUNTID, ListEntry);
-        Entry = Entry->Flink;
-        if (Temp->MountId == Arg->MountId)
+        LxMountFile = 0;
+        for (PLIST_ENTRY Entry = Device->LxMountList.Flink; &Device->LxMountList != Entry;)
         {
-            MountId = Temp;
-            break;
+            FILE *Temp = CONTAINING_RECORD(Entry, FILE, LxMountListEntry);
+            Entry = Entry->Flink;
+            if (Temp->LxMountId == Arg->LxMountId)
+            {
+                LxMountFile = Temp;
+                break;
+            }
         }
     }
 
     switch (Arg->Operation)
     {
     case '+':
-        if (0 != MountId)
+        if (0 != LxMountFile)
         {
             Error = -EEXIST;
             break;
         }
 
-        MountId = FuseAllocNonPaged(sizeof *MountId);
-        if (0 == MountId)
-        {
-            Error = -ENOMEM;
-            break;
-        }
-
-        RtlZeroMemory(MountId, sizeof *MountId);
-        MountId->MountId = Arg->MountId;
-        InsertTailList(&Device->MountList, &MountId->ListEntry);
+        File->LxMountId = Arg->LxMountId;
+        InsertTailList(&Device->LxMountList, &File->LxMountListEntry);
         break;
 
     case '-':
-        if (0 == MountId)
+        if (0 == LxMountFile)
         {
             Error = -ENOENT;
             break;
         }
 
-        RemoveEntryList(&MountId->ListEntry);
-        FuseFree(MountId);
+        RemoveEntryList(&LxMountFile->LxMountListEntry);
+        LxMountFile->LxMountId = (UINT64)-1LL;
+
+        if (0 != InterlockedCompareExchangePointer(&LxMountFile->VolumeFileObject, 0, 0))
+        {
+            IoStatus.Status = ZwFsControlFile(
+                LxMountFile->VolumeHandle,
+                0/*Event*/,
+                0/*ApcRoutine*/,
+                0/*ApcContext*/,
+                &IoStatus,
+                FSP_FSCTL_STOP,
+                0/*InputBuffer*/,
+                0/*InputBufferLength*/,
+                0/*OutputBuffer*/,
+                0/*OutputBufferLength*/);
+            if (NT_SUCCESS(IoStatus.Status))
+                IoStatus.Status = FuseProtoPostDestroy(&LxMountFile->FuseInstance);
+            if (!NT_SUCCESS(IoStatus.Status))
+                Error = -EIO; // !!!: REVISIT
+        }
         break;
 
     case '?':
-        if (0 == MountId)
+        if (0 == LxMountFile)
         {
             Error = -ENOENT;
             break;
@@ -255,7 +323,7 @@ static INT FileIoctlMount(
         break;
     }
 
-    ExReleasePushLockExclusive(&Device->MountListLock);
+    ExReleasePushLockExclusive(&Device->LxMountListLock);
 
     return Error;
 }
@@ -351,6 +419,7 @@ static INT FileIoctl(
     ULONG Code,
     PVOID Buffer)
 {
+    INT (*IoctlProc)(FILE *File, PVOID Arg);
     FILE *File = (FILE *)File0;
     PVOID SystemBuffer;
     INT Error;
@@ -358,26 +427,26 @@ static INT FileIoctl(
     switch (Code)
     {
     case WSLFUSE_IOCTL_CREATEVOLUME:
-        Error = FileIoctlBegin(Code, Buffer, &SystemBuffer);
-        if (0 == Error)
-        {
-            Error = FileIoctlCreateVolume(File, SystemBuffer);
-            Error = FileIoctlEnd(Code, Buffer, &SystemBuffer, Error);
-        }
+        IoctlProc = FileIoctlCreateVolume;
         break;
 
-    case WSLFUSE_IOCTL_MOUNTID:
-        Error = FileIoctlBegin(Code, Buffer, &SystemBuffer);
-        if (0 == Error)
-        {
-            Error = FileIoctlMount(File, SystemBuffer);
-            Error = FileIoctlEnd(Code, Buffer, &SystemBuffer, Error);
-        }
+    case WSLFUSE_IOCTL_WINMOUNT:
+        IoctlProc = FileIoctlWinMount;
+        break;
+
+    case WSLFUSE_IOCTL_LXMOUNT:
+        IoctlProc = FileIoctlLxMount;
         break;
 
     default:
-        Error = -EINVAL;
-        break;
+        return -EINVAL;
+    }
+
+    Error = FileIoctlBegin(Code, Buffer, &SystemBuffer);
+    if (0 == Error)
+    {
+        Error = IoctlProc(File, SystemBuffer);
+        Error = FileIoctlEnd(Code, Buffer, &SystemBuffer, Error);
     }
 
     return Error;
@@ -434,6 +503,7 @@ static INT FileWrite(
 {
     FILE *File = (FILE *)File0;
     ULONG InputBufferLength = (ULONG)Length;
+    ULONG OutputBufferLength = 0;
     PFILE_OBJECT VolumeFileObject;
     NTSTATUS Result;
 
@@ -454,7 +524,7 @@ static INT FileWrite(
 
     Result = FuseInstanceTransact(&File->FuseInstance,
         Buffer, InputBufferLength,
-        0, 0,
+        0, &OutputBufferLength,
         0, VolumeFileObject,
         0);
     if (!NT_SUCCESS(Result))
@@ -470,6 +540,9 @@ static INT FileDelete(
     PLX_FILE File0)
 {
     FILE *File = (FILE *)File0;
+
+    if (0 != File->WinMountHandle)
+        ZwClose(File->WinMountHandle);
 
     if (0 != File->VolumeFileObject)
         FuseInstanceFini(&File->FuseInstance);
@@ -512,7 +585,7 @@ static INT DeviceOpen(
     /* File: initialize fields. File->Base MUST be zeroed out. */
     RtlZeroMemory(File, sizeof *File);
     File->Device = (DEVICE *)Device;
-    ExInitializePushLock(&File->CreateVolumeLock);
+    ExInitializePushLock(&File->VolumeLock);
 
     *PFile = &File->Base;
     Error = 0;
@@ -524,16 +597,11 @@ exit:
 static INT DeviceDelete(
     PLX_DEVICE Device0)
 {
+#if DBG
     DEVICE *Device = (DEVICE *)Device0;
-    MOUNTID *MountId;
 
-    /* Device: finalize fields */
-    for (PLIST_ENTRY Entry = Device->MountList.Flink; &Device->MountList != Entry;)
-    {
-        MountId = CONTAINING_RECORD(Entry, MOUNTID, ListEntry);
-        Entry = Entry->Flink;
-        FuseFree(MountId);
-    }
+    ASSERT(!IsListEmpty(&Device->LxMountList));
+#endif
 
     return 0;
 }
@@ -557,8 +625,8 @@ INT FuseMiscRegister(
     }
 
     /* Device: initialize fields. Device->Base MUST NOT be zeroed out. */
-    ExInitializePushLock(&Device->MountListLock);
-    InitializeListHead(&Device->MountList);
+    ExInitializePushLock(&Device->LxMountListLock);
+    InitializeListHead(&Device->LxMountList);
 
     LxpDevMiscRegister(Instance, &Device->Base, FUSE_MINOR);
 
