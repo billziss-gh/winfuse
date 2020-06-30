@@ -19,7 +19,8 @@
  * associated repository.
  */
 
-#include <winfsp/winfsp.h>
+#include <windows.h>
+#include <winternl.h>
 
 #define PROGNAME                        "fusermount-helper"
 
@@ -72,33 +73,105 @@ static void printlog(HANDLE h, const char *format, ...)
     va_end(ap);
 }
 
+NTSTATUS NTAPI NtOpenSymbolicLinkObject(PHANDLE LinkHandle,
+    ACCESS_MASK DesiredAccess, POBJECT_ATTRIBUTES ObjectAttributes);
+NTSTATUS NTAPI NtMakeTemporaryObject(HANDLE Handle);
+NTSTATUS NTAPI NtClose(HANDLE Handle);
+
+static BOOL MountSet_Drive(PWSTR VolumeName, PWSTR MountPoint, PHANDLE PMountHandle)
+{
+    WCHAR SymlinkBuf[6];
+    UNICODE_STRING Symlink;
+    OBJECT_ATTRIBUTES Obja;
+    NTSTATUS Result;
+
+    *PMountHandle = 0;
+
+    if (!DefineDosDeviceW(DDD_RAW_TARGET_PATH, MountPoint, VolumeName))
+        return FALSE;
+
+    memcpy(SymlinkBuf, L"\\??\\X:", sizeof SymlinkBuf);
+    SymlinkBuf[4] = MountPoint[0];
+    Symlink.Length = Symlink.MaximumLength = sizeof SymlinkBuf;
+    Symlink.Buffer = SymlinkBuf;
+
+    memset(&Obja, 0, sizeof Obja);
+    Obja.Length = sizeof Obja;
+    Obja.ObjectName = &Symlink;
+    Obja.Attributes = OBJ_CASE_INSENSITIVE;
+
+    Result = NtOpenSymbolicLinkObject(PMountHandle, DELETE, &Obja);
+    if (NT_SUCCESS(Result))
+    {
+        Result = NtMakeTemporaryObject(*PMountHandle);
+        if (!NT_SUCCESS(Result))
+        {
+            NtClose(*PMountHandle);
+            *PMountHandle = 0;
+        }
+    }
+
+    return TRUE;
+}
+
+static BOOL MountSet(PWSTR VolumeName, PWSTR MountPoint, PHANDLE PMountHandle)
+{
+    *PMountHandle = 0;
+
+    if (L'*' == MountPoint[0] && ':' == MountPoint[1] && L'\0' == MountPoint[2])
+    {
+        DWORD Drives;
+        WCHAR Drive;
+
+        Drives = GetLogicalDrives();
+        if (0 == Drives)
+            return FALSE;
+
+        for (Drive = 'Z'; 'D' <= Drive; Drive--)
+            if (0 == (Drives & (1 << (Drive - 'A'))))
+            {
+                MountPoint[0] = Drive;
+                if (MountSet_Drive(VolumeName, MountPoint, PMountHandle))
+                    return TRUE;
+            }
+        MountPoint[0] = L'*';
+        SetLastError(ERROR_NO_SUCH_DEVICE);
+            /* error code chosen for WinFsp compatibility (FspMountSet) */
+        return FALSE;
+    }
+    else if (
+        (
+            (L'A' <= MountPoint[0] && MountPoint[0] <= L'Z') ||
+            (L'a' <= MountPoint[0] && MountPoint[0] <= L'z')
+        ) && L':' == MountPoint[1] && L'\0' == MountPoint[2])
+        return MountSet_Drive(VolumeName, MountPoint, PMountHandle);
+    else
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+}
+
 int wmain(int argc, wchar_t **argv)
 {
-    FSP_MOUNT_DESC Desc;
+    PWSTR VolumeName;
+    PWSTR MountPoint;
+    HANDLE MountHandle;
     WCHAR WildMountPoint[] = L"*:";
     UINT8 MountPointU8[MAX_PATH];
     UINT8 Buffer[1];
     DWORD BytesTransferred;
-    NTSTATUS Result;
-
-    if (!NT_SUCCESS(FspLoad(0)))
-        fatal(1, "cannot find winfsp");
 
     if (2 > argc || 3 < argc)
         fatal(2, "usage: VolumeName [WinMountPoint]");
 
-    memset(&Desc, 0, sizeof Desc);
-    Desc.VolumeName = argv[1];
-    Desc.MountPoint = 2 < argc ? argv[2] : 0;
+    VolumeName = argv[1];
+    MountPoint = 2 < argc ? argv[2] : WildMountPoint;
 
-    if (0 == Desc.MountPoint)
-        Desc.MountPoint = WildMountPoint;
+    if (!MountSet(VolumeName, MountPoint, &MountHandle))
+        fatal(1, "cannot set Windows mount point %S (LastError=%lu)", MountPoint, GetLastError());
 
-    Result = FspMountSet(&Desc);
-    if (!NT_SUCCESS(Result))
-        fatal(1, "cannot set Windows mount point %S (Status=%lx)", Desc.MountPoint, Result);
-
-    if (0 == WideCharToMultiByte(CP_UTF8, 0, Desc.MountPoint, -1, MountPointU8, MAX_PATH, 0, 0))
+    if (0 == WideCharToMultiByte(CP_UTF8, 0, MountPoint, -1, MountPointU8, MAX_PATH, 0, 0))
         fatal(1, "invalid Windows mount point (LastError=%lu)", GetLastError());
 
     BytesTransferred = lstrlenA(MountPointU8) + 1;
