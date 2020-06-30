@@ -469,17 +469,6 @@ static INT FileRead(
     if (0 == VolumeFileObject)
         return -ENODEV;
 
-    try
-    {
-        if ((UINT_PTR)Buffer + Length < (UINT_PTR)Buffer ||
-            (UINT_PTR)Buffer + Length > MM_USER_PROBE_ADDRESS)
-            *(PUINT8)MM_USER_PROBE_ADDRESS = 0;
-    }
-    except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        return -EFAULT;
-    }
-
     Result = FuseInstanceTransact(&File->FuseInstance,
         0, 0,
         Buffer, &OutputBufferLength,
@@ -511,17 +500,6 @@ static INT FileWrite(
     if (0 == VolumeFileObject)
         return -ENODEV;
 
-    try
-    {
-        if ((UINT_PTR)Buffer + Length < (UINT_PTR)Buffer ||
-            (UINT_PTR)Buffer + Length > MM_USER_PROBE_ADDRESS)
-            *(PUINT8)MM_USER_PROBE_ADDRESS = 0;
-    }
-    except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        return -EFAULT;
-    }
-
     Result = FuseInstanceTransact(&File->FuseInstance,
         Buffer, InputBufferLength,
         0, &OutputBufferLength,
@@ -533,6 +511,96 @@ static INT FileWrite(
     *PBytesTransferred = InputBufferLength;
 
     return 0;
+}
+
+static INT FileWriteVector(
+    PLX_CALL_CONTEXT CallContext,
+    PLX_FILE File0,
+    PLX_IOVECTOR IoVector,
+    POFF_T POffset,
+    ULONG Flags,
+    PSIZE_T PBytesTransferred)
+{
+    FILE *File = (FILE *)File0;
+    FUSE_PROTO_RSP FuseResponseBuf, *FuseResponse = &FuseResponseBuf;
+    ULONG InputBufferLength;
+    ULONG OutputBufferLength = 0;
+    PFILE_OBJECT VolumeFileObject;
+    NTSTATUS Result;
+    INT Error;
+
+    VolumeFileObject = InterlockedCompareExchangePointer(&File->VolumeFileObject, 0, 0);
+    if (0 == VolumeFileObject)
+        return -ENODEV;
+
+    InputBufferLength = 0;
+    for (ULONG I = 0; (ULONG)IoVector->Count > I; I++)
+        InputBufferLength += (ULONG)IoVector->Vector[I].Length;
+    if (FUSE_PROTO_RSP_HEADER_SIZE > InputBufferLength)
+        return -EINVAL;
+
+    try
+    {
+        ULONG L = sizeof(FUSE_PROTO_RSP) < InputBufferLength ?
+            FUSE_PROTO_RSP_HEADER_SIZE : sizeof(FUSE_PROTO_RSP);
+        PUINT8 P = (PUINT8)&FuseResponseBuf, EndP = P + L;
+        for (ULONG I = 0; (ULONG)IoVector->Count > I && EndP > P; I++)
+        {
+            L = (ULONG)(EndP - P);
+            if (L > (ULONG)IoVector->Vector[I].Length)
+                L = (ULONG)IoVector->Vector[I].Length;
+            RtlCopyMemory(P, IoVector->Vector[I].Buffer, L);
+            P += L;
+        }
+
+        if (sizeof(FUSE_PROTO_RSP) < InputBufferLength)
+        {
+            P = FuseAlloc(InputBufferLength);
+            if (0 == P)
+            {
+                Error = -ENOMEM;
+                goto exit;
+            }
+            FuseResponse = (PVOID)P;
+
+            L = InputBufferLength;
+            EndP = P + L;
+            for (ULONG I = 0; (ULONG)IoVector->Count > I && EndP > P; I++)
+            {
+                L = (ULONG)(EndP - P);
+                if (L > (ULONG)IoVector->Vector[I].Length)
+                    L = (ULONG)IoVector->Vector[I].Length;
+                RtlCopyMemory(P, IoVector->Vector[I].Buffer, L);
+                P += L;
+            }
+        }
+    }
+    except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        Error = -EFAULT;
+        goto exit;
+    }
+
+    Result = FuseInstanceTransact(&File->FuseInstance,
+        &FuseResponseBuf, InputBufferLength,
+        0, &OutputBufferLength,
+        0, VolumeFileObject,
+        0);
+    if (!NT_SUCCESS(Result))
+    {
+        Error = -EIO;
+        goto exit;
+    }
+
+    *PBytesTransferred = InputBufferLength;
+
+    Error = 0;
+
+exit:
+    if (&FuseResponseBuf != FuseResponse)
+        FuseFree(FuseResponse);
+
+    return Error;
 }
 
 static INT FileDelete(
@@ -568,6 +636,7 @@ static INT DeviceOpen(
         .Ioctl = FileIoctl,
         .Read = FileRead,
         .Write = FileWrite,
+        .WriteVector = FileWriteVector,
     };
     DEVICE *Device = (DEVICE *)Device0;
     FILE *File;
