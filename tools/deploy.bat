@@ -61,6 +61,15 @@ if exist %~dp0..\ext\lxdk\build\VStudio\build\%Config% (
     if not exist "!LXDK!" (echo cannot find LxDK installation >&2 & goto fail)
 )
 
+set MEMFS_FUSE3_EXE=
+if exist %~dp0..\tst\memfs-fuse3\build\%Config%\memfs-fuse3-x64.exe (
+    set MEMFS_FUSE3_EXE=memfs-fuse3-x64.exe
+)
+set MEMFS_FUSE3_OUT=
+if exist %~dp0..\tst\memfs-fuse3\build\%Config%\memfs-fuse3.out (
+    set MEMFS_FUSE3_OUT=memfs-fuse3.out
+)
+
 set Files=
 for %%f in (
     %~dp0..\build\VStudio\build\%Config%\
@@ -72,6 +81,9 @@ for %%f in (
         fusermount-helper.exe
         deploy-setup.bat
         deploy-setup.sh
+    %~dp0..\tst\memfs-fuse3\build\%Config%\
+        !MEMFS_FUSE3_EXE!
+        !MEMFS_FUSE3_OUT!
     "!WINFSP!"
         winfsp-%Suffix%.sys
         winfsp-%Suffix%.dll

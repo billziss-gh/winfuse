@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30204.135
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "memfs-fuse3", "memfs-fuse3.vcxproj", "{CF538F42-C714-4653-B351-E72FD7B0B217}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "memfs-fuse3.exe", "memfs-fuse3.exe.vcxproj", "{CF538F42-C714-4653-B351-E72FD7B0B217}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "memfs-fuse3.out", "memfs-fuse3.out.vcxproj", "{38AD1D24-7745-4B6E-9928-BD9731FED72A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,8 +23,15 @@ Global
 		{CF538F42-C714-4653-B351-E72FD7B0B217}.Release|x64.Build.0 = Release|x64
 		{CF538F42-C714-4653-B351-E72FD7B0B217}.Release|x86.ActiveCfg = Release|Win32
 		{CF538F42-C714-4653-B351-E72FD7B0B217}.Release|x86.Build.0 = Release|Win32
+		{38AD1D24-7745-4B6E-9928-BD9731FED72A}.Debug|x64.ActiveCfg = Debug|x64
+		{38AD1D24-7745-4B6E-9928-BD9731FED72A}.Debug|x86.ActiveCfg = Debug|x64
+		{38AD1D24-7745-4B6E-9928-BD9731FED72A}.Release|x64.ActiveCfg = Release|x64
+		{38AD1D24-7745-4B6E-9928-BD9731FED72A}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F8910224-C4C3-4B29-9EB9-AEBDDBFCC250}
 	EndGlobalSection
 EndGlobal
