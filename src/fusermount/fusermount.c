@@ -321,7 +321,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
 
     if (-1 == pipe(ifd) || -1 == pipe(ofd))
     {
-        warn("mount: cannot create helper pipe: %s", strerror(errno));
+        warn("helper: cannot create pipe: %s", strerror(errno));
         goto exit;
     }
 
@@ -333,7 +333,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
     pid = fork();
     if (-1 == pid)
     {
-        warn("mount: cannot fork helper process: %s", strerror(errno));
+        warn("helper: cannot fork: %s", strerror(errno));
         goto exit;
     }
     else if (0 != pid)
@@ -349,7 +349,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
 
         if (-1 == dup2(ifd[1], 1) || -1 == dup2(ofd[0], 0))
         {
-            warn("mount: helper: cannot dup2: %s", strerror(errno));
+            warn("helper: cannot dup2: %s", strerror(errno));
             exit(1);
         }
         close(ofd[1]);
@@ -358,7 +358,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
         close(ifd[0]);
 
         if (-1 == execv(argv[0], argv))
-            warn("mount: helper: cannot execute %s: %s", argv[0], strerror(errno));
+            warn("helper: cannot execute %s: %s", argv[0], strerror(errno));
         exit(1);
     }
 
@@ -372,7 +372,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
         {
             if (EINTR != errno)
             {
-                warn("mount: cannot read helper output: %s", strerror(errno));
+                warn("helper: cannot read output: %s", strerror(errno));
                 goto exit;
             }
             bytes = 0;
@@ -387,7 +387,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
 
     if (MountPoint == p)
     {
-        warn("mount: no helper output");
+        warn("helper: no output");
         goto exit;
     }
 
