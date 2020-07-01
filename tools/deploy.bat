@@ -20,7 +20,18 @@ if not X%2==X set Chkpnt=%2
     echo reg add HKLM\Software\LxDK\Services\wslfuse /f
     echo sc start winfsp
     echo sc start lxldr
-) > %~dp0..\build\VStudio\build\%Config%\deploy-setup.bat
+) >%~dp0..\build\VStudio\build\%Config%\deploy-setup.bat
+
+(set LF=^
+%=this line is empty=%
+)
+(
+    set /p =sudo mknod /dev/fuse c 10 229!LF!
+    set /p =sudo cp fusermount.out /usr/bin/fusermount!LF!
+    set /p =sudo chmod u+s /usr/bin/fusermount!LF!
+    set /p =sudo cp fusermount.out /usr/bin/fusermount3!LF!
+    set /p =sudo chmod u+s /usr/bin/fusermount3!LF!
+) <nul >%~dp0..\build\VStudio\build\%Config%\deploy-setup.sh
 
 if exist %~dp0..\ext\winfsp\build\VStudio\build\%Config% (
     set WINFSP=%~dp0..\ext\winfsp\build\VStudio\build\%Config%\
@@ -60,6 +71,7 @@ for %%f in (
         fusermount.out
         fusermount-helper.exe
         deploy-setup.bat
+        deploy-setup.sh
     "!WINFSP!"
         winfsp-%Suffix%.sys
         winfsp-%Suffix%.dll
