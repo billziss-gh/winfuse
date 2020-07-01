@@ -372,9 +372,10 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
     argv[1] = (char *)VolumeName;
     argv[2] = '\0' != MountPoint[0] ? (char *)MountPoint : 0;
     argv[3] = 0;
-    res = posix_spawn(&pid, argv[0], &actions, 0, argv, 0);
+    res = posix_spawn(&pid, argv[0], &actions, &attr, argv, 0);
     if (0 != res)
         goto exit;
+    *pidp = pid;
 
     close(ifd[1]); ifd[1] = -1;
     close(ofd[0]); ofd[0] = -1;
@@ -407,7 +408,6 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
 
     close(ifd[0]); ifd[0] = -1;
 
-    *pidp = pid;
     *ofdp = ofd[1]; ofd[1] = -1;
 
     res = 0;
