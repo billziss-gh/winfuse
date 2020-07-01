@@ -63,7 +63,7 @@ if exist %~dp0..\ext\lxdk\build\VStudio\build\%Config% (
 
 set MEMFS_FUSE3_EXE=
 if exist %~dp0..\tst\memfs-fuse3\build\%Config%\memfs-fuse3-x64.exe (
-    set MEMFS_FUSE3_EXE=memfs-fuse3-x64.exe
+    set MEMFS_FUSE3_EXE=memfs-fuse3-x64.exe fuse3-x64.dll
 )
 set MEMFS_FUSE3_OUT=
 if exist %~dp0..\tst\memfs-fuse3\build\%Config%\memfs-fuse3.out (
