@@ -22,8 +22,8 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <grp.h>
 #include <getopt.h>
-#include <spawn.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -311,71 +311,56 @@ static void mount_opt_parse(struct mount_opts *mo)
 
 static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_t *pidp, int *ofdp)
 {
-    int res;
+    int success = 0;
     pid_t pid;
     int ifd[2] = { -1, -1 };
     int ofd[2] = { -1, -1 };
-    posix_spawn_file_actions_t actions;
-    posix_spawnattr_t attr;
     char *argv[4];
     char *p, *endp;
     ssize_t bytes;
-    int initdone_actions = 0, initdone_attr = 0;
 
-    if (-1 == pipe(ifd))
+    if (-1 == pipe(ifd) || -1 == pipe(ofd))
     {
-        res = errno;
+        warn("mount: cannot create helper pipe: %s", strerror(errno));
         goto exit;
     }
-
-    if (-1 == pipe(ofd))
-    {
-        res = errno;
-        goto exit;
-    }
-
-    res = posix_spawn_file_actions_init(&actions);
-    if (0 != res)
-        goto exit;
-    initdone_actions = 1;
-
-    res = posix_spawn_file_actions_addclose(&actions, ifd[0]);
-    if (0 != res)
-        goto exit;
-    res = posix_spawn_file_actions_adddup2(&actions, ifd[1], 1);
-    if (0 != res)
-        goto exit;
-    res = posix_spawn_file_actions_addclose(&actions, ifd[1]);
-    if (0 != res)
-        goto exit;
-
-    res = posix_spawn_file_actions_addclose(&actions, ofd[1]);
-    if (0 != res)
-        goto exit;
-    res = posix_spawn_file_actions_adddup2(&actions, ofd[0], 0);
-    if (0 != res)
-        goto exit;
-    res = posix_spawn_file_actions_addclose(&actions, ofd[0]);
-    if (0 != res)
-        goto exit;
-
-    res = posix_spawnattr_init(&attr);
-    if (0 != res)
-        goto exit;
-    initdone_attr = 1;
-
-    res = posix_spawnattr_setflags(&attr, POSIX_SPAWN_RESETIDS);
-    if (0 != res)
-        goto exit;
 
     argv[0] = "/usr/bin/fusermount-helper.exe";
     argv[1] = (char *)VolumeName;
     argv[2] = '\0' != MountPoint[0] ? (char *)MountPoint : 0;
     argv[3] = 0;
-    res = posix_spawn(&pid, argv[0], &actions, &attr, argv, 0);
-    if (0 != res)
+
+    pid = fork();
+    if (-1 == pid)
+    {
+        warn("mount: cannot fork helper process: %s", strerror(errno));
         goto exit;
-    *pidp = pid;
+    }
+    else if (0 != pid)
+        *pidp = pid;
+    else
+    {
+        /* drop privileges */
+        uid_t uid = getuid();
+        gid_t gid = getgid();
+        setgroups(1, &gid);
+        setreuid(uid, uid);
+        setregid(gid, gid);
+
+        if (-1 == dup2(ifd[1], 1) || -1 == dup2(ofd[0], 0))
+        {
+            warn("mount: helper: cannot dup2: %s", strerror(errno));
+            exit(1);
+        }
+        close(ofd[1]);
+        close(ofd[0]);
+        close(ifd[1]);
+        close(ifd[0]);
+
+        if (-1 == execv(argv[0], argv))
+            warn("mount: helper: cannot execute %s: %s", argv[0], strerror(errno));
+        exit(1);
+    }
 
     close(ifd[1]); ifd[1] = -1;
     close(ofd[0]); ofd[0] = -1;
@@ -387,7 +372,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
         {
             if (EINTR != errno)
             {
-                res = errno;
+                warn("mount: cannot read helper output: %s", strerror(errno));
                 goto exit;
             }
             bytes = 0;
@@ -402,7 +387,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
 
     if (MountPoint == p)
     {
-        res = EINVAL;
+        warn("mount: no helper output");
         goto exit;
     }
 
@@ -410,15 +395,9 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
 
     *ofdp = ofd[1]; ofd[1] = -1;
 
-    res = 0;
+    success = 1;
 
 exit:
-    if (initdone_attr)
-        posix_spawnattr_destroy(&attr);
-
-    if (initdone_actions)
-        posix_spawn_file_actions_destroy(&actions);
-
     if (-1 != ofd[1])
         close(ofd[1]);
     if (-1 != ofd[0])
@@ -429,7 +408,7 @@ exit:
     if (-1 != ifd[0])
         close(ifd[0]);
 
-    return res;
+    return success ? 0 : -1;
 }
 
 static void stop_mount_helper(pid_t pid, int ofd)
@@ -501,13 +480,8 @@ static void do_mount(void)
     /*
      * Start the Windows side helper process to create the Windows mount point.
      */
-    errno = start_mount_helper(CreateArg.VolumeName, mo.WinMountPoint,
-        &helper_pid, &helper_fd);
-    if (0 != errno)
-    {
-        warn("mount: cannot set Windows mount point: %s", strerror(errno));
+    if (-1 == start_mount_helper(CreateArg.VolumeName, mo.WinMountPoint, &helper_pid, &helper_fd))
         goto exit;
-    }
 
     /*
      * Associate the Windows mount point with the /dev/fuse fd.
