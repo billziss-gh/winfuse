@@ -32,9 +32,9 @@ struct _FILE
     DEVICE *Device;
     EX_PUSH_LOCK VolumeLock;
     FSP_FSCTL_VOLUME_PARAMS VolumeParams;
+    FUSE_INSTANCE *FuseInstance;
     HANDLE VolumeHandle;
     PFILE_OBJECT VolumeFileObject;
-    FUSE_INSTANCE FuseInstance;
     HANDLE WinMountHandle;
     LIST_ENTRY LxMountListEntry;
     UINT64 LxMountId;
@@ -57,6 +57,7 @@ static INT FileIoctlCreateVolume(
     WCHAR *DevicePathPtr, *DevicePathEnd;
     OBJECT_ATTRIBUTES ObjectAttributes;
     IO_STATUS_BLOCK IoStatus;
+    FUSE_INSTANCE *FuseInstance = 0;
     BOOLEAN InitDoneInstance = FALSE;
     HANDLE VolumeHandle = 0;
     PFILE_OBJECT VolumeFileObject = 0;
@@ -81,7 +82,14 @@ static INT FileIoctlCreateVolume(
     }
     RtlCopyMemory(&File->VolumeParams, &Arg->VolumeParams, VolumeParamsSize);
 
-    IoStatus.Status = FuseInstanceInit(&File->FuseInstance, &File->VolumeParams, FuseInstanceLinux);
+    FuseInstance = FuseAllocNonPaged(sizeof *FuseInstance);
+    if (0 == FuseInstance)
+    {
+        IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
+        goto exit;
+    }
+
+    IoStatus.Status = FuseInstanceInit(FuseInstance, &File->VolumeParams, FuseInstanceLinux);
     if (!NT_SUCCESS(IoStatus.Status))
         goto exit;
     InitDoneInstance = TRUE;
@@ -153,6 +161,7 @@ static INT FileIoctlCreateVolume(
     if (!NT_SUCCESS(IoStatus.Status))
         goto exit;
 
+    File->FuseInstance = FuseInstance;
     File->VolumeHandle = VolumeHandle;
     InterlockedExchangePointer(&File->VolumeFileObject, VolumeFileObject);
 
@@ -168,7 +177,10 @@ exit:
             ZwClose(VolumeHandle);
 
         if (InitDoneInstance)
-            FuseInstanceFini(&File->FuseInstance);
+            FuseInstanceFini(FuseInstance);
+
+        if (0 != FuseInstance)
+            FuseFree(FuseInstance);
     }
 
     ExReleasePushLockExclusive(&File->VolumeLock);
@@ -304,7 +316,7 @@ static INT FileIoctlLxMount(
                 0/*OutputBuffer*/,
                 0/*OutputBufferLength*/);
             if (NT_SUCCESS(IoStatus.Status))
-                IoStatus.Status = FuseProtoPostDestroy(&LxMountFile->FuseInstance);
+                IoStatus.Status = FuseProtoPostDestroy(LxMountFile->FuseInstance);
             if (!NT_SUCCESS(IoStatus.Status))
                 Error = -EIO; // !!!: REVISIT
         }
@@ -469,7 +481,7 @@ static INT FileRead(
     if (0 == VolumeFileObject)
         return -ENODEV;
 
-    Result = FuseInstanceTransact(&File->FuseInstance,
+    Result = FuseInstanceTransact(File->FuseInstance,
         0, 0,
         Buffer, &OutputBufferLength,
         0, VolumeFileObject,
@@ -500,7 +512,7 @@ static INT FileWrite(
     if (0 == VolumeFileObject)
         return -ENODEV;
 
-    Result = FuseInstanceTransact(&File->FuseInstance,
+    Result = FuseInstanceTransact(File->FuseInstance,
         Buffer, InputBufferLength,
         0, &OutputBufferLength,
         0, VolumeFileObject,
@@ -581,7 +593,7 @@ static INT FileWriteVector(
         goto exit;
     }
 
-    Result = FuseInstanceTransact(&File->FuseInstance,
+    Result = FuseInstanceTransact(File->FuseInstance,
         &FuseResponseBuf, InputBufferLength,
         0, &OutputBufferLength,
         0, VolumeFileObject,
@@ -613,13 +625,13 @@ static INT FileDelete(
         ZwClose(File->WinMountHandle);
 
     if (0 != File->VolumeFileObject)
-        FuseInstanceFini(&File->FuseInstance);
-
-    if (0 != File->VolumeFileObject)
+    {
         ObDereferenceObject(File->VolumeFileObject);
-
-    if (0 != File->VolumeHandle)
         ZwClose(File->VolumeHandle);
+
+        FuseInstanceFini(File->FuseInstance);
+        FuseFree(File->FuseInstance);
+    }
 
     return 0;
 }
