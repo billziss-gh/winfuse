@@ -681,7 +681,7 @@ static INT DeviceDelete(
 #if DBG
     DEVICE *Device = (DEVICE *)Device0;
 
-    ASSERT(!IsListEmpty(&Device->LxMountList));
+    ASSERT(IsListEmpty(&Device->LxMountList));
 #endif
 
     return 0;
