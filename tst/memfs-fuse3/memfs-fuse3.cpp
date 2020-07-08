@@ -601,7 +601,7 @@ private:
 
     std::shared_ptr<node_t> get_node(const char *path, struct fuse_file_info *fi = nullptr)
     {
-        if (!fi)
+        if (!fi || !fi->fh)
             return std::get<2>(lookup_node(path));
         else
             return *(std::shared_ptr<node_t> *)(uintptr_t)fi->fh;
