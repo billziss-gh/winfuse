@@ -473,7 +473,7 @@ static INT FileRead(
     PSIZE_T PBytesTransferred)
 {
     FILE *File = (FILE *)File0;
-    ULONG OutputBufferLength = (ULONG)Length;
+    ULONG OutputBufferLength;
     PFILE_OBJECT VolumeFileObject;
     NTSTATUS Result;
 
@@ -481,13 +481,17 @@ static INT FileRead(
     if (0 == VolumeFileObject)
         return -ENODEV;
 
-    Result = FuseInstanceTransact(File->FuseInstance,
-        0, 0,
-        Buffer, &OutputBufferLength,
-        0, VolumeFileObject,
-        0);
-    if (!NT_SUCCESS(Result))
-        return -EIO; // !!!: REVISIT
+    do
+    {
+        OutputBufferLength = (ULONG)Length;
+        Result = FuseInstanceTransact(File->FuseInstance,
+            0, 0,
+            Buffer, &OutputBufferLength,
+            0, VolumeFileObject,
+            0);
+        if (!NT_SUCCESS(Result))
+            return -EIO; // !!!: REVISIT
+    } while (0 == OutputBufferLength);
 
     *PBytesTransferred = OutputBufferLength;
 
