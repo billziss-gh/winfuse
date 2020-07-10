@@ -155,11 +155,17 @@
                 <Component Id="C.memfs_fuse3.sln">
                     <File Name="memfs-fuse3.sln" KeyPath="yes" />
                 </Component>
-                <Component Id="C.memfs_fuse3.vcxproj">
-                    <File Name="memfs-fuse3.vcxproj" KeyPath="yes" />
+                <Component Id="C.memfs_fuse3.exe.vcxproj">
+                    <File Name="memfs-fuse3.exe.vcxproj" KeyPath="yes" />
                 </Component>
-                <Component Id="C.memfs_fuse3.vcxproj.filters">
-                    <File Name="memfs-fuse3.vcxproj.filters" KeyPath="yes" />
+                <Component Id="C.memfs_fuse3.exe.vcxproj.filters">
+                    <File Name="memfs-fuse3.exe.vcxproj.filters" KeyPath="yes" />
+                </Component>
+                <Component Id="C.memfs_fuse3.out.vcxproj">
+                    <File Name="memfs-fuse3.out.vcxproj" KeyPath="yes" />
+                </Component>
+                <Component Id="C.memfs_fuse3.out.vcxproj.filters">
+                    <File Name="memfs-fuse3.out.vcxproj.filters" KeyPath="yes" />
                 </Component>
             </Directory>
         </DirectoryRef>
@@ -195,8 +201,10 @@
             <ComponentRef Id="C.memfs_fuse3.cpp" />
             <ComponentRef Id="C.memfs_fuse3.compat.h" />
             <ComponentRef Id="C.memfs_fuse3.sln" />
-            <ComponentRef Id="C.memfs_fuse3.vcxproj" />
-            <ComponentRef Id="C.memfs_fuse3.vcxproj.filters" />
+            <ComponentRef Id="C.memfs_fuse3.exe.vcxproj" />
+            <ComponentRef Id="C.memfs_fuse3.exe.vcxproj.filters" />
+            <ComponentRef Id="C.memfs_fuse3.out.vcxproj" />
+            <ComponentRef Id="C.memfs_fuse3.out.vcxproj.filters" />
         </ComponentGroup>
         <ComponentGroup Id="C.WinFuse.sym">
             <ComponentRef Id="C.winfuse.sys.pdb" />
