@@ -170,6 +170,11 @@ NTSTATUS FuseInstanceTransact(FUSE_INSTANCE *Instance,
         if (0 == Context)
             goto request;
 
+#if DBG
+        if (fuse_debug & fuse_debug_dp)
+            FuseDebugLogResponse(FuseResponse);
+#endif
+
         Continue = FuseContextProcess(Context, FuseResponse, 0, 0);
 
         if (Continue)
@@ -191,7 +196,7 @@ NTSTATUS FuseInstanceTransact(FUSE_INSTANCE *Instance,
 request:
     if (0 != FuseRequest)
     {
-        RtlZeroMemory(FuseRequest, FUSE_PROTO_REQ_HEADER_SIZE);
+        RtlZeroMemory(FuseRequest, sizeof(FUSE_PROTO_REQ));
 
         Context = FuseIoqNextPending(Instance->Ioq);
         if (0 == Context)
@@ -293,6 +298,11 @@ request:
         }
 
         *POutputBufferLength = FuseRequest->len;
+
+#if DBG
+        if (fuse_debug & fuse_debug_dp)
+            FuseDebugLogRequest(FuseRequest);
+#endif
     }
 
     Result = STATUS_SUCCESS;

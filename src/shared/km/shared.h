@@ -36,11 +36,30 @@
 
 /* debug */
 #if DBG
+enum
+{
+    fuse_debug_dt                       = 0x01000000,   /* DEBUGTEST switch */
+    fuse_debug_dp                       = 0x10000000,   /* DbgPrint switch */
+};
+extern __declspec(selectany) int fuse_debug = fuse_debug_dt;
 ULONG DebugRandom(VOID);
 BOOLEAN DebugMemory(PVOID Memory, SIZE_T Size, BOOLEAN Test);
+VOID FuseDebugLogRequest(FUSE_PROTO_REQ *Request);
+VOID FuseDebugLogResponse(FUSE_PROTO_RSP *Response);
+#endif
+
+/* DbgPrint */
+#if DBG
+#define DbgPrint(...)                   \
+    ((void)((fuse_debug & fuse_debug_dp) ? DbgPrint(__VA_ARGS__) : 0))
+#endif
+
+/* debug tools */
+#if DBG
 #define DEBUGLOG(fmt, ...)              \
     DbgPrint("[%d] FUSE!" __FUNCTION__ ": " fmt "\n", KeGetCurrentIrql(), __VA_ARGS__)
-#define DEBUGTEST(Percent)              (DebugRandom() <= (Percent) * 0x7fff / 100)
+#define DEBUGTEST(Percent)              \
+    (0 == (fuse_debug & fuse_debug_dt) || DebugRandom() <= (Percent) * 0x7fff / 100)
 #define DEBUGFILL(M, S)                 DebugMemory(M, S, FALSE)
 #define DEBUGGOOD(M, S)                 DebugMemory(M, S, TRUE)
 #else
@@ -315,6 +334,9 @@ struct _FUSE_CONTEXT
     FUSE_PROTO_REQ *FuseRequest;
     FUSE_PROTO_RSP *FuseResponse;
     ULONG FuseRequestLength;
+#if DBG
+    UINT32 DebugLogOpcode;
+#endif
     INT OpGuardResult;
     SHORT CoroState[16];
     UINT32 OrigUid, OrigGid, OrigPid;
