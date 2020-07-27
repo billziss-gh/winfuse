@@ -309,7 +309,7 @@ static void mount_opt_parse(struct mount_opts *mo)
             (UINT32)(mo->VolumeParams.VolumeCreationTime & 0xffffffff);
 }
 
-static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_t *pidp, int *ofdp)
+static int start_winmount_helper(const char *VolumeName, char MountPoint[260], pid_t *pidp, int *ofdp)
 {
     int success = 0;
     pid_t pid;
@@ -321,7 +321,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
 
     if (-1 == pipe(ifd) || -1 == pipe(ofd))
     {
-        warn("helper: cannot create pipe: %s", strerror(errno));
+        warn("winmount: cannot create pipe: %s", strerror(errno));
         goto exit;
     }
 
@@ -333,7 +333,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
     pid = fork();
     if (-1 == pid)
     {
-        warn("helper: cannot fork: %s", strerror(errno));
+        warn("winmount: cannot fork: %s", strerror(errno));
         goto exit;
     }
     else if (0 != pid)
@@ -349,7 +349,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
 
         if (-1 == dup2(ifd[1], 1) || -1 == dup2(ofd[0], 0))
         {
-            warn("helper: cannot dup2: %s", strerror(errno));
+            warn("winmount: cannot dup2: %s", strerror(errno));
             exit(1);
         }
         close(ofd[1]);
@@ -358,7 +358,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
         close(ifd[0]);
 
         if (-1 == execv(argv[0], argv))
-            warn("helper: cannot execute %s: %s", argv[0], strerror(errno));
+            warn("winmount: cannot execute %s: %s", argv[0], strerror(errno));
         exit(1);
     }
 
@@ -372,7 +372,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
         {
             if (EINTR != errno)
             {
-                warn("helper: cannot read output: %s", strerror(errno));
+                warn("winmount: cannot read output: %s", strerror(errno));
                 goto exit;
             }
             bytes = 0;
@@ -387,7 +387,7 @@ static int start_mount_helper(const char *VolumeName, char MountPoint[260], pid_
 
     if (MountPoint == p)
     {
-        warn("helper: no output");
+        warn("winmount: no output");
         goto exit;
     }
 
@@ -411,7 +411,7 @@ exit:
     return success ? 0 : -1;
 }
 
-static void stop_mount_helper(pid_t pid, int ofd)
+static void stop_winmount_helper(pid_t pid, int ofd)
 {
     ssize_t bytes;
     (void)bytes;
@@ -432,8 +432,8 @@ static void do_mount(void)
     WSLFUSE_IOCTL_CREATEVOLUME_ARG CreateArg;
     WSLFUSE_IOCTL_WINMOUNT_ARG WinMountArg;
     WSLFUSE_IOCTL_LXMOUNT_ARG LxMountArg;
-    pid_t helper_pid = -1;
-    int helper_fd = -1;
+    pid_t winmount_pid = -1;
+    int winmount_fd = -1;
     struct msghdr msg;
     struct cmsghdr *cmsg;
     char cmsgbuf[CMSG_SPACE(sizeof fusefd)];
@@ -480,7 +480,7 @@ static void do_mount(void)
     /*
      * Start the Windows side helper process to create the Windows mount point.
      */
-    if (-1 == start_mount_helper(CreateArg.VolumeName, mo.WinMountPoint, &helper_pid, &helper_fd))
+    if (-1 == start_winmount_helper(CreateArg.VolumeName, mo.WinMountPoint, &winmount_pid, &winmount_fd))
         goto exit;
 
     /*
@@ -567,8 +567,8 @@ exit:
         }
     }
 
-    if (-1 != helper_pid)
-        stop_mount_helper(helper_pid, helper_fd);
+    if (-1 != winmount_pid)
+        stop_winmount_helper(winmount_pid, winmount_fd);
 
     if (-1 != fusefd)
         close(fusefd);
