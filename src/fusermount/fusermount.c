@@ -309,7 +309,7 @@ static void mount_opt_parse(struct mount_opts *mo)
             (UINT32)(mo->VolumeParams.VolumeCreationTime & 0xffffffff);
 }
 
-static int start_winmount_helper(const char *VolumeName, char MountPoint[260], pid_t *pidp, int *ofdp)
+static int start_winmount_helper(const char *VolumeName, char WinMountPoint[260], pid_t *pidp, int *ofdp)
 {
     int success = 0;
     pid_t pid;
@@ -319,6 +319,9 @@ static int start_winmount_helper(const char *VolumeName, char MountPoint[260], p
     char *p, *endp;
     ssize_t bytes;
 
+    *pidp = -1;
+    *ofdp = -1;
+
     if (-1 == pipe(ifd) || -1 == pipe(ofd))
     {
         warn("winmount: cannot create pipe: %s", strerror(errno));
@@ -327,7 +330,7 @@ static int start_winmount_helper(const char *VolumeName, char MountPoint[260], p
 
     argv[0] = "/usr/bin/fusermount-helper.exe";
     argv[1] = (char *)VolumeName;
-    argv[2] = '\0' != MountPoint[0] ? (char *)MountPoint : 0;
+    argv[2] = '\0' != WinMountPoint[0] ? (char *)WinMountPoint : 0;
     argv[3] = 0;
 
     pid = fork();
@@ -365,7 +368,7 @@ static int start_winmount_helper(const char *VolumeName, char MountPoint[260], p
     close(ifd[1]); ifd[1] = -1;
     close(ofd[0]); ofd[0] = -1;
 
-    for (p = MountPoint, endp = MountPoint + 260 - 1; endp > p; p += bytes)
+    for (p = WinMountPoint, endp = WinMountPoint + 260 - 1; endp > p; p += bytes)
     {
         bytes = read(ifd[0], p, (size_t)(endp - p));
         if (-1 == bytes)
@@ -385,7 +388,7 @@ static int start_winmount_helper(const char *VolumeName, char MountPoint[260], p
     }
     *p = '\0';
 
-    if (MountPoint == p)
+    if (WinMountPoint == p)
     {
         warn("winmount: no output");
         goto exit;
@@ -422,16 +425,106 @@ static void stop_winmount_helper(pid_t pid, int ofd)
     waitpid(pid, 0, 0);
 }
 
+static int spawn_lxmount_helper(char WinMountPoint[260], const char *mountpoint, int fusefd)
+{
+    pid_t pid;
+    int status;
+
+    /* fork the intermediate process */
+    pid = fork();
+    if (-1 == pid)
+    {
+        warn("lxmount: cannot fork intermediate process: %s", strerror(errno));
+        return -1;
+    }
+    else if (0 != pid)
+    {
+        /* wait for the intermediate process */
+		return
+            pid == waitpid(pid, &status, 0) && WIFEXITED(status) && 0 == WEXITSTATUS(status) ?
+            0 :
+            -1;
+    }
+
+    /* become a session leader and ignore SIGHUP */
+    setsid();
+    signal(SIGHUP, SIG_IGN);
+
+    /* fork a second time to get the process that will perform the Linux mount */
+    pid = fork();
+    if (-1 == pid)
+    {
+        warn("lxmount: cannot fork mount process: %s", strerror(errno));
+        exit(1);
+    }
+    else if (0 != pid)
+        /* exit the intermediate process; our child will be reaped by the init process */
+        exit(0);
+
+    /*
+     * MOUNT PROCESS
+     *
+     * Grand-child of original fusermount process.
+     */
+    int success = 0;
+    int mounted = 0, mnt_id;
+    WSLFUSE_IOCTL_LXMOUNT_ARG LxMountArg;
+
+    /*
+     * Mount the WinFsp volume using drvfs.
+     */
+    if (-1 == mount(WinMountPoint, mountpoint, "drvfs", 0, 0))
+    {
+        warn("lxmount: cannot mount %s: %s", mountpoint, strerror(errno));
+        goto exit;
+    }
+    mounted = 1;
+
+    /*
+     * Get the mnt_id of the newly mounted file system.
+     */
+    mnt_id = get_mnt_id(mountpoint);
+    if (-1 == mnt_id)
+    {
+        warn("lxmount: cannot get mnt_id: %s", strerror(errno));
+        goto exit;
+    }
+
+    /*
+     * Associate the WSL mnt_id with the /dev/fuse fd.
+     */
+    memset(&LxMountArg, 0, sizeof LxMountArg);
+    LxMountArg.Operation = '+';
+    LxMountArg.LxMountId = (UINT64)mnt_id;
+    if (-1 == ioctl(fusefd, WSLFUSE_IOCTL_LXMOUNT, &LxMountArg))
+    {
+        warn("lxmount: cannot ioctl(m) /dev/fuse: %s", strerror(errno));
+        goto exit;
+    }
+
+    success = 1;
+
+exit:
+    if (!success)
+    {
+        if (mounted)
+            umount2(mountpoint, UMOUNT_NOFOLLOW);
+    }
+
+    exit(success ? 0 : 1);
+
+    /* should not happen */
+    return -1;
+}
+
 static void do_mount(void)
 {
     int success = 0;
     struct mount_opts mo;
     const char *env;
     int commfd, fusefd = -1;
-    int mounted = 0, mnt_id;
     WSLFUSE_IOCTL_CREATEVOLUME_ARG CreateArg;
     WSLFUSE_IOCTL_WINMOUNT_ARG WinMountArg;
-    WSLFUSE_IOCTL_LXMOUNT_ARG LxMountArg;
     pid_t winmount_pid = -1;
     int winmount_fd = -1;
     struct msghdr msg;
@@ -439,7 +532,6 @@ static void do_mount(void)
     char cmsgbuf[CMSG_SPACE(sizeof fusefd)];
     struct iovec iov;
     char dummy = 0;
-    int msgsent = 0;
 
     mount_opt_parse(&mo);
 
@@ -456,7 +548,7 @@ static void do_mount(void)
     commfd = atoi(env);
 
     /*
-     * Open the /dev/fuse device. We use the returned fd to communicate with WinFuse using
+     * Open the /dev/fuse device. We use the returned fd to communicate with WslFuse using
      * special ioctl's. We will also return the fd to the file system via COMMFD.
      */
     fusefd = open("/dev/fuse", O_RDWR);
@@ -467,7 +559,7 @@ static void do_mount(void)
     }
 
     /*
-     * Send an ioctl to instruct WinFuse to create a new WinFsp volume.
+     * Send an ioctl to instruct WslFuse to create a new WinFsp volume.
      */
     memset(&CreateArg, 0, sizeof CreateArg);
     memcpy(&CreateArg.VolumeParams, &mo.VolumeParams, sizeof mo.VolumeParams);
@@ -516,57 +608,16 @@ static void do_mount(void)
             warn("mount: cannot sendmsg to _FUSE_COMMFD: %s", strerror(errno));
             goto exit;
         }
-    msgsent = 1;
 
     /*
-     * Mount the WinFsp volume using drvfs.
+     * Spawn a child process to perform a Linux mount of the WinFsp volume asynchronously.
      */
-    if (-1 == mount(mo.WinMountPoint, args.mountpoint, "drvfs", 0, 0))
-    {
-        warn("mount: cannot mount %s: %s", args.mountpoint, strerror(errno));
+    if (-1 == spawn_lxmount_helper(mo.WinMountPoint, args.mountpoint, fusefd))
         goto exit;
-    }
-    mounted = 1;
-
-    /*
-     * Get the mnt_id of the newly mounted file system.
-     */
-    mnt_id = get_mnt_id(args.mountpoint);
-    if (-1 == mnt_id)
-    {
-        warn("mount: cannot get mnt_id: %s", strerror(errno));
-        goto exit;
-    }
-
-    /*
-     * Associate the WSL mnt_id with the /dev/fuse fd.
-     */
-    memset(&LxMountArg, 0, sizeof LxMountArg);
-    LxMountArg.Operation = '+';
-    LxMountArg.LxMountId = (UINT64)mnt_id;
-    if (-1 == ioctl(fusefd, WSLFUSE_IOCTL_LXMOUNT, &LxMountArg))
-    {
-        warn("mount: cannot ioctl(m) /dev/fuse: %s", strerror(errno));
-        goto exit;
-    }
 
     success = 1;
 
 exit:
-    if (!success)
-    {
-        if (mounted)
-            umount2(args.mountpoint, UMOUNT_NOFOLLOW);
-
-        if (msgsent)
-        {
-            memset(&LxMountArg, 0, sizeof LxMountArg);
-            LxMountArg.Operation = '-';
-            LxMountArg.LxMountId = (UINT64)-1LL;
-            ioctl(fusefd, WSLFUSE_IOCTL_LXMOUNT, &LxMountArg);
-        }
-    }
-
     if (-1 != winmount_pid)
         stop_winmount_helper(winmount_pid, winmount_fd);
 
@@ -641,7 +692,7 @@ exit:
 
 static void do_version(void)
 {
-    fprintf(stdout, "%s version: %s\n", progname, "winfuse");
+    fprintf(stdout, "%s version: %s\n", progname, "wslfuse");
     exit(0);
 }
 
