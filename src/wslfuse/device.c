@@ -92,6 +92,7 @@ static INT FileIoctlCreateVolume(
     IoStatus.Status = FuseInstanceInit(FuseInstance, &File->VolumeParams, FuseInstanceLinux);
     if (!NT_SUCCESS(IoStatus.Status))
         goto exit;
+    File->VolumeParams.TransactTimeout = 3000; /* transact timeout allows poll with LxpThreadWait */
     InitDoneInstance = TRUE;
 
     RtlInitEmptyUnicodeString(&DevicePath, DevicePathBuf, sizeof DevicePathBuf);
@@ -481,7 +482,7 @@ static INT FileRead(
     if (0 == VolumeFileObject)
         return -ENODEV;
 
-    do
+    for (;;)
     {
         OutputBufferLength = (ULONG)Length;
         Result = FuseInstanceTransact(File->FuseInstance,
@@ -491,7 +492,14 @@ static INT FileRead(
             0);
         if (!NT_SUCCESS(Result))
             return -EIO; // !!!: REVISIT
-    } while (0 == OutputBufferLength);
+        if (0 != OutputBufferLength)
+            break;
+
+        LARGE_INTEGER ZeroTimeout = { 0 };
+        Result = LxpThreadWait(0, &ZeroTimeout, FALSE);
+        if (STATUS_TIMEOUT != Result)
+            return -EINTR;
+    }
 
     *PBytesTransferred = OutputBufferLength;
 
