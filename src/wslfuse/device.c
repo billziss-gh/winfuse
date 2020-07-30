@@ -346,6 +346,12 @@ static INT FileIoctlLxMount(
             break;
         }
 
+        if ((UINT64)-1LL == Mount->LxMountId)
+        {
+            Error = -EINVAL;
+            break;
+        }
+
         MountFile = Mount->File;
 
         RemoveEntryList(&Mount->ListEntry);
