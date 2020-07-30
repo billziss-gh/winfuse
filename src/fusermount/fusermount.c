@@ -24,6 +24,8 @@
 #include <fcntl.h>
 #include <grp.h>
 #include <getopt.h>
+#include <libgen.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -658,9 +660,22 @@ static void do_unmount(void)
     }
 
     /*
+     * Verify the WSL mnt_id with WslFuse.
+     */
+    memset(&LxMountArg, 0, sizeof LxMountArg);
+    LxMountArg.Operation = '?';
+    LxMountArg.LxMountId = (UINT64)mnt_id;
+    if (-1 == ioctl(fusefd, WSLFUSE_IOCTL_LXMOUNT, &LxMountArg))
+    {
+        warn("unmount: unknown mountpoint %s", args.mountpoint);
+        goto exit;
+    }
+
+    /*
      * Unmount the previously mounted file system.
      */
-    if (-1 == umount2(args.mountpoint, UMOUNT_NOFOLLOW | (args.lazy ? MNT_DETACH : 0)))
+    if (-1 == umount2(args.mountpoint, args.lazy ? MNT_DETACH : 0))
+        /* UMOUNT_NOFOLLOW not supported in WSL1 */
     {
         warn("unmount: cannot unmount %s: %s", args.mountpoint, strerror(errno));
         goto exit;
@@ -688,6 +703,61 @@ exit:
         exit(1);
 
     exit(0);
+}
+
+static char *realpath_parent(const char *path)
+{
+    char *resolved = 0;
+    char *pathcopy = 0;
+    const char *parent, *leaf;
+    char linkbuf[PATH_MAX];
+    size_t rlen, llen;
+
+    pathcopy = strdup(path);
+    if (0 == pathcopy)
+        goto fail;
+
+    resolved = malloc(PATH_MAX);
+    if (0 == resolved)
+        goto fail;
+
+    parent = dirname(pathcopy);
+    leaf = basename(pathcopy);
+
+    if (0 == realpath(parent, resolved))
+        goto fail;
+
+    rlen = strlen(resolved);
+    llen = strlen(leaf);
+    if (PATH_MAX < rlen + llen + 2)
+    {
+        errno = ENAMETOOLONG;
+        goto fail;
+    }
+
+    resolved[rlen] = '/';
+    memcpy(resolved + rlen + 1, leaf, llen);
+    resolved[rlen + 1 + llen] = '\0';
+
+    if (-1 != readlink(resolved, linkbuf, sizeof linkbuf) || EINVAL != errno)
+    {
+        errno = EINVAL;
+        goto fail;
+    }
+
+    if (0 != pathcopy)
+        free(pathcopy);
+
+    return resolved;
+
+fail:
+    if (0 != resolved)
+        free(resolved);
+
+    if (0 != pathcopy)
+        free(pathcopy);
+
+    return 0;
 }
 
 static void do_version(void)
@@ -753,7 +823,10 @@ int main(int argc, char *argv[])
     if (argc != optind + 1)
         usage();
 
-    args.mountpoint = realpath(argv[optind], 0);
+    if (!args.unmount)
+        args.mountpoint = realpath(argv[optind], 0);
+    else
+        args.mountpoint = realpath_parent(argv[optind]);
     if (0 == args.mountpoint)
     {
         warn("mountpoint: %s", strerror(errno));
