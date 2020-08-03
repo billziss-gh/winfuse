@@ -247,7 +247,7 @@ static const char *FuseDebugLogEntryString(FUSE_PROTO_ENTRY *Entry, char *Buf)
 VOID FuseDebugLogRequest(FUSE_PROTO_REQ *Request)
 {
 #define LOG(fmt, ...)                   \
-    DbgPrint("[%d] FUSE: %p[%06x]: >>%s[ino=%llu,uid=%u:%u,pid=%u] " fmt "\n",\
+    DbgPrint("[%d] FUSE: %p[%06x]: <<%s[ino=%llu,uid=%u:%u,pid=%u] " fmt "\n",\
         KeGetCurrentIrql(),             \
         (PVOID)(UINT_PTR)Request->unique,\
         Request->len,                   \
@@ -422,7 +422,7 @@ VOID FuseDebugLogRequest(FUSE_PROTO_REQ *Request)
 VOID FuseDebugLogResponse(FUSE_PROTO_RSP *Response)
 {
 #define LOG(fmt, ...)                   \
-    DbgPrint("[%d] FUSE: %p[%06x]: <<%s[err=%s%s] " fmt "\n",\
+    DbgPrint("[%d] FUSE: %p[%06x]: >>%s[err=%s%s] " fmt "\n",\
         KeGetCurrentIrql(),             \
         (PVOID)(UINT_PTR)Response->unique,\
         Response->len,                  \
