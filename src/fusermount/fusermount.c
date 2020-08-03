@@ -708,21 +708,24 @@ exit:
 static char *realpath_parent(const char *path)
 {
     char *resolved = 0;
-    char *pathcopy = 0;
+    char *pathcopy[2] = { 0, 0 };
     const char *parent, *leaf;
     char linkbuf[PATH_MAX];
     size_t rlen, llen;
 
-    pathcopy = strdup(path);
-    if (0 == pathcopy)
+    pathcopy[0] = strdup(path);
+    if (0 == pathcopy[0])
+        goto fail;
+    pathcopy[1] = strdup(path);
+    if (0 == pathcopy[1])
         goto fail;
 
     resolved = malloc(PATH_MAX);
     if (0 == resolved)
         goto fail;
 
-    parent = dirname(pathcopy);
-    leaf = basename(pathcopy);
+    parent = dirname(pathcopy[0]);
+    leaf = basename(pathcopy[1]);
 
     if (0 == realpath(parent, resolved))
         goto fail;
@@ -734,7 +737,6 @@ static char *realpath_parent(const char *path)
         errno = ENAMETOOLONG;
         goto fail;
     }
-
     resolved[rlen] = '/';
     memcpy(resolved + rlen + 1, leaf, llen);
     resolved[rlen + 1 + llen] = '\0';
@@ -745,8 +747,10 @@ static char *realpath_parent(const char *path)
         goto fail;
     }
 
-    if (0 != pathcopy)
-        free(pathcopy);
+    if (0 != pathcopy[1])
+        free(pathcopy[1]);
+    if (0 != pathcopy[0])
+        free(pathcopy[0]);
 
     return resolved;
 
@@ -754,8 +758,10 @@ fail:
     if (0 != resolved)
         free(resolved);
 
-    if (0 != pathcopy)
-        free(pathcopy);
+    if (0 != pathcopy[1])
+        free(pathcopy[1]);
+    if (0 != pathcopy[0])
+        free(pathcopy[0]);
 
     return 0;
 }
