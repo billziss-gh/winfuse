@@ -26,6 +26,7 @@ VOID FuseIoqDelete(FUSE_IOQ *Ioq);
 VOID FuseIoqStartProcessing(FUSE_IOQ *Ioq, FUSE_CONTEXT *Context);
 FUSE_CONTEXT *FuseIoqEndProcessing(FUSE_IOQ *Ioq, UINT64 Unique);
 VOID FuseIoqPostPending(FUSE_IOQ *Ioq, FUSE_CONTEXT *Context);
+VOID FuseIoqPostPendingAndStop(FUSE_IOQ *Ioq, FUSE_CONTEXT *Context);
 FUSE_CONTEXT *FuseIoqNextPending(FUSE_IOQ *Ioq);
 
 #ifdef ALLOC_PRAGMA
@@ -34,6 +35,7 @@ FUSE_CONTEXT *FuseIoqNextPending(FUSE_IOQ *Ioq);
 #pragma alloc_text(PAGE, FuseIoqStartProcessing)
 #pragma alloc_text(PAGE, FuseIoqEndProcessing)
 #pragma alloc_text(PAGE, FuseIoqPostPending)
+#pragma alloc_text(PAGE, FuseIoqPostPendingAndStop)
 #pragma alloc_text(PAGE, FuseIoqNextPending)
 #endif
 
@@ -43,6 +45,7 @@ struct _FUSE_IOQ
 {
     FAST_MUTEX Mutex;
     LIST_ENTRY PendingList, ProcessList;
+    FUSE_CONTEXT *LastContext;
     ULONG ProcessBucketCount;
     FUSE_CONTEXT *ProcessBuckets[];
 };
@@ -95,6 +98,21 @@ VOID FuseIoqStartProcessing(FUSE_IOQ *Ioq, FUSE_CONTEXT *Context)
 
     ExAcquireFastMutex(&Ioq->Mutex);
 
+    if (0 != Ioq->LastContext)
+    {
+        if (Context != Ioq->LastContext)
+        {
+            ExReleaseFastMutex(&Ioq->Mutex);
+            ASSERT(0 != Context->FuseRequest);
+            if (0 != Context->FuseRequest)
+                Context->FuseRequest->len = 0;
+            FuseContextDelete(Context);
+            return;
+        }
+        else
+            Ioq->LastContext = (PVOID)(UINT_PTR)1;
+    }
+
     InsertTailList(&Ioq->ProcessList, &Context->ListEntry);
 
     ULONG Index = FuseHashMixPointer(Context) % Ioq->ProcessBucketCount;
@@ -144,7 +162,48 @@ VOID FuseIoqPostPending(FUSE_IOQ *Ioq, FUSE_CONTEXT *Context)
 
     ExAcquireFastMutex(&Ioq->Mutex);
 
+    if (0 != Ioq->LastContext)
+    {
+        ExReleaseFastMutex(&Ioq->Mutex);
+        FuseContextDelete(Context);
+        return;
+    }
+
     InsertTailList(&Ioq->PendingList, &Context->ListEntry);
+
+    ExReleaseFastMutex(&Ioq->Mutex);
+}
+
+VOID FuseIoqPostPendingAndStop(FUSE_IOQ *Ioq, FUSE_CONTEXT *Context)
+    /*
+     * This function is used to post the last Context for processing (usually DESTROY).
+     * It clears the Pending list, but does not touch the Process list. The reason is
+     * that the last Context must be retrieved only after all in-flight Context's are
+     * done and FuseIoqNextPending checks for this condition when the last Context has
+     * been posted.
+     */
+{
+    PAGED_CODE();
+
+    ExAcquireFastMutex(&Ioq->Mutex);
+
+    if (0 != Ioq->LastContext)
+    {
+        ExReleaseFastMutex(&Ioq->Mutex);
+        FuseContextDelete(Context);
+        return;
+    }
+
+    for (PLIST_ENTRY Entry = Ioq->PendingList.Flink; &Ioq->PendingList != Entry;)
+    {
+        FUSE_CONTEXT *Temp = CONTAINING_RECORD(Entry, FUSE_CONTEXT, ListEntry);
+        Entry = Entry->Flink;
+        FuseContextDelete(Temp);
+    }
+    InitializeListHead(&Ioq->PendingList);
+
+    InsertTailList(&Ioq->PendingList, &Context->ListEntry);
+    Ioq->LastContext = Context;
 
     ExReleaseFastMutex(&Ioq->Mutex);
 }
@@ -154,6 +213,12 @@ FUSE_CONTEXT *FuseIoqNextPending(FUSE_IOQ *Ioq)
     PAGED_CODE();
 
     ExAcquireFastMutex(&Ioq->Mutex);
+
+    if (0 != Ioq->LastContext && !IsListEmpty(&Ioq->ProcessList))
+    {
+        ExReleaseFastMutex(&Ioq->Mutex);
+        return 0;
+    }
 
     PLIST_ENTRY Entry = Ioq->PendingList.Flink;
     FUSE_CONTEXT *Context = &Ioq->PendingList != Entry ?

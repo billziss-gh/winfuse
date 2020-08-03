@@ -235,6 +235,7 @@ typedef struct _FUSE_INSTANCE
     LIST_ENTRY FileList;
     KEVENT InitEvent;
     UINT32 VersionMajor, VersionMinor;
+    VOID (*ProtoSendDestroyHandler)(PVOID); PVOID ProtoSendDestroyData;
     /*
      * The following bitmap is used to remember which opcodes have returned ENOSYS.
      *
@@ -472,6 +473,7 @@ VOID FuseIoqDelete(FUSE_IOQ *Ioq);
 VOID FuseIoqStartProcessing(FUSE_IOQ *Ioq, FUSE_CONTEXT *Context);
 FUSE_CONTEXT *FuseIoqEndProcessing(FUSE_IOQ *Ioq, UINT64 Unique);
 VOID FuseIoqPostPending(FUSE_IOQ *Ioq, FUSE_CONTEXT *Context);
+VOID FuseIoqPostPendingAndStop(FUSE_IOQ *Ioq, FUSE_CONTEXT *Context);
 FUSE_CONTEXT *FuseIoqNextPending(FUSE_IOQ *Ioq); /* does not block! */
 
 /* FUSE "entry" cache */

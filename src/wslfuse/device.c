@@ -84,6 +84,24 @@ static inline VOID MountDereference(MOUNT *Mount)
         FuseFree(Mount);
 }
 
+static VOID FileProtoSendDestroyHandler(PVOID File0)
+{
+    FILE *File = (FILE *)File0;
+    IO_STATUS_BLOCK IoStatus;
+
+    ZwFsControlFile(
+        File->VolumeHandle,
+        0/*Event*/,
+        0/*ApcRoutine*/,
+        0/*ApcContext*/,
+        &IoStatus,
+        FSP_FSCTL_STOP,
+        0/*InputBuffer*/,
+        0/*InputBufferLength*/,
+        0/*OutputBuffer*/,
+        0/*OutputBufferLength*/);
+}
+
 static INT FileIoctlCreateVolume(
     FILE *File,
     WSLFUSE_IOCTL_CREATEVOLUME_ARG *Arg)
@@ -129,6 +147,8 @@ static INT FileIoctlCreateVolume(
     IoStatus.Status = FuseInstanceInit(FuseInstance, &File->VolumeParams, FuseInstanceLinux);
     if (!NT_SUCCESS(IoStatus.Status))
         goto exit;
+    FuseInstance->ProtoSendDestroyHandler = FileProtoSendDestroyHandler;
+    FuseInstance->ProtoSendDestroyData = File;
     File->VolumeParams.TransactTimeout = 3000; /* transact timeout allows poll with LxpThreadWait */
     InitDoneInstance = TRUE;
 
@@ -296,7 +316,6 @@ static INT FileIoctlLxMount(
     DEVICE *Device = File->Device;
     MOUNT *Mount;
     FILE *MountFile;
-    IO_STATUS_BLOCK IoStatus;
     INT Error = 0;
 
     ExAcquirePushLockExclusive(&Device->MountListLock);
@@ -359,26 +378,8 @@ static INT FileIoctlLxMount(
         MountDereference(Mount);
 
         if (0 != MountFile)
-        {
-            if (0 != InterlockedCompareExchangePointer(&MountFile->VolumeFileObject, 0, 0))
-            {
-                IoStatus.Status = ZwFsControlFile(
-                    MountFile->VolumeHandle,
-                    0/*Event*/,
-                    0/*ApcRoutine*/,
-                    0/*ApcContext*/,
-                    &IoStatus,
-                    FSP_FSCTL_STOP,
-                    0/*InputBuffer*/,
-                    0/*InputBufferLength*/,
-                    0/*OutputBuffer*/,
-                    0/*OutputBufferLength*/);
-                if (NT_SUCCESS(IoStatus.Status))
-                    IoStatus.Status = FuseProtoPostDestroy(MountFile->FuseInstance);
-                if (!NT_SUCCESS(IoStatus.Status))
-                    Error = -EIO; // !!!: REVISIT
-            }
-        }
+            FuseProtoPostDestroy(MountFile->FuseInstance);
+                /* ignore errors */
         break;
 
     case '?':
@@ -549,7 +550,7 @@ static INT FileRead(
             0, VolumeFileObject,
             0);
         if (!NT_SUCCESS(Result))
-            return -EIO; // !!!: REVISIT
+            return STATUS_CANCELLED == Result ? -ENODEV : -EIO;
         if (0 != OutputBufferLength)
             break;
 
@@ -560,37 +561,6 @@ static INT FileRead(
     }
 
     *PBytesTransferred = OutputBufferLength;
-
-    return 0;
-}
-
-static INT FileWrite(
-    PLX_CALL_CONTEXT CallContext,
-    PLX_FILE File0,
-    PVOID Buffer,
-    SIZE_T Length,
-    POFF_T POffset,
-    PSIZE_T PBytesTransferred)
-{
-    FILE *File = (FILE *)File0;
-    ULONG InputBufferLength = (ULONG)Length;
-    ULONG OutputBufferLength = 0;
-    PFILE_OBJECT VolumeFileObject;
-    NTSTATUS Result;
-
-    VolumeFileObject = InterlockedCompareExchangePointer(&File->VolumeFileObject, 0, 0);
-    if (0 == VolumeFileObject)
-        return -ENODEV;
-
-    Result = FuseInstanceTransact(File->FuseInstance,
-        Buffer, InputBufferLength,
-        0, &OutputBufferLength,
-        0, VolumeFileObject,
-        0);
-    if (!NT_SUCCESS(Result))
-        return -EIO; // !!!: REVISIT
-
-    *PBytesTransferred = InputBufferLength;
 
     return 0;
 }
@@ -670,7 +640,7 @@ static INT FileWriteVector(
         0);
     if (!NT_SUCCESS(Result))
     {
-        Error = -EIO;
+        Error = STATUS_CANCELLED == Result ? -ENODEV : -EIO;
         goto exit;
     }
 
@@ -724,7 +694,6 @@ static INT DeviceOpen(
         .Delete = FileDelete,
         .Ioctl = FileIoctl,
         .Read = FileRead,
-        .Write = FileWrite,
         .WriteVector = FileWriteVector,
     };
     DEVICE *Device = (DEVICE *)Device0;

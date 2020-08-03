@@ -182,7 +182,7 @@ NTSTATUS FuseProtoPostDestroy(FUSE_INSTANCE *Instance)
 
     Context->InternalResponse->Hint = FUSE_PROTO_OPCODE_DESTROY;
 
-    FuseIoqPostPending(Instance->Ioq, Context);
+    FuseIoqPostPendingAndStop(Instance->Ioq, Context);
 
     return STATUS_SUCCESS;
 }
@@ -198,6 +198,9 @@ VOID FuseProtoSendDestroy(FUSE_CONTEXT *Context)
 
         FuseProtoInitRequest(Context,
             FUSE_PROTO_REQ_HEADER_SIZE, FUSE_PROTO_OPCODE_DESTROY, 0);
+
+        if (0 != Context->Instance->ProtoSendDestroyHandler)
+            Context->Instance->ProtoSendDestroyHandler(Context->Instance->ProtoSendDestroyData);
 
     FUSE_PROTO_SEND_END
 }
