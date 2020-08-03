@@ -27,6 +27,7 @@ if not X%2==X set Chkpnt=%2
 )
 (
     set /p =sudo mknod /dev/fuse c 10 229!LF!
+    set /p =sudo chmod a+w /dev/fuse!LF!
     set /p =sudo cp fusermount.out /usr/bin/fusermount!LF!
     set /p =sudo cp fusermount.out /usr/bin/fusermount3!LF!
     set /p =sudo cp fusermount-helper.exe /usr/bin/fusermount-helper.exe!LF!
