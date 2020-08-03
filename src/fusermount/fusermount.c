@@ -65,9 +65,12 @@ static void warn(const char *format, ...)
     va_list ap;
 
     va_start(ap, format);
-    fprintf(stderr, "%s: ", progname);
-    vfprintf(stderr, format, ap);
-    fprintf(stderr, "\n");
+    if (!args.quiet)
+    {
+        fprintf(stderr, "%s: ", progname);
+        vfprintf(stderr, format, ap);
+        fprintf(stderr, "\n");
+    }
     va_end(ap);
 }
 
@@ -801,6 +804,7 @@ int main(int argc, char *argv[])
         { "quiet", no_argument, 0, 'q' },
         { 0 },
     };
+    int quiet = 0;
     int opt;
     while (-1 != (opt = getopt_long(argc, argv, "hVo:uzq", longopts, 0)))
         switch (opt)
@@ -822,12 +826,13 @@ int main(int argc, char *argv[])
             args.lazy = 1;
             break;
         case 'q':
-            args.quiet = 1;
+            quiet = 1;
             break;
         }
 
     if (argc != optind + 1)
         usage();
+    args.quiet = quiet;
 
     if (!args.unmount)
         args.mountpoint = realpath(argv[optind], 0);
