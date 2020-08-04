@@ -191,7 +191,7 @@ exit:
 static void mount_opt_parse(struct mount_opts *mo)
 {
     const char *opt;
-    char optarg[4096], *optval;
+    char optbuf[4096], *optarg, *optval, empty = '\0';
 
     memset(mo, 0, sizeof *mo);
 
@@ -199,14 +199,35 @@ static void mount_opt_parse(struct mount_opts *mo)
     mo->VolumeParams.FileInfoTimeout = 1000;
     mo->VolumeParams.FlushAndPurgeOnCleanup = 1;
 
+    /*
+     * Libfuse does not recognize any of our options and rejects them.
+     * So (for now at least) prefix our options with "context=", which
+     * Libfuse accepts (to support SELinux).
+     *
+     * So to pass "Volume=X:" use "context=Volume=X:".
+     */
+
     for (
-        opt = opt_parse_arg(args.opts, optarg, sizeof optarg);
+        opt = opt_parse_arg(args.opts, optbuf, sizeof optbuf);
         0 != opt;
-        opt = opt_parse_arg(opt, optarg, sizeof optarg))
+        opt = opt_parse_arg(opt, optbuf, sizeof optbuf))
     {
+        optarg = optbuf;
         optval = strchr(optarg, '=');
         if (0 != optval)
             *optval++ = '\0';
+        else
+            optval = &empty;
+
+        if (0 == strcmp(optarg, "context"))
+        {
+            optarg = optval;
+            optval = strchr(optarg, '=');
+            if (0 != optval)
+                *optval++ = '\0';
+            else
+                optval = &empty;
+        }
 
         if (0 == strcmp(optarg, "Volume"))
         {
