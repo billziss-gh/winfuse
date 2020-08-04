@@ -15,7 +15,8 @@ cd build\%Configuration%
 
 set dfl_tests=^
     winfuse-tests-x64 ^
-    winfuse-tests-x86
+    winfuse-tests-x86 ^
+    wslfuse-tests
 set opt_tests=^
     sample-build-memfs-fuse3-x64 ^
     sample-test0-memfs-fuse3-x64 ^
@@ -30,8 +31,7 @@ set opt_tests=^
     sample-testinf-memfs-fuse3-x86 ^
     sample-fsx0-memfs-fuse3-x86 ^
     sample-fsx1-memfs-fuse3-x86 ^
-    sample-fsxinf-memfs-fuse3-x86 ^
-    wslfuse-tests
+    sample-fsxinf-memfs-fuse3-x86
 
 set tests=
 for %%f in (%dfl_tests%) do (
