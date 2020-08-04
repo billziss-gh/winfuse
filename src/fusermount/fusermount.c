@@ -744,27 +744,24 @@ static char *realpath_parent(const char *path)
     memcpy(resolved + rlen + 1, leaf, llen);
     resolved[rlen + 1 + llen] = '\0';
 
-    if (-1 != readlink(resolved, linkbuf, sizeof linkbuf) || EINVAL != errno)
+    if (-1 != readlink(resolved, linkbuf, sizeof linkbuf))
     {
         errno = EINVAL;
         goto fail;
     }
+    else if (EINVAL != errno)
+        goto fail;
 
-    if (0 != pathcopy[1])
-        free(pathcopy[1]);
-    if (0 != pathcopy[0])
-        free(pathcopy[0]);
+    free(pathcopy[1]);
+    free(pathcopy[0]);
 
     return resolved;
 
 fail:
-    if (0 != resolved)
-        free(resolved);
+    free(resolved);
 
-    if (0 != pathcopy[1])
-        free(pathcopy[1]);
-    if (0 != pathcopy[0])
-        free(pathcopy[0]);
+    free(pathcopy[1]);
+    free(pathcopy[0]);
 
     return 0;
 }
