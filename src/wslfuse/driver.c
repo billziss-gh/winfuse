@@ -36,5 +36,7 @@ NTSTATUS DriverEntry(
         DbgBreakPoint();
 #endif
 
+    FuseMiscInitialize();
+
     return LxldrRegisterService(DriverObject, TRUE, FuseMiscRegister);
 }

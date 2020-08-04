@@ -30,6 +30,7 @@ typedef struct _DEVICE DEVICE;
 struct _FILE
 {
     LX_FILE Base;
+    LIST_ENTRY ListEntry;
     DEVICE *Device;
     MOUNT *Mount;
     EX_PUSH_LOCK VolumeLock;
@@ -54,6 +55,9 @@ struct _DEVICE
     EX_PUSH_LOCK MountListLock;
     LIST_ENTRY MountList;
 };
+
+static VOID FuseMiscFileListInsert(FILE *File);
+static VOID FuseMiscFileListRemove(FILE *File);
 
 static inline MOUNT *MountCreate(VOID)
 {
@@ -222,6 +226,8 @@ static INT FileIoctlCreateVolume(
     File->FuseInstance = FuseInstance;
     File->VolumeHandle = VolumeHandle;
     InterlockedExchangePointer(&File->VolumeFileObject, VolumeFileObject);
+
+    FuseMiscFileListInsert(File);
 
     IoStatus.Status = STATUS_SUCCESS;
 
@@ -662,6 +668,9 @@ static INT FileDelete(
     FILE *File = (FILE *)File0;
     DEVICE *Device = File->Device;
 
+    if (0 != File->VolumeFileObject)
+        FuseMiscFileListRemove(File);
+
     ExAcquirePushLockExclusive(&Device->MountListLock);
     File->Mount->File = 0;
     ExReleasePushLockExclusive(&Device->MountListLock);
@@ -752,8 +761,82 @@ static INT DeviceDelete(
     return 0;
 }
 
-INT FuseMiscRegister(
-    PLX_INSTANCE Instance)
+static EX_PUSH_LOCK FuseMiscLock;
+static LIST_ENTRY FuseMiscFileList;
+static KTIMER FuseMiscTimer;
+static KDPC FuseMiscTimerDpc;
+static WORK_QUEUE_ITEM FuseMiscTimerItem;
+static BOOLEAN FuseMiscTimerInitDone;
+
+static VOID FuseMiscFileListInsert(FILE *File)
+{
+    ExAcquirePushLockExclusive(&FuseMiscLock);
+
+    InsertTailList(&FuseMiscFileList, &File->ListEntry);
+
+    ExReleasePushLockExclusive(&FuseMiscLock);
+}
+
+static VOID FuseMiscFileListRemove(FILE *File)
+{
+    ExAcquirePushLockExclusive(&FuseMiscLock);
+
+    RemoveEntryList(&File->ListEntry);
+
+    ExReleasePushLockExclusive(&FuseMiscLock);
+}
+
+static VOID FuseMiscExpirationRoutine(PVOID Context)
+{
+    UINT64 InterruptTime;
+    FILE *File;
+
+    InterruptTime = KeQueryInterruptTime();
+
+    ExAcquirePushLockShared(&FuseMiscLock);
+
+    for (PLIST_ENTRY Entry = FuseMiscFileList.Flink; &FuseMiscFileList != Entry;)
+    {
+        File = CONTAINING_RECORD(Entry, FILE, ListEntry);
+        Entry = Entry->Flink;
+        FuseInstanceExpirationRoutine(File->FuseInstance, InterruptTime);
+    }
+
+    ExReleasePushLockShared(&FuseMiscLock);
+}
+
+static VOID FuseMiscTimerDpcRoutine(PKDPC Dpc,
+    PVOID DeferredContext, PVOID SystemArgument1, PVOID SystemArgument2)
+{
+    // !PAGED_CODE();
+
+    ExQueueWorkItem(&FuseMiscTimerItem, DelayedWorkQueue);
+}
+
+static VOID FuseMiscTimerInit(VOID)
+{
+    PAGED_CODE();
+
+    ExAcquirePushLockExclusive(&FuseMiscLock);
+
+    if (!FuseMiscTimerInitDone)
+    {
+        KeInitializeTimer(&FuseMiscTimer);
+        KeInitializeDpc(&FuseMiscTimerDpc, FuseMiscTimerDpcRoutine, 0);
+        ExInitializeWorkItem(&FuseMiscTimerItem, FuseMiscExpirationRoutine, 0);
+
+        LONG Period = 1000; /* 1000ms = 1s */
+        LARGE_INTEGER DueTime;
+        DueTime.QuadPart = -10000LL * Period;
+        KeSetTimerEx(&FuseMiscTimer, DueTime, Period, &FuseMiscTimerDpc);
+
+        FuseMiscTimerInitDone = TRUE;
+    }
+
+    ExReleasePushLockExclusive(&FuseMiscLock);
+}
+
+INT FuseMiscRegister(PLX_INSTANCE Instance)
 {
     static LX_DEVICE_CALLBACKS DeviceCallbacks =
     {
@@ -762,6 +845,8 @@ INT FuseMiscRegister(
     };
     DEVICE *Device = 0;
     INT Error;
+
+    FuseMiscTimerInit();
 
     Device = (DEVICE *)VfsDeviceMinorAllocate(&DeviceCallbacks, sizeof *Device);
     if (0 == Device)
@@ -783,4 +868,10 @@ exit:
         VfsDeviceMinorDereference(&Device->Base);
 
     return Error;
+}
+
+VOID FuseMiscInitialize(VOID)
+{
+    ExInitializePushLock(&FuseMiscLock);
+    InitializeListHead(&FuseMiscFileList);
 }

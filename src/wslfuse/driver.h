@@ -26,7 +26,7 @@
 #include <shared/ku/wslfuse.h>
 #include <lxdk/lxdk.h>
 
-INT FuseMiscRegister(
-    PLX_INSTANCE Instance);
+INT FuseMiscRegister(PLX_INSTANCE Instance);
+VOID FuseMiscInitialize(VOID);
 
 #endif
