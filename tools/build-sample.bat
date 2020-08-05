@@ -10,6 +10,12 @@ if not X%4==X set DestDir=%4
 
 if X!Sample!==X (echo usage: build-sample Config Arch Sample [DestDir] >&2 & goto fail)
 
+set SampleProj=
+for /F "tokens=1,2 delims=*" %%k in ("!Sample!") do (
+    set Sample=%%k
+    set SampleProj=%%l
+)
+
 set SampleDir=%~dp0..\tst
 if not exist "!SampleDir!\!Sample!" (echo sample !Sample! not found >&2 & goto fail)
 
@@ -28,7 +34,11 @@ for /f "usebackq tokens=*" %%i in (`%vswhere% -find VC\**\vcvarsall.bat`) do (
 )
 
 if exist build rmdir /s/q build
-devenv "!Sample!.sln" /build "!Config!|!Arch!"
+if X!SampleProj!==X (
+    devenv "!Sample!.sln" /build "!Config!|!Arch!"
+) else (
+    devenv "!Sample!.sln" /build "!Config!|!Arch!" /project "!SampleProj!"
+)
 if !ERRORLEVEL! neq 0 goto :fail
 
 exit /b 0

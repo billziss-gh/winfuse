@@ -31,7 +31,14 @@ set opt_tests=^
     sample-testinf-memfs-fuse3-x86 ^
     sample-fsx0-memfs-fuse3-x86 ^
     sample-fsx1-memfs-fuse3-x86 ^
-    sample-fsxinf-memfs-fuse3-x86
+    sample-fsxinf-memfs-fuse3-x86 ^
+    sample-build-memfs-fuse3-wsl ^
+    sample-test0-memfs-fuse3-wsl ^
+    sample-test1-memfs-fuse3-wsl ^
+    sample-testinf-memfs-fuse3-wsl ^
+    sample-fsx0-memfs-fuse3-wsl ^
+    sample-fsx1-memfs-fuse3-wsl ^
+    sample-fsxinf-memfs-fuse3-wsl
 
 set tests=
 for %%f in (%dfl_tests%) do (
@@ -111,12 +118,17 @@ if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
 :sample-build-memfs-fuse3-x64
-call :__run_sample_build memfs-fuse3 x64
+call :__run_sample_build memfs-fuse3*memfs-fuse3.exe x64
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
 :sample-build-memfs-fuse3-x86
-call :__run_sample_build memfs-fuse3 x86
+call :__run_sample_build memfs-fuse3*memfs-fuse3.exe x86
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-build-memfs-fuse3-wsl
+call :__run_sample_build memfs-fuse3*memfs-fuse3.out x64
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
