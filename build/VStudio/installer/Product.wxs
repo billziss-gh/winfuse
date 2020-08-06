@@ -143,6 +143,20 @@
                     <File Id="FILE.libfuse.License.txt" Name="License.txt" KeyPath="yes" />
                 </Component>
             </Directory>
+            <Directory Id="OPTDIR.wslfuse" Name="wslfuse">
+                <Component Id="C.wslfuse.fusermount.out">
+                    <File Name="fusermount.out" KeyPath="yes" Source="..\build\$(var.Configuration)\fusermount.out" />
+                </Component>
+                <Component Id="C.wslfuse.fusermount_helper.exe">
+                    <File Name="fusermount-helper.exe" KeyPath="yes" Source="..\build\$(var.Configuration)\fusermount-helper.exe" />
+                </Component>
+                <Component Id="C.wslfuse.install.sh">
+                    <File Name="install.sh" KeyPath="yes" Source="..\..\..\src\fusermount\install.sh" />
+                </Component>
+                <Component Id="C.wslfuse.uninstall.sh">
+                    <File Name="uninstall.sh" KeyPath="yes" Source="..\..\..\src\fusermount\uninstall.sh" />
+                </Component>
+            </Directory>
         </DirectoryRef>
         <DirectoryRef Id="SMPDIR" FileSource="..\..\..\tst">
             <Directory Id="SMPDIR.memfs_fuse3" Name="memfs-fuse3">
@@ -197,6 +211,12 @@
             <ComponentRef Id="C.libfuse.fuse.lib" />
             <ComponentRef Id="C.libfuse.License.txt" />
         </ComponentGroup>
+        <ComponentGroup Id="C.opt.wslfuse">
+            <ComponentRef Id="C.wslfuse.fusermount.out" />
+            <ComponentRef Id="C.wslfuse.fusermount_helper.exe" />
+            <ComponentRef Id="C.wslfuse.install.sh" />
+            <ComponentRef Id="C.wslfuse.uninstall.sh" />
+        </ComponentGroup>
         <ComponentGroup Id="C.WinFuse.smp">
             <ComponentRef Id="C.memfs_fuse3.cpp" />
             <ComponentRef Id="C.memfs_fuse3.compat.h" />
@@ -234,6 +254,7 @@
                 InstallDefault="local"
                 Absent="disallow">
                 <ComponentGroupRef Id="C.WinFuse.bin" />
+                <ComponentGroupRef Id="C.opt.wslfuse" />
             </Feature>
             <Feature
                 Id="F.Developer"
