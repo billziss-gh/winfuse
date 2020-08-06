@@ -118,22 +118,22 @@ if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
 :sample-build-memfs-fuse3-x64
-call :__run_sample_build memfs-fuse3*memfs-fuse3.exe x64
+call :__run_sample_build memfs-fuse3 memfs-fuse3.exe x64
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
 :sample-build-memfs-fuse3-x86
-call :__run_sample_build memfs-fuse3*memfs-fuse3.exe x86
+call :__run_sample_build memfs-fuse3 memfs-fuse3.exe x86
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
 :sample-build-memfs-fuse3-wsl
-call :__run_sample_build memfs-fuse3*memfs-fuse3.out x64
+call :__run_sample_build memfs-fuse3 memfs-fuse3.out x64
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
 :__run_sample_build
-call %ProjRoot%\tools\build-sample.bat %Configuration% %2 %1 "%TMP%\%1"
+call %ProjRoot%\tools\build-sample.bat %Configuration% %3 %1*%2 "%TMP%\%1"
 if !ERRORLEVEL! neq 0 goto fail
 exit /b 0
 
