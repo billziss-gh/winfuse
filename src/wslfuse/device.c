@@ -640,7 +640,7 @@ static INT FileWriteVector(
     }
 
     Result = FuseInstanceTransact(File->FuseInstance,
-        &FuseResponseBuf, InputBufferLength,
+        FuseResponse, InputBufferLength,
         0, &OutputBufferLength,
         0, VolumeFileObject,
         0);
