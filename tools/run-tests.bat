@@ -236,6 +236,75 @@ popd
 taskkill /f /im %1-%2.exe
 exit /b !TestExit!
 
+:sample-test0-memfs-fuse3-wsl
+call :__run_sample_wsl_test memfs-fuse3 0
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-test1-memfs-fuse3-wsl
+call :__run_sample_wsl_test memfs-fuse3 1
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-testinf-memfs-fuse3-wsl
+call :__run_sample_wsl_test memfs-fuse3 -1
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:__run_sample_wsl_test
+set TestExit=0
+start "" /b /d "%TMP%\%1\build\%Configuration%" wsl -- sh "/mnt/c/Program Files/WinFuse/opt/wslfuse/install.sh"; mkdir -p mnt; ./%1.out -f -ocontext=FileInfoTimeout=%2,context=Volume=L: mnt
+waitfor 7BF47D72F6664550B03248ECFE77C7DD /t 10 2>nul
+pushd >nul
+cd L: >nul 2>nul || (echo Unable to find drive L: >&2 & goto fail)
+L:
+"C:\Program Files (x86)\WinFsp\bin\winfsp-tests-x64.exe" ^
+    --external --resilient ^
+    create_test create_related_test create_sd_test create_notraverse_test create_backup_test ^
+    create_restore_test create_share_test create_curdir_test create_namelen_test ^
+    getfileinfo_test delete_test delete_pending_test delete_mmap_test delete_standby_test ^
+    rename_* ^
+    getvolinfo_test ^
+    getsecurity_test ^
+    rdwr_* ^
+    flush_* ^
+    lock_* ^
+    querydir_* ^
+    dirnotify_test ^
+    exec_*
+if !ERRORLEVEL! neq 0 set TestExit=1
+popd
+start "" /b /d "%TMP%\%1\build\%Configuration%" wsl -- fusermount3 -u mnt
+exit /b !TestExit!
+
+:sample-fsx0-memfs-fuse3-wsl
+call :__run_sample_fsx_wsl_test memfs-fuse3 0
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-fsx1-memfs-fuse3-wsl
+call :__run_sample_fsx_wsl_test memfs-fuse3 1
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:sample-fsxinf-memfs-fuse3-wsl
+call :__run_sample_fsx_wsl_test memfs-fuse3 -1
+if !ERRORLEVEL! neq 0 goto fail
+exit /b 0
+
+:__run_sample_fsx_wsl_test
+set TestExit=0
+start "" /b /d "%TMP%\%1\build\%Configuration%" wsl -- sh "/mnt/c/Program Files/WinFuse/opt/wslfuse/install.sh"; mkdir -p mnt; ./%1.out -f -ocontext=FileInfoTimeout=%2,context=Volume=L: mnt
+waitfor 7BF47D72F6664550B03248ECFE77C7DD /t 10 2>nul
+pushd >nul
+cd L: >nul 2>nul || (echo Unable to find drive L: >&2 & goto fail)
+L:
+"%ProjRoot%\ext\winfsp\ext\test\fstools\src\fsx\fsx.exe" -N 5000 test xxxxxx
+if !ERRORLEVEL! neq 0 set TestExit=1
+popd
+start "" /b /d "%TMP%\%1\build\%Configuration%" wsl -- fusermount3 -u mnt
+exit /b !TestExit!
+
 :leak-test
 rem wait a bit to avoid reporting lingering allocations
 waitfor 7BF47D72F6664550B03248ECFE77C7DD /t 3 2>nul
