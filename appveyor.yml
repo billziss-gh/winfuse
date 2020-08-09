@@ -18,8 +18,8 @@ install:
 - git submodule update --init --recursive
 # install WinFsp
 - appveyor AddMessage "Install WinFsp" -Category Information
-- if %WINFSP%==rel appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5/winfsp-1.5.20002.msi
-- if %WINFSP%==rel appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.5/winfsp-tests-1.5.20002.zip
+- if %WINFSP%==rel appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.8B2/winfsp-1.8.20221.msi
+- if %WINFSP%==rel appveyor DownloadFile https://github.com/billziss-gh/winfsp/releases/download/v1.8B2/winfsp-tests-1.8.20221.zip
 - if %WINFSP%==src tools\build-winfsp.bat %CONFIGURATION%
 - if %WINFSP%==src copy ext\winfsp\build\VStudio\build\%CONFIGURATION%\winfsp-*.msi .
 - if %WINFSP%==src copy ext\winfsp\build\VStudio\build\%CONFIGURATION%\winfsp-tests-*.zip .
