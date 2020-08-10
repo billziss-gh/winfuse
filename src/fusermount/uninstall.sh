@@ -7,8 +7,8 @@ fi
 cd "$(dirname "$0")"
 
 # /dev/fuse
-#rm -f /etc/tmpfiles.d/wslfuse.conf
-#rm -f /dev/fuse
+rm -f /etc/tmpfiles.d/wslfuse.conf
+rm -f /dev/fuse
 
 # fusermount
 uninstall()

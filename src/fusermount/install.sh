@@ -19,7 +19,7 @@ cmp_install --backup=numbered -o0 -g0 -mu=srwx,go=rx fusermount.out /usr/bin/fus
 cmp_install -o0 -g0 -m700 fusermount-helper.exe /usr/bin/fusermount-helper.exe
 
 # /dev/fuse
-#echo c /dev/fuse 0666 root root - 10:229 > /etc/tmpfiles.d/wslfuse.conf
-#systemd-tmpfiles --create wslfuse.conf
+echo c /dev/fuse 0666 root root - 10:229 > /etc/tmpfiles.d/wslfuse.conf
+systemd-tmpfiles --create wslfuse.conf
 
 echo FUSE for WSL1 user space components installed
