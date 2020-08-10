@@ -253,7 +253,7 @@ exit /b 0
 
 :__run_sample_wsl_test
 set TestExit=0
-start "" /b /d "%TMP%\%1\build\%Configuration%" wsl -- sh "/mnt/c/Program Files/WinFuse/opt/wslfuse/install.sh"; mkdir -p mnt; ./%1.out -f -ocontext=FileInfoTimeout=%2,context=Volume=L: mnt
+start "" /b /d "%TMP%\%1\build\%Configuration%" wsl -- sudo sh "/mnt/c/Program Files/WinFuse/opt/wslfuse/install.sh"; mkdir -p mnt; ./%1.out -f -ocontext=FileInfoTimeout=%2,context=Volume=L: mnt
 waitfor 7BF47D72F6664550B03248ECFE77C7DD /t 10 2>nul
 pushd >nul
 cd L: >nul 2>nul || (echo Unable to find drive L: >&2 & goto fail)
@@ -294,7 +294,7 @@ exit /b 0
 
 :__run_sample_fsx_wsl_test
 set TestExit=0
-start "" /b /d "%TMP%\%1\build\%Configuration%" wsl -- sh "/mnt/c/Program Files/WinFuse/opt/wslfuse/install.sh"; mkdir -p mnt; ./%1.out -f -ocontext=FileInfoTimeout=%2,context=Volume=L: mnt
+start "" /b /d "%TMP%\%1\build\%Configuration%" wsl -- sudo sh "/mnt/c/Program Files/WinFuse/opt/wslfuse/install.sh"; mkdir -p mnt; ./%1.out -f -ocontext=FileInfoTimeout=%2,context=Volume=L: mnt
 waitfor 7BF47D72F6664550B03248ECFE77C7DD /t 10 2>nul
 pushd >nul
 cd L: >nul 2>nul || (echo Unable to find drive L: >&2 & goto fail)
