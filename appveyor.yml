@@ -31,6 +31,21 @@ install:
 - if %LXDK%==src tools\build-lxdk.bat %CONFIGURATION%
 - if %LXDK%==src copy ext\lxdk\build\VStudio\build\%CONFIGURATION%\lxdk-*.msi .
 - for %%f in ("lxdk-*.msi") do start /wait msiexec /i %%f /qn INSTALLLEVEL=1000
+# install WSL Ubuntu 20.04 - adapted from appveyor/build-images:scripts/Windows/install_wsl.ps1
+- appveyor AddMessage "Install WSL Ubuntu 20.04" -Category Information
+- ps: (New-Object Net.WebClient).DownloadFile('https://aka.ms/wslubuntu2004', "$env:TEMP\wsl-ubuntu-2004.zip")
+- ps: Expand-Archive -Path "$env:TEMP\wsl-ubuntu-2004.zip" -DestinationPath "C:\WSL\WinFuse-Ubuntu2004" -Force
+- ps: Remove-Item "$env:TEMP\wsl-ubuntu-2004.zip"
+- ps: . "C:\WSL\WinFuse-Ubuntu2004\ubuntu2004.exe" install --root
+- ps: . "C:\WSL\WinFuse-Ubuntu2004\ubuntu2004.exe" run adduser appveyor --gecos `"First,Last,RoomNumber,WorkPhone,HomePhone`" --disabled-password
+- ps: . "C:\WSL\WinFuse-Ubuntu2004\ubuntu2004.exe" run "echo 'appveyor:Password12!' | sudo chpasswd"
+- ps: . "C:\WSL\WinFuse-Ubuntu2004\ubuntu2004.exe" run usermod -aG sudo appveyor
+- ps: |
+    . "C:\WSL\WinFuse-Ubuntu2004\ubuntu2004.exe" run "echo -e `"`"appveyor\tALL=(ALL)\tNOPASSWD: ALL`"`" > /etc/sudoers.d/appveyor"
+- ps: . "C:\WSL\WinFuse-Ubuntu2004\ubuntu2004.exe" run chmod 0755 /etc/sudoers.d/appveyor
+- ps: . "C:\WSL\WinFuse-Ubuntu2004\ubuntu2004.exe" config --default-user appveyor
+- wslconfig /setdefault Ubuntu-20.04
+- wsl -- lsb_release -a
 # install WSL tools
 - appveyor AddMessage "Install WSL tools" -Category Information
 - wsl -- sudo apt-get update; sudo apt-get install -y g++ gdb make ninja-build rsync zip libfuse3-dev
