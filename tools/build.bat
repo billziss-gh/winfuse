@@ -47,7 +47,7 @@ if X%SignedPackage%==X (
     call %~dp0build-libfuse.bat %Configuration% x86 build\%Configuration%\libfuse\x86
     if errorlevel 1 goto fail
 
-    for %%f in (build\%Configuration%\winfuse-x64.sys build\%Configuration%\winfuse-x86.sys) do (
+    for %%f in (build\%Configuration%\winfuse-x64.sys build\%Configuration%\wslfuse-x64.sys build\%Configuration%\winfuse-x86.sys) do (
         signtool sign /ac %CrossCert% /i %Issuer% /n %Subject% /fd sha1 /t http://timestamp.digicert.com %%f
         if errorlevel 1 set /a signfail=signfail+1
         signtool sign /as /ac %CrossCert% /i %Issuer% /n %Subject% /fd sha256 /tr http://timestamp.digicert.com /td sha256 %%f
