@@ -17,7 +17,7 @@ if not X%2==X set Chkpnt=%2
     echo sc create WinFuse type=kernel binPath=%%~dp0winfuse-%SUFFIX%.sys
     echo sc create WslFuse type=kernel binPath=%%~dp0wslfuse-%SUFFIX%.sys
     echo reg add HKLM\Software\WinFsp\Fsext /v 00093118 /d "winfuse" /f /reg:32
-    echo reg add HKLM\Software\LxDK\Services\wslfuse /f
+    echo reg add HKLM\Software\LxDK\Services\wslfuse /v Depends /d "winfsp" /f
     echo sc start winfsp
     echo sc start lxldr
 ) >%~dp0..\build\VStudio\build\%Config%\deploy-setup.bat

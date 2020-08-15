@@ -97,11 +97,13 @@
 <?if $(var.MyArch) = x64?>
             <Component Id="C.wslfuse.sys">
                 <File Name="wslfuse-$(var.Platform).sys" KeyPath="yes" />
-                <RegistryKey
+                <RegistryValue
                     Root="HKLM"
                     Key="[P.LxdkRegistryKey]\wslfuse"
-                    ForceCreateOnInstall="yes"
-                    ForceDeleteOnUninstall="yes" />
+                    Name="Depends"
+                    Type="multiString"
+                    Value="winfsp"
+                    Action="append" />
             </Component>
 <?endif?>
         </DirectoryRef>
