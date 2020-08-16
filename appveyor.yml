@@ -27,7 +27,7 @@ install:
 - for %%f in ("winfsp-tests-*.zip") do powershell -command "Expand-Archive -Path %%f -DestinationPath 'C:\Program Files (x86)\WinFsp\bin'"
 # install LxDK
 - appveyor AddMessage "Install LxDK" -Category Information
-- if %LXDK%==rel appveyor DownloadFile https://github.com/billziss-gh/lxdk/releases/download/v0.2/lxdk-0.2.20209.msi
+- if %LXDK%==rel appveyor DownloadFile https://github.com/billziss-gh/lxdk/releases/download/v0.3/lxdk-0.3.20228.msi
 - if %LXDK%==src tools\build-lxdk.bat %CONFIGURATION%
 - if %LXDK%==src copy ext\lxdk\build\VStudio\build\%CONFIGURATION%\lxdk-*.msi .
 - for %%f in ("lxdk-*.msi") do start /wait msiexec /i %%f /qn INSTALLLEVEL=1000
