@@ -451,8 +451,36 @@ static void stop_winmount_helper(pid_t pid, int ofd)
     waitpid(pid, 0, 0);
 }
 
-static int spawn_lxmount_helper(char WinMountPoint[260], const char *mountpoint, int fusefd)
+static int spawn_lxmount_helper(char WinMountPoint[260], const char *mountpoint, int fusefd, UINT64 VolumeId)
 {
+    /*
+     * Spawn a child process to perform a Linux mount of the WinFsp volume asynchronously.
+     *
+     * This is necessary to avoid the deadlock described below.
+     *
+     * First observe that when mount(2) happens the FUSE file system is not yet ready to
+     * accept file system requests. So any file system request will be queued within WinFsp
+     * and will not be retrieved by the FUSE file system until after (it thinks that) the
+     * mount(2) has completed.
+     *
+     * Now when mount(2) is invoked with type "drvfs", LXCORE attempts to open the volume
+     * passed in the source argument (e.g. if the source argument is "Z:", then LXCORE will
+     * attempt to open volume "Z:"). This should normally not be a problem because WinFsp
+     * handles volume opens without forwarding them to the user mode file system. Unfortunately
+     * some system filters convert a volume ("Z:") open request to a root directory ("Z:\")
+     * open request, which is a request that must be handled by the user mode file system.
+     * But the user mode file system is waiting for the mount/fusermount to complete, before it
+     * can process requests. Hence deadlock!
+     *
+     * In order to work around this problem we perform the mount(2) asynchronously in a child
+     * process. This of course means that we lie to the FUSE file system that the mount(2) was
+     * successful, thus allowing it to process the root directory open request, which then
+     * allows the mount(2) call to complete. The drawback is that if the mount(2) fails for
+     * some reason the FUSE file system never hears about it. (However this is not considered
+     * a huge problem, because the FUSE file system will still service the Windows drive that
+     * we allocated for it correctly (see start_winmount_helper).)
+     */
+
     pid_t pid;
     int status;
 
@@ -497,6 +525,34 @@ static int spawn_lxmount_helper(char WinMountPoint[260], const char *mountpoint,
     WSLFUSE_IOCTL_LXMOUNT_ARG LxMountArg;
 
     /*
+     * Close the passed fusefd and reopen /dev/fuse. We will use the reopened fd
+     * to communicate with WslFuse using special ioctl's.
+     *
+     * The reason for this is subtle: consider the earlier discussed deadlock and
+     * the case where the FUSE file system fails to service the root directory open
+     * request (e.g. because it crashed). Now we are in a situation where mount(2)
+     * is waiting for a root directory open request to complete; this request is stuck
+     * inside WinFsp; it has been retrieved by wslfuse and is either pending or
+     * processing within the FUSE file system. Suppose now that the file system
+     * terminates abruptly for some reason. The open request will never complete and
+     * hence (a form of) deadlock again!
+     *
+     * Normally this is not a problem because upon termination of the FUSE process
+     * all its file descriptors will be closed and WslFuse and WinFsp will have a
+     * chance to purge their internal I/O queues thus canceling the root directory
+     * open request, which allows mount(2) to complete. However when we forked our
+     * mount process, the original fusefd was cloned and this keeps our internal I/O
+     * queues alive. For this reason we have to close the fusefd in the mount process.
+     */
+    close(fusefd);
+    fusefd = open("/dev/fuse", O_RDWR);
+    if (-1 == fusefd)
+    {
+        warn("lxmount: cannot open /dev/fuse: %s", strerror(errno));
+        goto exit;
+    }
+
+    /*
      * Mount the WinFsp volume using drvfs.
      */
     if (-1 == mount(WinMountPoint, mountpoint, "drvfs", 0, 0))
@@ -521,6 +577,7 @@ static int spawn_lxmount_helper(char WinMountPoint[260], const char *mountpoint,
      */
     memset(&LxMountArg, 0, sizeof LxMountArg);
     LxMountArg.Operation = '+';
+    LxMountArg.VolumeId = VolumeId;
     LxMountArg.LxMountId = (UINT64)mnt_id;
     if (-1 == ioctl(fusefd, WSLFUSE_IOCTL_LXMOUNT, &LxMountArg))
     {
@@ -638,7 +695,7 @@ static void do_mount(void)
     /*
      * Spawn a child process to perform a Linux mount of the WinFsp volume asynchronously.
      */
-    if (-1 == spawn_lxmount_helper(mo.WinMountPoint, args.mountpoint, fusefd))
+    if (-1 == spawn_lxmount_helper(mo.WinMountPoint, args.mountpoint, fusefd, CreateArg.VolumeId))
         goto exit;
 
     success = 1;

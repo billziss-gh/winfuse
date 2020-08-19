@@ -115,7 +115,11 @@ _Static_assert(504 == sizeof(FSP_FSCTL_VOLUME_PARAMS),
 typedef union
 {
     FSP_FSCTL_VOLUME_PARAMS VolumeParams;
-    CHAR VolumeName[(FSP_FSCTL_VOLUME_NAME_SIZEMAX / sizeof(WCHAR)) * 3 / 2];
+    struct
+    {
+        CHAR VolumeName[(FSP_FSCTL_VOLUME_NAME_SIZEMAX / sizeof(WCHAR)) * 3 / 2];
+        UINT64 VolumeId;
+    };
 } WSLFUSE_IOCTL_CREATEVOLUME_ARG;
 #if defined(__linux__)
 _Static_assert(504 == sizeof(WSLFUSE_IOCTL_CREATEVOLUME_ARG),
@@ -134,10 +138,11 @@ _Static_assert(260 == sizeof(WSLFUSE_IOCTL_WINMOUNT_ARG),
 typedef struct
 {
     UINT8 Operation;
+    UINT64 VolumeId;
     UINT64 LxMountId;
 } WSLFUSE_IOCTL_LXMOUNT_ARG;
 #if defined(__linux__)
-_Static_assert(16 == sizeof(WSLFUSE_IOCTL_LXMOUNT_ARG),
+_Static_assert(24 == sizeof(WSLFUSE_IOCTL_LXMOUNT_ARG),
     "sizeof(WSLFUSE_IOCTL_LXMOUNT_ARG) must be 16.");
 #endif
 
@@ -163,9 +168,9 @@ _Static_assert(WSLFUSE_IOCTL_WINMOUNT == _IOW('F', 'M', WSLFUSE_IOCTL_WINMOUNT_A
 
 /*
  * _IOW('F', 'm', WSLFUSE_IOCTL_LXMOUNT_ARG)
- * sh tools/ioc.c 1 70 109 16
+ * sh tools/ioc.c 1 70 109 24
  */
-#define WSLFUSE_IOCTL_LXMOUNT           0x4010466d
+#define WSLFUSE_IOCTL_LXMOUNT           0x4018466d
 #if defined(__linux__)
 _Static_assert(WSLFUSE_IOCTL_LXMOUNT == _IOW('F', 'm', WSLFUSE_IOCTL_LXMOUNT_ARG),
     "WSLFUSE_IOCTL_LXMOUNT");

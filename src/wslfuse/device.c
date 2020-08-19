@@ -36,6 +36,7 @@ struct _FILE
     EX_PUSH_LOCK VolumeLock;
     FSP_FSCTL_VOLUME_PARAMS VolumeParams;
     FUSE_INSTANCE *FuseInstance;
+    UINT64 VolumeId;
     HANDLE VolumeHandle;
     PFILE_OBJECT VolumeFileObject;
     HANDLE WinMountHandle;
@@ -58,6 +59,7 @@ struct _DEVICE
 
 static VOID FuseMiscFileListInsert(FILE *File);
 static VOID FuseMiscFileListRemove(FILE *File);
+static MOUNT *FuseMiscFileListGetMount(DEVICE *Device, UINT64 VolumeId);
 
 static inline MOUNT *MountCreate(VOID)
 {
@@ -222,6 +224,7 @@ static INT FileIoctlCreateVolume(
         VolumeNameSize);
     if (!NT_SUCCESS(IoStatus.Status))
         goto exit;
+    Arg->VolumeId = File->VolumeId;
 
     File->FuseInstance = FuseInstance;
     File->VolumeHandle = VolumeHandle;
@@ -351,11 +354,15 @@ static INT FileIoctlLxMount(
             Error = -EEXIST;
             break;
         }
-
-        Mount = File->Mount;
+        Mount = FuseMiscFileListGetMount(Device, Arg->VolumeId);
+        if (0 == Mount)
+        {
+            Error = -ENOENT;
+            break;
+        }
         if ((UINT64)-1LL != Mount->LxMountId)
         {
-            Error = -EINVAL;
+            Error = -EEXIST;
             break;
         }
 
@@ -365,15 +372,9 @@ static INT FileIoctlLxMount(
         break;
 
     case '-':
-        if (0 == Mount)
+        if (0 == Mount || (UINT64)-1LL == Mount->LxMountId)
         {
             Error = -ENOENT;
-            break;
-        }
-
-        if ((UINT64)-1LL == Mount->LxMountId)
-        {
-            Error = -EINVAL;
             break;
         }
 
@@ -383,17 +384,19 @@ static INT FileIoctlLxMount(
         Mount->LxMountId = (UINT64)-1LL;
         MountDereference(Mount);
 
-        if (0 != MountFile)
+        if (0 != MountFile &&
+            0 != InterlockedCompareExchangePointer(&MountFile->VolumeFileObject, 0, 0))
             FuseProtoPostDestroy(MountFile->FuseInstance);
                 /* ignore errors */
         break;
 
     case '?':
-        if (0 == Mount)
+        if (0 == Mount || (UINT64)-1LL == Mount->LxMountId)
         {
             Error = -ENOENT;
             break;
         }
+
         break;
 
     default:
@@ -705,6 +708,7 @@ static INT DeviceOpen(
         .Read = FileRead,
         .WriteVector = FileWriteVector,
     };
+    static LONG64 StaticVolumeId = -1LL;
     DEVICE *Device = (DEVICE *)Device0;
     MOUNT *Mount = 0;
     FILE *File;
@@ -731,6 +735,7 @@ static INT DeviceOpen(
     File->Device = (DEVICE *)Device;
     File->Mount = Mount;
     ExInitializePushLock(&File->VolumeLock);
+    File->VolumeId = InterlockedIncrement64(&StaticVolumeId);
 
     Mount->File = File;
     Mount = 0;
@@ -784,6 +789,35 @@ static VOID FuseMiscFileListRemove(FILE *File)
     RemoveEntryList(&File->ListEntry);
 
     ExReleasePushLockExclusive(&FuseMiscLock);
+}
+
+static MOUNT *FuseMiscFileListGetMount(DEVICE *Device, UINT64 VolumeId)
+{
+    /* NOTE:
+     * This function is assumed to be called with the Device->MountListLock
+     * acquired.
+     */
+
+    FILE *File;
+    MOUNT *Mount;
+
+    ExAcquirePushLockShared(&FuseMiscLock);
+
+    Mount = 0;
+    for (PLIST_ENTRY Entry = FuseMiscFileList.Flink; &FuseMiscFileList != Entry;)
+    {
+        File = CONTAINING_RECORD(Entry, FILE, ListEntry);
+        Entry = Entry->Flink;
+        if (File->Device == Device && File->VolumeId == VolumeId)
+        {
+            Mount = File->Mount;
+            break;
+        }
+    }
+
+    ExReleasePushLockShared(&FuseMiscLock);
+
+    return Mount;
 }
 
 static VOID FuseMiscExpirationRoutine(PVOID Context)
