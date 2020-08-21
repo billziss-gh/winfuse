@@ -14,19 +14,14 @@
     </a>
 </p>
 
-WinFuse is a suite of software components that allows FUSE file systems to run on Windows. It consists of a kernel driver that exposes the low-level FUSE protocol and a Windows port of the libfuse library compiled as a DLL.
-
-This is the first release of WinFuse and it should be considered of ALPHA quality. Although I am not aware of any such issues, bugchecks, leaks, system hangs and other system problems are a possibility. For this reason I recommend that you try WinFuse in a VM.
-
-I would really appreciate it if you give WinFuse a try and report any problems. This is especially so if you have a low-level FUSE file system that you cannot easily port to Windows; well now you can. Your feedback is very welcome.
-
-Finally note that this release contains the winfuse kernel driver, which exposes the FUSE protocol in the Windows kernel (via `DeviceIoControl`). It does not contain the wslfuse kernel driver, which will expose the FUSE protocol in WSL1 (via `/dev/fuse`).
-
 <p align="center">
-    <img src="doc/cap.gif"/>
+    WinFuse is a suite of software components that allows FUSE file systems to run on Windows. Both Windows and Linux (WSL1) FUSE file systems are supported. Windows FUSE file systems are supported via a kernel driver that exposes the FUSE protocol via <code>DeviceIoControl</code> and a port of the libfuse library compiled as a Windows DLL. Linux FUSE file systems are expected to run in the WSL1 environment and are supported via a kernel driver that exposes <code>/dev/fuse</code>.
+    <br/>
+    <br/>
+    <img src="doc/wslcap.gif"/>
 </p>
 
-## Architecture
+## ARCHITECTURE
 
 ### Structural Diagram
 
