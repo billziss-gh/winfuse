@@ -1,3 +1,4 @@
+skinparam shadowing false
 hide footbox
 
 box "Originating Process Context"

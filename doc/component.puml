@@ -1,7 +1,8 @@
 left to right direction
 skinparam componentStyle uml2
-skinparam nodesep 80
-skinparam ranksep 10
+skinparam nodesep 50
+skinparam ranksep 30
+skinparam shadowing false
 skinparam rectangle {
     fontcolor grey
     borderColor grey
@@ -11,16 +12,16 @@ skinparam linetype ortho
 
 rectangle NTOS {
     together dummy {
-        component winfsp
-        interface "FSP_FSCTL\nTRANSACT" as FSP_FSCTL_TRANSACT
-        winfsp -right- FSP_FSCTL_TRANSACT
-
         component winfuse #Salmon
         interface "FUSE_FSCTL\nTRANSACT" as FUSE_FSCTL_TRANSACT #Salmon
         winfuse -right- FUSE_FSCTL_TRANSACT
 
-        winfsp .down.> winfuse: loads
-        winfuse -up-( FSP_FSCTL_TRANSACT
+        component winfsp
+        interface "FSP_FSCTL\nTRANSACT" as FSP_FSCTL_TRANSACT
+        winfsp -right- FSP_FSCTL_TRANSACT
+
+        winfsp .up.> winfuse: loads
+        winfuse -down-( FSP_FSCTL_TRANSACT
     }
 
     rectangle LXCORE {
@@ -33,8 +34,8 @@ rectangle NTOS {
         lxldr .up.> wslfuse: loads
     }
 
-    winfuse -[hidden]- wslfuse
-    wslfuse -up--( FUSE_FSCTL_TRANSACT
+    winfsp -[hidden]- wslfuse
+    wslfuse -up-( FSP_FSCTL_TRANSACT
 }
 
 component "Windows\nWinFsp FS" as fspfs

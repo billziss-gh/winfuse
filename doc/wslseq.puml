@@ -1,3 +1,4 @@
+skinparam shadowing false
 hide footbox
 
 box "Originating Process Context"
@@ -6,7 +7,6 @@ box "Originating Process Context"
 end box
 box "File System Process Context"
     participant "winfsp" as winfspFS
-    participant winfuse #Salmon
     participant wslfuse #Salmon
     participant "Linux\nFUSE FS" as FS
 end box
@@ -18,11 +18,8 @@ activate winfspOP
 winfspOP-->winfspFS: Context Switch
 deactivate winfspOP
 activate winfspFS
-winfspFS->winfuse: FSP_FSCTL_TRANSACT Req
+winfspFS->wslfuse: FSP_FSCTL_TRANSACT Req
 deactivate winfspFS
-activate winfuse
-winfuse->wslfuse: FUSE_FSCTL_TRANSACT Req
-deactivate winfuse
 activate wslfuse
 wslfuse->FS: /dev/fuse read
 deactivate wslfuse
@@ -33,11 +30,8 @@ deactivate FS
 FS->wslfuse: /dev/fuse write
 deactivate FS
 activate wslfuse
-wslfuse->winfuse: FUSE_FSCTL_TRANSACT Rsp
+wslfuse->winfspFS: FSP_FSCTL_TRANSACT Rsp
 deactivate wslfuse
-activate winfuse
-winfuse->winfspFS: FSP_FSCTL_TRANSACT Rsp
-deactivate winfuse
 activate winfspFS
 winfspFS-->OP: Context Switch and Return
 deactivate winfspFS

@@ -47,7 +47,7 @@ The components and their interfaces are:
 - The **wslfuse** component which is provided by the WinFuse project (this project).
     - The component is an LXCORE driver.
     - The component provides a **/dev/fuse** Linux interface.
-    - The component connects to the **FUSE_FSCTL_TRANSACT** interface. FUSE file system requests retrieved via this interface become available via **/dev/fuse**.
+    - The component connects to the **FSP_FSCTL_TRANSACT** interface. WinFsp file system requests retrieved via this interface are translated to FUSE file system requests and become available via **/dev/fuse**.
 - The **lxldr** component which is provided by the [LxDK](https://github.com/billziss-gh/lxdk) project.
     - The component is an LXCORE driver.
     - The component is responsible for loading the **wslfuse** component.
@@ -78,4 +78,4 @@ The following sequence diagrams show how the WinFuse project components interact
 
 ![Linux FS Sequence Diagram](doc/wslseq.svg)
 
-This case is similar to the first case except that there is an additional driver **wslfuse** that acts as a bridge between the `FUSE_FSCTL_TRANSACT` interface and the **/dev/fuse** interface that the Linux FUSE file system understands.
+This case is similar to the previous case except that the **winfuse** driver is replaced by the **wslfuse** driver that exposes the FUSE protocol via the **/dev/fuse** interface that the Linux FUSE file system understands.
